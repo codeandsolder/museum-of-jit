@@ -1,0 +1,8 @@
+[project]
+name = "museum-of-jit-tools"
+version = "0.1.0"
+description = "Benchmark orchestration for Museum of JIT"
+requires-python = ">=3.11"
+
+[tool.uv]
+package = false

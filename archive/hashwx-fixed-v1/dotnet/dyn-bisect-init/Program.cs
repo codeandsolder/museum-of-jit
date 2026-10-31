@@ -1,0 +1,61 @@
+using System;
+using System.Diagnostics;
+using System.Numerics;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+readonly record struct Ins(int Op,int Src,int Dst,int Imm);
+readonly record struct Prog(Ins[] I,bool U);
+static class H{
+ public const ulong K0=1663540288323457296UL,K1=2242261671028070680UL;
+ [MethodImpl(MethodImplOptions.AggressiveInlining)] public static void Sip(ref ulong v0,ref ulong v1,ref ulong v2,ref ulong v3){unchecked{v0+=v1;v2+=v3;v1=BitOperations.RotateLeft(v1,13);v3=BitOperations.RotateLeft(v3,16);v1^=v0;v3^=v2;v0=BitOperations.RotateLeft(v0,32);v2+=v1;v0+=v3;v1=BitOperations.RotateLeft(v1,17);v3=BitOperations.RotateLeft(v3,21);v1^=v2;v3^=v0;v2=BitOperations.RotateLeft(v2,32);}}
+ [MethodImpl(MethodImplOptions.AggressiveInlining)] public static void Init(ulong salt,out ulong r0,out ulong r1,out ulong r2,out ulong r3,out ulong r4,out ulong r5,out ulong r6,out ulong r7){unchecked{ulong v0=0x736f6d6570736575UL^K0,v1=0x646f72616e646f6dUL^K1,v2=0x6c7967656e657261UL^K0,v3=0x7465646279746573UL^K1;v3^=salt;Sip(ref v0,ref v1,ref v2,ref v3);v0^=salt;v2^=0xbb;Sip(ref v0,ref v1,ref v2,ref v3);Sip(ref v0,ref v1,ref v2,ref v3);Sip(ref v0,ref v1,ref v2,ref v3);r0=v3;r1=v2;r2=v1;r3=v0;v0^=K0;v1^=K1;v2^=K0;v3^=K1;Sip(ref v0,ref v1,ref v2,ref v3);Sip(ref v0,ref v1,ref v2,ref v3);Sip(ref v0,ref v1,ref v2,ref v3);Sip(ref v0,ref v1,ref v2,ref v3);r4=v3;r5=v2;r6=v1;r7=v0;}}
+ public static readonly Prog[] P=new Prog[]{new Prog(new Ins[]{new Ins(3,8,7,40),new Ins(12,4,6,2),new Ins(6,6,5,54),new Ins(11,5,3,2),new Ins(1,3,2,33),new Ins(1,7,0,9),new Ins(0,2,1,9),new Ins(5,1,4,60)},false),
+new Prog(new Ins[]{new Ins(3,8,4,20),new Ins(12,3,5,2),new Ins(11,5,3,3),new Ins(1,2,7,9),new Ins(1,7,0,1),new Ins(4,4,2,45),new Ins(1,6,1,1),new Ins(6,1,6,51)},false),
+new Prog(new Ins[]{new Ins(3,8,0,10),new Ins(8,7,2,1),new Ins(1,4,6,33),new Ins(10,3,5,1),new Ins(0,0,1,33),new Ins(1,6,4,9),new Ins(4,1,3,24),new Ins(9,5,7,2)},false),
+new Prog(new Ins[]{new Ins(3,8,5,24),new Ins(8,0,1,3),new Ins(10,7,6,1),new Ins(11,4,3,3),new Ins(4,5,2,37),new Ins(1,3,4,33),new Ins(2,2,7,9),new Ins(2,1,0,1)},false),
+new Prog(new Ins[]{new Ins(3,8,1,49),new Ins(10,1,0,2),new Ins(10,6,4,1),new Ins(5,7,5,10),new Ins(9,5,7,2),new Ins(0,3,6,9),new Ins(0,0,3,1),new Ins(0,4,2,9)},false),
+new Prog(new Ins[]{new Ins(3,8,3,63),new Ins(1,0,5,1),new Ins(9,4,1,3),new Ins(11,1,4,2),new Ins(12,3,2,2),new Ins(0,6,7,9),new Ins(1,7,6,33),new Ins(10,2,0,2)},false),
+new Prog(new Ins[]{new Ins(3,8,4,59),new Ins(0,7,3,1),new Ins(10,3,6,2),new Ins(2,6,0,9),new Ins(4,0,2,11),new Ins(9,2,5,1),new Ins(1,1,7,9),new Ins(6,5,1,5)},false),
+new Prog(new Ins[]{new Ins(3,8,0,57),new Ins(8,7,4,3),new Ins(12,4,2,2),new Ins(2,1,6,1),new Ins(11,5,3,2),new Ins(4,6,5,6),new Ins(0,3,7,1),new Ins(1,0,1,1)},false),
+new Prog(new Ins[]{new Ins(3,8,6,35),new Ins(5,1,2,18),new Ins(2,6,7,1),new Ins(2,5,3,33),new Ins(8,4,0,3),new Ins(12,3,1,3),new Ins(0,0,5,9),new Ins(7,2,4,3)},false),
+new Prog(new Ins[]{new Ins(3,8,4,34),new Ins(5,3,1,16),new Ins(7,7,6,1),new Ins(1,1,7,33),new Ins(1,0,2,33),new Ins(5,2,0,32),new Ins(8,6,3,1),new Ins(1,4,5,9)},false),
+new Prog(new Ins[]{new Ins(3,8,1,1),new Ins(10,6,7,1),new Ins(1,3,2,1),new Ins(0,7,3,1),new Ins(1,4,5,33),new Ins(12,5,4,1),new Ins(4,1,0,9),new Ins(7,2,6,2)},false),
+new Prog(new Ins[]{new Ins(3,8,3,17),new Ins(5,3,0,35),new Ins(10,1,5,1),new Ins(0,7,4,33),new Ins(6,4,1,7),new Ins(0,6,2,9),new Ins(1,5,7,33),new Ins(4,0,6,55)},false),
+new Prog(new Ins[]{new Ins(3,8,0,21),new Ins(7,6,5,3),new Ins(11,5,2,2),new Ins(0,2,7,9),new Ins(7,7,3,1),new Ins(0,3,1,1),new Ins(0,0,6,1),new Ins(7,1,4,1)},false),
+new Prog(new Ins[]{new Ins(3,8,5,41),new Ins(5,3,6,55),new Ins(10,6,7,1),new Ins(1,2,4,9),new Ins(6,0,1,36),new Ins(10,4,2,2),new Ins(0,5,3,1),new Ins(1,1,0,33)},false),
+new Prog(new Ins[]{new Ins(3,8,6,19),new Ins(5,6,3,61),new Ins(2,2,5,1),new Ins(6,4,7,54),new Ins(10,5,2,2),new Ins(2,7,4,33),new Ins(0,0,1,1),new Ins(5,3,0,62)},false),
+new Prog(new Ins[]{new Ins(3,8,1,50),new Ins(5,6,4,35),new Ins(0,5,2,1),new Ins(1,1,3,1),new Ins(8,3,6,1),new Ins(9,2,5,2),new Ins(0,7,0,33),new Ins(8,0,7,2)},false),
+new Prog(new Ins[]{new Ins(3,8,0,31),new Ins(1,6,5,33),new Ins(9,1,7,1),new Ins(0,0,3,9),new Ins(5,2,6,36),new Ins(4,5,4,37),new Ins(0,3,1,1),new Ins(11,7,2,2)},false),
+new Prog(new Ins[]{new Ins(3,8,3,58),new Ins(12,6,7,3),new Ins(1,7,6,33),new Ins(11,2,5,1),new Ins(10,0,4,1),new Ins(0,5,0,1),new Ins(7,4,2,1),new Ins(1,3,1,33)},false),
+new Prog(new Ins[]{new Ins(3,8,5,34),new Ins(9,6,7,2),new Ins(6,7,4,1),new Ins(11,4,0,2),new Ins(1,0,2,9),new Ins(10,5,1,2),new Ins(0,2,3,33),new Ins(1,3,6,33)},false),
+new Prog(new Ins[]{new Ins(3,8,2,11),new Ins(4,7,6,55),new Ins(7,3,0,3),new Ins(10,0,7,1),new Ins(2,2,4,1),new Ins(7,4,3,3),new Ins(1,5,1,9),new Ins(1,1,5,33)},false),
+new Prog(new Ins[]{new Ins(3,8,0,24),new Ins(11,4,2,1),new Ins(2,3,6,1),new Ins(0,7,1,1),new Ins(11,2,4,1),new Ins(0,1,3,9),new Ins(4,6,5,42),new Ins(7,0,7,3)},false),
+new Prog(new Ins[]{new Ins(3,8,1,20),new Ins(1,2,7,9),new Ins(6,6,5,44),new Ins(7,5,2,3),new Ins(7,1,4,2),new Ins(9,3,0,3),new Ins(0,0,3,33),new Ins(2,4,6,9)},false),
+new Prog(new Ins[]{new Ins(3,8,7,22),new Ins(8,0,5,2),new Ins(11,4,6,2),new Ins(1,6,2,33),new Ins(0,1,0,9),new Ins(4,7,3,26),new Ins(5,3,4,1),new Ins(1,5,1,33)},false),
+new Prog(new Ins[]{new Ins(3,8,7,59),new Ins(8,1,0,2),new Ins(12,2,5,1),new Ins(1,0,1,1),new Ins(0,3,2,9),new Ins(2,5,3,33),new Ins(7,7,6,2),new Ins(11,6,4,2)},false),
+new Prog(new Ins[]{new Ins(3,8,7,21),new Ins(7,3,6,3),new Ins(1,6,1,33),new Ins(2,1,5,9),new Ins(11,7,0,3),new Ins(6,5,4,31),new Ins(1,4,2,9),new Ins(10,2,3,2)},false),
+new Prog(new Ins[]{new Ins(3,8,4,33),new Ins(11,7,3,2),new Ins(11,3,0,3),new Ins(1,5,1,1),new Ins(9,4,6,3),new Ins(0,2,7,1),new Ins(1,1,2,9),new Ins(11,6,5,2)},false),
+new Prog(new Ins[]{new Ins(3,8,3,4),new Ins(11,5,4,2),new Ins(11,4,5,3),new Ins(1,3,7,1),new Ins(1,1,2,9),new Ins(0,2,1,9),new Ins(11,6,0,2),new Ins(4,0,6,22)},false),
+new Prog(new Ins[]{new Ins(3,8,4,3),new Ins(12,1,6,1),new Ins(0,4,1,1),new Ins(0,5,0,33),new Ins(6,0,3,19),new Ins(12,2,7,3),new Ins(9,6,5,1),new Ins(0,7,2,9)},false),
+new Prog(new Ins[]{new Ins(3,8,6,3),new Ins(0,3,0,9),new Ins(2,7,5,33),new Ins(0,2,3,9),new Ins(12,0,2,3),new Ins(11,5,1,3),new Ins(9,6,4,2),new Ins(9,4,7,3)},false),
+new Prog(new Ins[]{new Ins(3,8,0,29),new Ins(0,0,1,9),new Ins(1,5,4,9),new Ins(4,4,5,47),new Ins(5,2,3,13),new Ins(6,3,6,51),new Ins(1,7,2,33),new Ins(4,1,7,31)},false),
+new Prog(new Ins[]{new Ins(3,8,6,52),new Ins(4,7,3,39),new Ins(6,3,4,56),new Ins(9,4,5,3),new Ins(0,5,2,1),new Ins(12,6,0,3),new Ins(2,2,1,33),new Ins(0,1,7,1)},false),
+new Prog(new Ins[]{new Ins(3,8,7,5),new Ins(10,1,6,2),new Ins(0,5,4,9),new Ins(0,0,2,1),new Ins(7,2,5,3),new Ins(4,4,0,62),new Ins(2,6,1,1),new Ins(9,7,3,2)},true)};
+ public static Func<ulong,byte[],ulong> Build(){
+   var dm=new DynamicMethod("HashWx",typeof(ulong),new[]{typeof(ulong),typeof(byte[])},typeof(H),true){InitLocals=false};var il=dm.GetILGenerator();
+   var r=new LocalBuilder[9];for(int i=0;i<9;i++)r[i]=il.DeclareLocal(typeof(ulong));var bf=il.DeclareLocal(typeof(uint));var bc=il.DeclareLocal(typeof(int));var sp=il.DeclareLocal(typeof(int));var rep=il.DeclareLocal(typeof(int));var mem=il.DeclareLocal(typeof(IntPtr));
+   il.Emit(OpCodes.Ldarg_0);for(int i=0;i<8;i++)il.Emit(OpCodes.Ldloca,r[i]);il.EmitCall(OpCodes.Call,typeof(H).GetMethod(nameof(Init))!,null);
+   il.Emit(OpCodes.Ldloc,r[0]);il.Emit(OpCodes.Ldloc,r[4]);il.Emit(OpCodes.Xor);il.Emit(OpCodes.Ldc_I8,-8L);il.Emit(OpCodes.And);il.Emit(OpCodes.Ldc_I4_3);il.Emit(OpCodes.Conv_U8);il.Emit(OpCodes.Or);il.Emit(OpCodes.Stloc,r[8]);
+   Store(il,mem,null,16384,r[8]);il.Emit(OpCodes.Ldc_I4,16384);il.Emit(OpCodes.Stloc,sp);
+   
+   for(int a=0;a<2;a++){for(int j=0;j<4;j++)il.Emit(OpCodes.Ldloca,r[a*4+j]);il.EmitCall(OpCodes.Call,typeof(H).GetMethod(nameof(Sip))!,null);}
+   il.Emit(OpCodes.Ldloc,r[3]);il.Emit(OpCodes.Ldloc,r[7]);il.Emit(OpCodes.Xor);il.Emit(OpCodes.Ldloc,r[8]);il.Emit(OpCodes.Xor);il.Emit(OpCodes.Ret);
+   return (Func<ulong,byte[],ulong>)dm.CreateDelegate(typeof(Func<ulong,byte[],ulong>));
+ }
+ static void Store(ILGenerator il,LocalBuilder mem,LocalBuilder? sp,int off,LocalBuilder val){il.Emit(OpCodes.Ldarg_1);if(sp!=null)il.Emit(OpCodes.Ldloc,sp);else il.Emit(OpCodes.Ldc_I4_0);if(off!=0){il.Emit(OpCodes.Ldc_I4,off);il.Emit(OpCodes.Add);}il.Emit(OpCodes.Ldelema,typeof(byte));il.Emit(OpCodes.Ldloc,val);il.Emit(OpCodes.Stind_I8);}
+ static void Source(ILGenerator il,LocalBuilder[]r,LocalBuilder mem,int src,bool memory){if(!memory){il.Emit(OpCodes.Ldloc,r[src]);return;}il.Emit(OpCodes.Ldarg_1);il.Emit(OpCodes.Ldloc,r[src]);il.Emit(OpCodes.Ldc_I8,16383);il.Emit(OpCodes.And);il.Emit(OpCodes.Conv_I4);il.Emit(OpCodes.Ldelema,typeof(byte));il.Emit(OpCodes.Ldind_I8);}
+ static void EmitOp(ILGenerator il,LocalBuilder[]r,LocalBuilder bf,LocalBuilder mem,Ins x,bool memory){int o=x.Op,d=x.Dst,s=x.Src,im=x.Imm;il.Emit(OpCodes.Ldloc,r[d]);if(o<=2){il.Emit(OpCodes.Ldc_I8,(long)im);il.Emit(o==0?OpCodes.Or:o==1?OpCodes.Xor:OpCodes.Add);Source(il,r,mem,s,memory);il.Emit(OpCodes.Mul);il.Emit(OpCodes.Stloc,r[d]);return;}if(o==3){Source(il,r,mem,s,false);il.Emit(OpCodes.Mul);il.Emit(OpCodes.Ldc_I4,im);il.EmitCall(OpCodes.Call,typeof(BitOperations).GetMethod(nameof(BitOperations.RotateRight),new[]{typeof(ulong),typeof(int)})!,null);il.Emit(OpCodes.Dup);il.Emit(OpCodes.Stloc,r[d]);il.Emit(OpCodes.Conv_U4);il.Emit(OpCodes.Stloc,bf);return;}if(o<=6){il.Emit(OpCodes.Ldc_I4,im);il.EmitCall(OpCodes.Call,typeof(BitOperations).GetMethod(nameof(BitOperations.RotateRight),new[]{typeof(ulong),typeof(int)})!,null);Source(il,r,mem,s,memory);il.Emit(o==4?OpCodes.Xor:o==5?OpCodes.Add:OpCodes.Sub);il.Emit(OpCodes.Stloc,r[d]);return;}if(o<=9){il.Emit(OpCodes.Conv_I8);il.Emit(OpCodes.Ldc_I4,im);il.Emit(OpCodes.Shr);il.Emit(OpCodes.Conv_U8);Source(il,r,mem,s,memory);il.Emit(o==7?OpCodes.Xor:o==8?OpCodes.Add:OpCodes.Sub);il.Emit(OpCodes.Stloc,r[d]);return;}il.Emit(OpCodes.Ldc_I4,im);il.Emit(OpCodes.Shr_Un);Source(il,r,mem,s,memory);il.Emit(o==10?OpCodes.Xor:o==11?OpCodes.Add:OpCodes.Sub);il.Emit(OpCodes.Stloc,r[d]);}
+ static void EmitPhase(ILGenerator il,LocalBuilder[]r,LocalBuilder bf,LocalBuilder bc,LocalBuilder sp,LocalBuilder rep,LocalBuilder mem,bool memory){il.Emit(OpCodes.Ldc_I4_0);il.Emit(OpCodes.Stloc,rep);var phase=il.DefineLabel();il.MarkLabel(phase);il.Emit(OpCodes.Ldc_I4,32);il.Emit(OpCodes.Stloc,bc);foreach(var p in P){var start=il.DefineLabel();var done=il.DefineLabel();il.MarkLabel(start);if(!memory){il.Emit(OpCodes.Ldloc,sp);il.Emit(OpCodes.Ldc_I4,64);il.Emit(OpCodes.Sub);il.Emit(OpCodes.Stloc,sp);int[]off={56,48,40,32,24,16,8,0};for(int j=0;j<8;j++)Store(il,mem,sp,off[j],r[j]);}foreach(var x in p.I)EmitOp(il,r,bf,mem,x,memory);il.Emit(OpCodes.Ldloc,bc);il.Emit(OpCodes.Brfalse,done);if(!p.U){il.Emit(OpCodes.Ldloc,bf);il.Emit(OpCodes.Ldc_I4,32);il.Emit(OpCodes.And);il.Emit(OpCodes.Brtrue,done);}il.Emit(OpCodes.Ldloc,bc);il.Emit(OpCodes.Ldc_I4_1);il.Emit(OpCodes.Sub);il.Emit(OpCodes.Stloc,bc);il.Emit(OpCodes.Br,start);il.MarkLabel(done);}il.Emit(OpCodes.Ldloc,rep);il.Emit(OpCodes.Ldc_I4_1);il.Emit(OpCodes.Add);il.Emit(OpCodes.Dup);il.Emit(OpCodes.Stloc,rep);il.Emit(OpCodes.Ldc_I4_4);il.Emit(OpCodes.Blt,phase);}
+}
+class Program{static void Main(){var sw=Stopwatch.StartNew();var f=H.Build();sw.Stop();Console.WriteLine($"BUILD_US {sw.Elapsed.TotalMicroseconds:F1}");sw.Restart();var mem=new byte[16392];var c=f(123456,mem);sw.Stop();Console.WriteLine($"FIRST_US {sw.Elapsed.TotalMicroseconds:F1} CHECK {c:x16}");for(int i=0;i<30000;i++)_=f((ulong)i,mem);const int N=300000;for(int s=0;s<7;s++){ulong sink=0;sw.Restart();for(int i=0;i<N;i++)sink^=f((ulong)i,mem);sw.Stop();Console.WriteLine($"RATE {N/sw.Elapsed.TotalSeconds:F3} sink={sink:x16}");}}}

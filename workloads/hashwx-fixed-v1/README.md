@@ -1,0 +1,14 @@
+# HashWX fixed program v1
+
+This is the exact 32-program × 8-instruction stream recovered from the original Rust/dynasm, C# and Java experiments. `program.json` is generated from the recovered Rust source and is the canonical corpus representation for new adapters.
+
+All normalized adapters use:
+
+- correctness probe: `hash(123456)`
+- warmup: 30,000 hashes
+- measured sample: 300,000 hashes
+- steady-state samples: 7
+
+Historical sources under `archive/hashwx-fixed-v1/` intentionally retain their original warmup/sample choices. Active sources under `implementations/` only normalize measurement counts; algorithm code remains the recovered implementation.
+
+The workload is useful for compiler/JIT comparisons because the generated program is fixed, so every backend sees the same control flow and operations. It is not a replacement for the seeded/corpus HashWX benchmark, which tests compile latency and generation variance separately.

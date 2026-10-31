@@ -1,0 +1,10 @@
+[package]
+name="hashwx-wasmtime-steady"
+version="0.0.0"
+edition="2024"
+[dependencies]
+challenge-hashwx={path="/home/jan/projects/challenge-disasterer-pow-matrix/crates/hashwx"}
+[profile.release]
+opt-level=3
+lto="thin"
+codegen-units=1

@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codeandsolder/museum-of-jit/schema/result.schema.json",
+  "title": "Museum of JIT benchmark result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "timestamp_utc",
+    "host",
+    "workload",
+    "implementation",
+    "runtime",
+    "samples"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "host": {
+      "type": "object",
+      "required": [
+        "hostname",
+        "arch",
+        "cpu_model",
+        "os",
+        "kernel"
+      ],
+      "properties": {
+        "hostname": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "cpu_model": {
+          "type": "string"
+        },
+        "cpu_family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cpu_model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "os": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "cpu_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "workload": {
+      "type": "object",
+      "required": [
+        "id",
+        "corpus_sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "corpus_sha256": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "implementation": {
+      "type": "object",
+      "required": [
+        "id",
+        "mode"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "reference",
+            "idiomatic",
+            "generated-source-or-bytecode",
+            "direct-ir-or-machine-code",
+            "accelerator"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "name",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "build_us": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "first_call_us": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "code_bytes": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "check": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "warmup_iterations": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "sample_iterations": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "hashes_per_second"
+        ],
+        "properties": {
+          "hashes_per_second": {
+            "type": "number"
+          },
+          "sink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "stdout": {
+      "type": "string"
+    },
+    "stderr": {
+      "type": "string"
+    },
+    "elapsed_seconds": {
+      "type": "number"
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,14 @@
+# Runtime/build debris: benchmark runners must keep these out of the checkout.
+**/target/
+**/bin/
+**/obj/
+**/.dotnet/
+**/*.class
+.runtime/
+.cache/
+.venv/
+__pycache__/
+*.pyc
+
+# Local raw runs; curated JSON under results/ is intentionally tracked.
+results/.scratch/

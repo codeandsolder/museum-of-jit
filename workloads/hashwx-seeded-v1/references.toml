@@ -1,0 +1,19 @@
+[hashwx_canonical]
+repository = "https://github.com/tevador/hashwx.git"
+revision = "74b567a31276a4c5d7cb232a5b7639467f49f961"
+
+[hashx_canonical]
+repository = "https://github.com/tevador/hashx.git"
+revision = "08babdf4f41b0b8991d1fa94914c7c6902de0cb6"
+
+[hashwx_rs]
+repository = "https://github.com/codeandsolder/hashwx-rs.git"
+revision = "44d5543273329843bf61268c8b0756798c86fb8e"
+
+[release_gate]
+hashwx_seeds = 3000
+hashwx_nonces = 463
+hashx_seeds = 500
+hashx_nonces = 65536
+chunks = 5
+sweeps = 3

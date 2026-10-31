@@ -1,0 +1,53 @@
+[rust-dynasm]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/rust-dynasm.sh"
+runtime = "rust/dynasm"
+source = "workloads/hashwx-fixed-v1/implementations/rust-dynasm"
+
+[dotnet-dynamic-il]
+mode = "generated-source-or-bytecode"
+runner = "tools/runners/dotnet-dynamic-il.sh"
+runtime = ".NET/RyuJIT"
+source = "workloads/hashwx-fixed-v1/implementations/dotnet-dynamic-il"
+
+[dotnet-dynamic-pointer]
+mode = "generated-source-or-bytecode"
+runner = "tools/runners/dotnet-dynamic-pointer.sh"
+runtime = ".NET/RyuJIT"
+source = "workloads/hashwx-fixed-v1/implementations/dotnet-dynamic-pointer"
+
+[dotnet-static]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-static.sh"
+runtime = ".NET/RyuJIT"
+source = "workloads/hashwx-fixed-v1/implementations/dotnet-static"
+
+[java-static]
+mode = "idiomatic"
+runner = "tools/runners/java-static.sh"
+runtime = "JVM"
+source = "workloads/hashwx-fixed-v1/implementations/java-static"
+
+[java-split]
+mode = "idiomatic"
+runner = "tools/runners/java-split.sh"
+runtime = "JVM"
+source = "workloads/hashwx-fixed-v1/implementations/java-split"
+
+[java-split-force]
+mode = "idiomatic"
+runner = "tools/runners/java-split-force.sh"
+runtime = "JVM"
+source = "workloads/hashwx-fixed-v1/implementations/java-split-force"
+
+[cpython-jit]
+mode = "generated-source-or-bytecode"
+runner = "tools/runners/cpython-jit.sh"
+runtime = "CPython JIT"
+source = "workloads/hashwx-fixed-v1/implementations/python-generated"
+
+[pypy-intop]
+mode = "generated-source-or-bytecode"
+runner = "tools/runners/pypy-intop.sh"
+runtime = "PyPy meta-JIT"
+source = "workloads/hashwx-fixed-v1/implementations/python-generated"

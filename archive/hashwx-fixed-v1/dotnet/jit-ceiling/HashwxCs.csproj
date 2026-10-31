@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><Optimize>true</Optimize><AllowUnsafeBlocks>true</AllowUnsafeBlocks><TieredCompilation>true</TieredCompilation><ServerGarbageCollection>false</ServerGarbageCollection><InvariantGlobalization>true</InvariantGlobalization></PropertyGroup></Project>
