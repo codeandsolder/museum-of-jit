@@ -42,3 +42,7 @@ uv run --no-project --python 3 tools/bench.py --impl all --output results/my-hos
 Runtime-specific binaries can be supplied with environment variables documented by each runner. `tools/runtime-lock.toml` records the versions used for curated runs.
 
 The result format is documented by `schema/result.schema.json`. A future Salad/fleet runner can submit exactly the same records; nothing in the schema assumes one machine or one language.
+
+## First Zen 5 snapshot
+
+The first curated cold-storage run on an AMD EPYC 9655 lands in `results/epyc-9655-zen5-2026-10-31.json`: direct Rust/dynasm is 442.4 kH/s median, .NET 10.0.403 dynamic-pointer is 412.1 kH/s (93.1% of direct emission), and static C# is 290.2 kH/s. See `results/README.md` for rejected/timeout bring-up notes.

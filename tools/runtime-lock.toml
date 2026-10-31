@@ -2,7 +2,7 @@
 rust = "1.99.1"
 dotnet_sdk = "10.0.403"
 openjdk = "21.0.13"
-graalvm = "25"
+graalvm = "25.0.4"
 node = "26.12.1"
 wasmtime = "50.0.1"
 pypy = "8.0.1-python3.12"
