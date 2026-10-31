@@ -193,7 +193,10 @@
     ],
     "stdout": "BUILD_US 50.951 CODE 9409 CHECK fd5d450b767035c5\nRATE 430170.780 sink=1842ddbd4c0fefed\nRATE 438901.670 sink=1842ddbd4c0fefed\nRATE 431278.756 sink=1842ddbd4c0fefed\nRATE 448176.805 sink=1842ddbd4c0fefed\nRATE 442368.286 sink=1842ddbd4c0fefed\nRATE 450299.416 sink=1842ddbd4c0fefed\nRATE 445700.002 sink=1842ddbd4c0fefed\n",
     "stderr": "warning: function `sip` is never used\n  --> src/main.rs:38:22\n   |\n38 | #[inline(always)] fn sip(v0:&mut u64,v1:&mut u64,v2:&mut u64,v3:&mut u64){*v0=v0.wrapping_add(*v1);*v2=v2.wrapping_add(*v3);*v1=v1.r...\n   |                      ^^^\n   |\n   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default\n\nwarning: function `init` is never used\n  --> src/main.rs:39:22\n   |\n39 | #[inline(always)] fn init(salt:u64)->[u64;9]{let(mut v0,mut v1,mut v2,mut v3)=(0x736f6d6570736575^K0,0x646f72616e646f6d^K1,0x6c79676...\n   |                      ^^^^\n\nwarning: function `finish` is never used\n  --> src/main.rs:40:22\n   |\n40 | #[inline(always)] fn finish(r:&[u64;9])->u64{let(mut a,mut b,mut c,mut d)=(r[0],r[1],r[2],r[3]);sip(&mut a,&mut b,&mut c,&mut d);let...\n   |                      ^^^^^^\n\n",
-    "elapsed_seconds": 48.86864755500574
+    "elapsed_seconds": 48.86864755500574,
+    "status": "success",
+    "exit_code": 0,
+    "error": null
   },
   {
     "schema_version": 1,
@@ -389,7 +392,10 @@
     ],
     "stdout": "/tmp/tmp.pvZU70Sdn0/Program.cs(59,64): warning CS8632: The annotation for nullable reference types should only be used in code within a '#nullable' annotations context. [/tmp/tmp.pvZU70Sdn0/HashwxDynPointer.csproj]\nBUILD_US 8170.7\nFIRST_US 6403.9 CHECK fd5d450b767035c5\nRATE 428433.657 sink=1842ddbd4c0fefed\nRATE 411984.972 sink=1842ddbd4c0fefed\nRATE 416143.655 sink=1842ddbd4c0fefed\nRATE 417203.991 sink=1842ddbd4c0fefed\nRATE 412054.970 sink=1842ddbd4c0fefed\nRATE 383367.866 sink=1842ddbd4c0fefed\nRATE 366713.692 sink=1842ddbd4c0fefed\n",
     "stderr": "",
-    "elapsed_seconds": 70.92123466101475
+    "elapsed_seconds": 70.92123466101475,
+    "status": "success",
+    "exit_code": 0,
+    "error": null
   },
   {
     "schema_version": 1,
@@ -585,6 +591,9 @@
     ],
     "stdout": "CHECK fd5d450b767035c5\nRATE 269532.795 sink=1842ddbd4c0fefed\nRATE 290235.267 sink=1842ddbd4c0fefed\nRATE 265824.323 sink=1842ddbd4c0fefed\nRATE 289736.798 sink=1842ddbd4c0fefed\nRATE 291963.245 sink=1842ddbd4c0fefed\nRATE 295332.622 sink=1842ddbd4c0fefed\nRATE 293650.196 sink=1842ddbd4c0fefed\n",
     "stderr": "",
-    "elapsed_seconds": 12.702257105964236
+    "elapsed_seconds": 12.702257105964236,
+    "status": "success",
+    "exit_code": 0,
+    "error": null
   }
 ]

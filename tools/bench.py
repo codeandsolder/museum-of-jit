@@ -106,17 +106,11 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
     runner = ROOT / spec["runner"]
     if not runner.is_file():
         raise FileNotFoundError(runner)
-    started = time.perf_counter()
-    proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-    elapsed = time.perf_counter() - started
-    if proc.returncode != 0:
-        raise RuntimeError(f"{impl} failed with exit {proc.returncode}\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}")
-    parsed = parse_output(proc.stdout)
     try:
         revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout.strip()
     except subprocess.CalledProcessError:
         revision = None
-    result = {
+    base = {
         "schema_version": 1,
         "run_id": str(uuid.uuid4()),
         "timestamp_utc": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -124,16 +118,53 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
         "workload": {"id": "hashwx-fixed-v1", "corpus_sha256": corpus_sha},
         "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
         "runtime": {"name": spec["runtime"], "version": runtime_version(impl, env), "command": [str(runner.relative_to(ROOT))]},
-        "build_us": parsed["build_us"],
-        "first_call_us": parsed["first_call_us"],
-        "code_bytes": parsed["code_bytes"],
-        "check": parsed["check"],
         "warmup_iterations": int(env.get("MUSEUM_WARMUP", "30000")),
         "sample_iterations": int(env.get("MUSEUM_ITERATIONS", "300000")),
-        "samples": parsed["samples"],
-        "stdout": proc.stdout,
-        "stderr": proc.stderr,
-        "elapsed_seconds": elapsed,
+        "samples": [],
+    }
+    timeout = float(env.get("MUSEUM_RUN_TIMEOUT", "120"))
+    started = time.perf_counter()
+    try:
+        proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        elapsed = time.perf_counter() - started
+        stdout = exc.stdout or ""
+        stderr = exc.stderr or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode(errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode(errors="replace")
+        result = base | {
+            "status": "timeout", "exit_code": None, "error": f"runner exceeded {timeout:g} seconds",
+            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
+            "stdout": stdout, "stderr": stderr, "elapsed_seconds": elapsed,
+        }
+        print(f"{impl:24s} TIMEOUT after {elapsed:.1f}s", file=sys.stderr)
+        return result
+    elapsed = time.perf_counter() - started
+    if proc.returncode != 0:
+        result = base | {
+            "status": "failed", "exit_code": proc.returncode, "error": f"runner exited with status {proc.returncode}",
+            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
+            "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+        }
+        print(f"{impl:24s} FAILED exit={proc.returncode}", file=sys.stderr)
+        return result
+    try:
+        parsed = parse_output(proc.stdout)
+    except ValueError as exc:
+        result = base | {
+            "status": "invalid", "exit_code": proc.returncode, "error": str(exc),
+            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
+            "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+        }
+        print(f"{impl:24s} INVALID {exc}", file=sys.stderr)
+        return result
+    result = base | {
+        "status": "success", "exit_code": proc.returncode, "error": None,
+        "build_us": parsed["build_us"], "first_call_us": parsed["first_call_us"],
+        "code_bytes": parsed["code_bytes"], "check": parsed["check"], "samples": parsed["samples"],
+        "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
     }
     rates = [x["hashes_per_second"] for x in result["samples"]]
     print(f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}", file=sys.stderr)
