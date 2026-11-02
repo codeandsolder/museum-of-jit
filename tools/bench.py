@@ -58,6 +58,18 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output([env.get("MUSEUM_CPYTHON", "python3"), "--version"], env)
     if impl == "pypy-intop":
         return command_output([env.get("MUSEUM_PYPY", "pypy3"), "--version"], env)
+    if impl == "v8-wasm":
+        return command_output([
+            env.get("MUSEUM_NODE", "node"),
+            "-p",
+            "process.version + ' / V8 ' + process.versions.v8",
+        ], env)
+    if impl == "wasmtime-wasm":
+        return command_output([
+            env.get("MUSEUM_WASMTIME_PY", "python3"),
+            "-c",
+            "import importlib.metadata; print('wasmtime ' + importlib.metadata.version('wasmtime'))",
+        ], env)
     return "unknown"
 
 
@@ -136,7 +148,7 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
     base = {
         "schema_version": 1,
         "run_id": str(uuid.uuid4()),
-        "timestamp_utc": dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timestamp_utc": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
         "host": host,
         "workload": {"id": "hashwx-fixed-v1", "corpus_sha256": corpus_sha},
         "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
@@ -149,7 +161,7 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
     timeout = float(env.get("MUSEUM_RUN_TIMEOUT", "120"))
     started = time.perf_counter()
     try:
-        proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=timeout)
+        proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, capture_output=True, check=False, timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         elapsed = time.perf_counter() - started
         stdout = exc.stdout or ""

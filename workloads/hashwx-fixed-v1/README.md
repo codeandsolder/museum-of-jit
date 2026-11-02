@@ -11,4 +11,6 @@ All normalized adapters use:
 
 Historical sources under `archive/hashwx-fixed-v1/` intentionally retain their original warmup/sample choices. Active sources under `implementations/` only normalize measurement counts; algorithm code remains the recovered implementation.
 
+The V8 and Wasmtime adapters share one generated WebAssembly module. It exports both `hash(i64) -> i64` for the normal correctness probe and `bench(start, count) -> i64`, which keeps the measured iteration loop inside Wasm so host-language call overhead is not confused with engine throughput. The module is regenerated from `program.json` in a temporary directory for every run; no generated `.wasm` is committed.
+
 The workload is useful for compiler/JIT comparisons because the generated program is fixed, so every backend sees the same control flow and operations. It is not a replacement for the seeded/corpus HashWX benchmark, which tests compile latency and generation variance separately.

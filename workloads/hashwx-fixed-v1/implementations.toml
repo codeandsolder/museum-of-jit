@@ -51,3 +51,15 @@ mode = "generated-source-or-bytecode"
 runner = "tools/runners/pypy-intop.sh"
 runtime = "PyPy meta-JIT"
 source = "workloads/hashwx-fixed-v1/implementations/python-generated"
+
+[v8-wasm]
+mode = "generated-source-or-bytecode"
+runner = "tools/runners/v8-wasm.sh"
+runtime = "V8/WebAssembly"
+source = "workloads/hashwx-fixed-v1/implementations/wasm-fixed"
+
+[wasmtime-wasm]
+mode = "generated-source-or-bytecode"
+runner = "tools/runners/wasmtime-wasm.sh"
+runtime = "Wasmtime/Cranelift"
+source = "workloads/hashwx-fixed-v1/implementations/wasm-fixed"
