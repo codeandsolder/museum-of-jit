@@ -84,12 +84,17 @@ def host_info() -> dict:
         os_name = osr.get("PRETTY_NAME") or osr.get("NAME") or platform.system()
     except OSError:
         os_name = platform.platform()
+    try:
+        cpu_affinity = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        cpu_affinity = None
     return {
         "hostname": platform.node(),
         "arch": platform.machine(),
         "cpu_model": cpu_model,
         "cpu_family": family,
         "cpu_model_id": model_id,
+        "cpu_affinity": cpu_affinity,
         "os": os_name,
         "kernel": platform.release(),
         "cpu_flags": flags,
