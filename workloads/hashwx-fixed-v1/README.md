@@ -16,3 +16,11 @@ The V8 and Wasmtime adapters share one generated WebAssembly module. It exports 
 The workload is useful for compiler/JIT comparisons because the generated program is fixed, so every backend sees the same control flow and operations. It is not a replacement for the seeded/corpus HashWX benchmark, which tests compile latency and generation variance separately.
 
 The `rpython-jitdriver` adapter is a distinct meta-JIT exhibit rather than a faster spelling of generated Python. A tiny RPython interpreter consumes the same fixed instruction stream with bytecode position as JIT-green state, allowing PyPy's tracing meta-JIT to residualize the workload. Its translated executable is built separately from the exact pinned PyPy/RPython source and supplied through `MUSEUM_RPYTHON_HASHWX`.
+
+Build the translated RPython executable outside the repository tree with the pinned, checksum-verified PyPy 8.0.1 toolchain:
+
+```sh
+tools/build-rpython-jitdriver.sh /path/to/runtime-root /path/to/build-dir
+```
+
+The translation is forced to one make job, compiles generated C through the host's existing `sccache` client with server auto-start disabled, and rejects an artifact if the translation log reports local sccache fallback. The resulting `hashwx-rpython-jit` is supplied to the benchmark runner as `MUSEUM_RPYTHON_HASHWX`.

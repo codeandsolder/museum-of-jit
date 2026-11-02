@@ -117,6 +117,7 @@
             "idiomatic",
             "generated-source-or-bytecode",
             "direct-ir-or-machine-code",
+            "meta-jit-interpreter",
             "accelerator"
           ]
         },

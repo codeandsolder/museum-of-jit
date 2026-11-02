@@ -73,7 +73,7 @@ def sip(regs, a, b, c, d):
 
 
 def load(regs, mem, src):
-    address = int(regs[src] & r_uint(16383))
+    address = intmask(regs[src] & r_uint(16383))
     word = address >> 3
     shift = (address & 7) << 3
     if shift:

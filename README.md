@@ -11,7 +11,7 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 - **Results are raw data first.** Curated runs record host identity, runtime version, exact implementation revision, warmup, every measured sample, compile/build latency where observable, code size where observable, correctness check, and command provenance.
 - **No benchmark artifacts in the tree.** Runners build in temporary directories and clean them.
 - **References stay visible.** Hand-written/native Rust and canonical upstream implementations are first-class reference points, not hidden baselines.
-- **Runtime abuse gets labelled.** `idiomatic`, `generated-source-or-bytecode`, and `direct-ir-or-machine-code` are distinct implementation modes.
+- **Runtime abuse gets labelled.** `idiomatic`, `generated-source-or-bytecode`, `direct-ir-or-machine-code`, and `meta-jit-interpreter` are distinct implementation modes.
 
 ## Current exhibits
 
