@@ -14,7 +14,7 @@ TARGET_TEMPLATE = r"""# Generated from workloads/hashwx-fixed-v1/program.json; d
 import sys
 import time
 
-from rpython.rlib.jit import JitDriver, promote
+from rpython.rlib.jit import JitDriver, promote, unroll_safe
 from rpython.rlib.rarithmetic import intmask, r_uint
 
 K0 = r_uint(0x1716151413121110)
@@ -28,13 +28,13 @@ UNCONDITIONAL = __UNCONDITIONAL__
 HEX = "0123456789abcdef"
 
 
-def get_location(memory, pidx, iidx):
+def get_location(memory, pidx):
     phase_id = 1 if memory else 0
-    return "hashwx phase=%d program=%d instruction=%d" % (phase_id, pidx, iidx)
+    return "hashwx phase=%d program=%d" % (phase_id, pidx)
 
 
 jitdriver = JitDriver(
-    greens=["memory", "pidx", "iidx"],
+    greens=["memory", "pidx"],
     reds="auto",
     get_printable_location=get_location,
     name="hashwx-fixed-rpython",
@@ -147,6 +147,24 @@ def snapshot(regs, mem, sp):
 snapshot._always_inline_ = True
 
 
+@unroll_safe
+def execute_program(regs, mem, memory, pidx):
+    bf = 0
+    iidx = 0
+    while iidx < 8:
+        pc = pidx * 8 + iidx
+        op = promote(OPS[pc])
+        src = promote(SRCS[pc])
+        dst = promote(DSTS[pc])
+        imm = promote(IMMS[pc])
+        bf = execute(regs, mem, op, src, dst, imm, memory, bf)
+        iidx += 1
+    return bf
+
+
+execute_program._always_inline_ = True
+
+
 def phase(regs, mem, memory):
     sp = 2048
     rep = 0
@@ -156,19 +174,10 @@ def phase(regs, mem, memory):
         while pidx < 32:
             unconditional = promote(UNCONDITIONAL[pidx])
             while True:
+                jitdriver.jit_merge_point(memory=memory, pidx=pidx)
                 if not memory:
                     sp = snapshot(regs, mem, sp)
-                bf = 0
-                iidx = 0
-                while iidx < 8:
-                    jitdriver.jit_merge_point(memory=memory, pidx=pidx, iidx=iidx)
-                    pc = pidx * 8 + iidx
-                    op = promote(OPS[pc])
-                    src = promote(SRCS[pc])
-                    dst = promote(DSTS[pc])
-                    imm = promote(IMMS[pc])
-                    bf = execute(regs, mem, op, src, dst, imm, memory, bf)
-                    iidx += 1
+                bf = execute_program(regs, mem, memory, pidx)
                 if bc == 0:
                     break
                 if not unconditional and (bf & 32) != 0:
