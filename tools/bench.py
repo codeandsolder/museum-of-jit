@@ -19,6 +19,24 @@ WORKLOAD = ROOT / "workloads/hashwx-fixed-v1"
 CONFIG = WORKLOAD / "implementations.toml"
 EXPECTED_CHECK = "fd5d450b767035c5"
 
+BENCH_DEFAULTS = {
+    "MUSEUM_WARMUP": (30000, 0),
+    "MUSEUM_ITERATIONS": (300000, 1),
+    "MUSEUM_SAMPLES": (7, 1),
+}
+
+
+def normalize_benchmark_env(env: dict[str, str]) -> None:
+    for name, (default, minimum) in BENCH_DEFAULTS.items():
+        raw = env.get(name, str(default))
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
+        if value < minimum:
+            raise SystemExit(f"{name} must be >= {minimum}, got {value}")
+        env[name] = str(value)
+
 
 def command_output(argv: list[str], env=None) -> str:
     try:
@@ -66,12 +84,17 @@ def host_info() -> dict:
         os_name = osr.get("PRETTY_NAME") or osr.get("NAME") or platform.system()
     except OSError:
         os_name = platform.platform()
+    try:
+        cpu_affinity = sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        cpu_affinity = None
     return {
         "hostname": platform.node(),
         "arch": platform.machine(),
         "cpu_model": cpu_model,
         "cpu_family": family,
         "cpu_model_id": model_id,
+        "cpu_affinity": cpu_affinity,
         "os": os_name,
         "kernel": platform.release(),
         "cpu_flags": flags,
@@ -118,8 +141,9 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
         "workload": {"id": "hashwx-fixed-v1", "corpus_sha256": corpus_sha},
         "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
         "runtime": {"name": spec["runtime"], "version": runtime_version(impl, env), "command": [str(runner.relative_to(ROOT))]},
-        "warmup_iterations": int(env.get("MUSEUM_WARMUP", "30000")),
-        "sample_iterations": int(env.get("MUSEUM_ITERATIONS", "300000")),
+        "warmup_iterations": int(env["MUSEUM_WARMUP"]),
+        "sample_iterations": int(env["MUSEUM_ITERATIONS"]),
+        "sample_count": int(env["MUSEUM_SAMPLES"]),
         "samples": [],
     }
     timeout = float(env.get("MUSEUM_RUN_TIMEOUT", "120"))
@@ -188,6 +212,7 @@ def main() -> None:
     if unknown:
         raise SystemExit(f"unknown implementation(s): {', '.join(unknown)}")
     env = os.environ.copy()
+    normalize_benchmark_env(env)
     corpus_sha = hashlib.sha256((WORKLOAD / "program.json").read_bytes()).hexdigest()
     host = host_info()
     results = [run_one(name, specs[name], env, host, corpus_sha) for name in names]

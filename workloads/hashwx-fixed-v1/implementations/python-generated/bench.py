@@ -187,9 +187,19 @@ def main() -> None:
     first_us = (time.perf_counter_ns() - t0) / 1000.0
     if check != EXPECTED_CHECK:
         raise SystemExit(f"wrong result: {check:016x} != {EXPECTED_CHECK:016x}")
-    warmup = int(os.environ.get("MUSEUM_WARMUP", "30000"))
-    iterations = int(os.environ.get("MUSEUM_ITERATIONS", "300000"))
-    samples = int(os.environ.get("MUSEUM_SAMPLES", "7"))
+    def count(name: str, default: int, minimum: int) -> int:
+        raw = os.environ.get(name, str(default))
+        try:
+            value = int(raw)
+        except ValueError as exc:
+            raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
+        if value < minimum:
+            raise SystemExit(f"{name} must be >= {minimum}, got {value}")
+        return value
+
+    warmup = count("MUSEUM_WARMUP", 30000, 0)
+    iterations = count("MUSEUM_ITERATIONS", 300000, 1)
+    samples = count("MUSEUM_SAMPLES", 7, 1)
     for n in range(warmup):
         hash_one(n, mem)
     jit = getattr(sys, "_jit", None)

@@ -39,7 +39,9 @@ uv run --no-project --python 3 tools/bench.py --impl rust-dynasm
 uv run --no-project --python 3 tools/bench.py --impl all --output results/my-host.json
 ```
 
-Runtime-specific binaries can be supplied with environment variables documented by each runner. `tools/runtime-lock.toml` records the versions used for curated runs.
+Runtime-specific binaries can be supplied with environment variables documented by each runner. `tools/runtime-lock.toml` records the versions used for curated runs. Benchmark dimensions are controlled uniformly by `MUSEUM_WARMUP`, `MUSEUM_ITERATIONS`, and `MUSEUM_SAMPLES`; the orchestrator validates them and records the exact values in each result. Java runners also accept `MUSEUM_JAVAC_RELEASE` so a newer `javac` can emit bytecode for an older JVM when comparing runtimes.
+
+Host provenance includes the process CPU affinity on platforms that expose it, so pinned single-CPU runs cannot be mistaken for unconstrained runs.
 
 The result format is documented by `schema/result.schema.json`. A future Salad/fleet runner can submit exactly the same records; nothing in the schema assumes one machine or one language.
 

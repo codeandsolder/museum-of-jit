@@ -67,6 +67,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "cpu_affinity": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "uniqueItems": true
         }
       },
       "additionalProperties": true
@@ -178,6 +189,13 @@
         "integer",
         "null"
       ]
+    },
+    "sample_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
     },
     "samples": {
       "type": "array",
