@@ -1393,5 +1393,6 @@ public final class HashWxSplit {
         v1^=v2;v3^=v0;v2=Long.rotateLeft(v2,32);
         return o3^v3^s.r8;
     }
-    public static void main(String[]a){long mem=U.allocateMemory(16392);S s=new S();try{long c=hash(123456L,mem,s);System.out.printf("CHECK %016x%n",c);for(int i=0;i<30000;i++)hash(i,mem,s);int N=300000;for(int q=0;q<7;q++){long z=0,t=System.nanoTime();for(int i=0;i<N;i++)z^=hash(i,mem,s);long dt=System.nanoTime()-t;System.out.printf("RATE %.3f sink=%016x%n",N/(dt*1e-9),z);}}finally{U.freeMemory(mem);}}
+    static int count(String name,int fallback,boolean allowZero){String raw=System.getenv(name);if(raw==null)return fallback;try{int value=Integer.parseInt(raw);if(allowZero?value<0:value<=0)throw new IllegalArgumentException(name+" has invalid count: "+raw);return value;}catch(NumberFormatException e){throw new IllegalArgumentException(name+" has invalid count: "+raw,e);}}
+    public static void main(String[]a){int warmup=count("MUSEUM_WARMUP",30000,true),n=count("MUSEUM_ITERATIONS",300000,false),samples=count("MUSEUM_SAMPLES",7,false);long mem=U.allocateMemory(16392);S s=new S();try{long c=hash(123456L,mem,s);System.out.printf("CHECK %016x%n",c);for(int i=0;i<warmup;i++)hash(i,mem,s);for(int q=0;q<samples;q++){long z=0,t=System.nanoTime();for(int i=0;i<n;i++)z^=hash(i,mem,s);long dt=System.nanoTime()-t;System.out.printf("RATE %.3f sink=%016x%n",n/(dt*1e-9),z);}}finally{U.freeMemory(mem);}}
 }

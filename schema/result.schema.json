@@ -179,6 +179,13 @@
         "null"
       ]
     },
+    "sample_count": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
     "samples": {
       "type": "array",
       "minItems": 0,
