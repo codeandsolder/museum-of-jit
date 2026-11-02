@@ -28,13 +28,13 @@ UNCONDITIONAL = __UNCONDITIONAL__
 HEX = "0123456789abcdef"
 
 
-def get_location(memory, pidx):
+def get_location(memory, pidx, bc):
     phase_id = 1 if memory else 0
-    return "hashwx phase=%d program=%d" % (phase_id, pidx)
+    return "hashwx phase=%d program=%d branch_count=%d" % (phase_id, pidx, bc)
 
 
 jitdriver = JitDriver(
-    greens=["memory", "pidx"],
+    greens=["memory", "pidx", "bc"],
     reds="auto",
     get_printable_location=get_location,
     name="hashwx-fixed-rpython",
@@ -174,7 +174,7 @@ def phase(regs, mem, memory):
         while pidx < 32:
             unconditional = promote(UNCONDITIONAL[pidx])
             while True:
-                jitdriver.jit_merge_point(memory=memory, pidx=pidx)
+                jitdriver.jit_merge_point(memory=memory, pidx=pidx, bc=bc)
                 if not memory:
                     sp = snapshot(regs, mem, sp)
                 bf = execute_program(regs, mem, memory, pidx)
