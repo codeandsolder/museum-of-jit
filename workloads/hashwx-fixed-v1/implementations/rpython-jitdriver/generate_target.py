@@ -14,22 +14,27 @@ TARGET_TEMPLATE = r"""# Generated from workloads/hashwx-fixed-v1/program.json; d
 import sys
 import time
 
-from rpython.rlib.jit import JitDriver
+from rpython.rlib.jit import JitDriver, promote
 from rpython.rlib.rarithmetic import intmask, r_uint
 
 K0 = r_uint(0x1716151413121110)
 K1 = r_uint(0x1f1e1d1c1b1a1918)
 EXPECTED = r_uint(0xfd5d450b767035c5)
-PROGRAMS = __PROGRAMS__
+OPS = __OPS__
+SRCS = __SRCS__
+DSTS = __DSTS__
+IMMS = __IMMS__
+UNCONDITIONAL = __UNCONDITIONAL__
 HEX = "0123456789abcdef"
 
 
-def get_location(phase, pidx, iidx):
-    return "hashwx phase=%d program=%d instruction=%d" % (phase, pidx, iidx)
+def get_location(memory, pidx, iidx):
+    phase_id = 1 if memory else 0
+    return "hashwx phase=%d program=%d instruction=%d" % (phase_id, pidx, iidx)
 
 
 jitdriver = JitDriver(
-    greens=["phase", "pidx", "iidx"],
+    greens=["memory", "pidx", "iidx"],
     reds="auto",
     get_printable_location=get_location,
     name="hashwx-fixed-rpython",
@@ -143,25 +148,26 @@ snapshot._always_inline_ = True
 
 
 def phase(regs, mem, memory):
-    phase_id = 1 if memory else 0
     sp = 2048
     rep = 0
     while rep < 4:
         bc = 32
         pidx = 0
         while pidx < 32:
-            program = PROGRAMS[pidx]
-            instructions = program[0]
-            unconditional = program[1]
+            unconditional = promote(UNCONDITIONAL[pidx])
             while True:
                 if not memory:
                     sp = snapshot(regs, mem, sp)
                 bf = 0
                 iidx = 0
                 while iidx < 8:
-                    jitdriver.jit_merge_point(phase=phase_id, pidx=pidx, iidx=iidx)
-                    ins = instructions[iidx]
-                    bf = execute(regs, mem, ins[0], ins[1], ins[2], ins[3], memory, bf)
+                    jitdriver.jit_merge_point(memory=memory, pidx=pidx, iidx=iidx)
+                    pc = pidx * 8 + iidx
+                    op = promote(OPS[pc])
+                    src = promote(SRCS[pc])
+                    dst = promote(DSTS[pc])
+                    imm = promote(IMMS[pc])
+                    bf = execute(regs, mem, op, src, dst, imm, memory, bf)
                     iidx += 1
                 if bc == 0:
                     break
@@ -274,15 +280,26 @@ if __name__ == "__main__":
 """
 
 
-def program_literal(document: dict) -> str:
-    programs = []
+def image_literals(document: dict) -> dict[str, str]:
+    ops: list[int] = []
+    srcs: list[int] = []
+    dsts: list[int] = []
+    imms: list[int] = []
+    unconditional: list[int] = []
     for program in document["programs"]:
-        instructions = tuple(
-            (ins["op"], ins["src"], ins["dst"], ins["imm"])
-            for ins in program["instructions"]
-        )
-        programs.append((instructions, bool(program["unconditional"])))
-    return repr(tuple(programs))
+        unconditional.append(int(bool(program["unconditional"])))
+        for ins in program["instructions"]:
+            ops.append(ins["op"])
+            srcs.append(ins["src"])
+            dsts.append(ins["dst"])
+            imms.append(ins["imm"])
+    return {
+        "__OPS__": repr(ops),
+        "__SRCS__": repr(srcs),
+        "__DSTS__": repr(dsts),
+        "__IMMS__": repr(imms),
+        "__UNCONDITIONAL__": repr(unconditional),
+    }
 
 
 def main() -> None:
@@ -294,7 +311,9 @@ def main() -> None:
         raise SystemExit("unexpected program format")
     if len(document["programs"]) != 32:
         raise SystemExit("expected 32 programs")
-    rendered = TARGET_TEMPLATE.replace("__PROGRAMS__", program_literal(document))
+    rendered = TARGET_TEMPLATE
+    for marker, literal in image_literals(document).items():
+        rendered = rendered.replace(marker, literal)
     Path(args.output).write_text(rendered)
 
 
