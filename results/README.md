@@ -16,4 +16,19 @@ The accepted Rust run used the host's canonical TCP/4226 sccache client with `SC
 
 The recovered historical `.NET dynamic-il` adapter is not in this success file because .NET SDK/runtime 10.0.403 rejects it with `InvalidProgramException`. PyPy 8.0.1 generated-source + `__pypy__.intop` passes correctness but only reached ~1.6 kH/s in the early 5k warm/sample probe; it remains a bring-up result until we decide on a stable warmup policy for pathological tracing cases.
 
-GraalVM 25.0.4 straight-line Java did not complete the standard 30k-warmup/7×300k run within the initial 120-second harness budget. That is a useful compiler-behavior finding, but it is not represented as a throughput result until the result schema grows explicit failure/timeout records.
+GraalVM 25.0.4 straight-line Java did not complete the standard 30k-warmup/7×300k run within the initial 120-second harness budget. Later diagnosis showed that this is a monolithic-method JIT pathology rather than source compilation failure; the split-helper shape is measured separately in the 2026-11-02 dataset below.
+
+## EPYC 9655 / Zen 5 — 2026-11-02
+
+`epyc-9655-zen5-2026-11-02.json` adds accepted single-logical-CPU (`cpu_affinity = [0]`) measurements for the recovered Java split shape and for a shared fixed-program WebAssembly module. Every entry uses 30,000 warmup hashes, seven measured samples of 300,000 hashes, and the canonical `fd5d450b767035c5` correctness probe.
+
+| implementation / runtime | median H/s | relative to Rust/dynasm | sample range H/s |
+|---|---:|---:|---:|
+| `v8-wasm` — Node 26.12.1 / V8 14.6 | 399,602 | 90.3% | 389,488–411,860 |
+| `wasmtime-wasm` — Wasmtime 50.0.1 / Cranelift | 348,988 | 78.9% | 338,858–367,275 |
+| `java-split` — GraalVM 25.0.4 | 291,467 | 65.9% | 277,290–294,358 |
+| `java-split` — OpenJDK 21.0.13 | 244,819 | 55.3% | 196,772–250,221 |
+
+The V8 and Wasmtime rows execute the exact same 14,166-byte generated WebAssembly module. Its measured loop runs inside Wasm, so the throughput figures do not include one host-language call per hash. Before promotion, the module's exported `hash()` matched the released `hashwx-rs` 0.1.0 Wasm emitter for 100,000 deterministic inputs. V8 compile+instantiate latency was 300.444 µs; Wasmtime was 9,581.362 µs with parallel compilation explicitly disabled.
+
+The Java runs preserve all samples because the first measured sample is visibly colder, especially on OpenJDK 21. The previously tested `@ForceInline` split variant was slightly worse than the ordinary Graal split in the diagnostic run and is not promoted as a separate canonical result.
