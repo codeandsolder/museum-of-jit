@@ -41,7 +41,7 @@ def hex64(value):
     shift = 60
     i = 0
     while i < 16:
-        chars[i] = HEX[int((value >> shift) & r_uint(15))]
+        chars[i] = HEX[intmask((value >> shift) & r_uint(15))]
         shift -= 4
         i += 1
     return "".join(chars)
