@@ -63,3 +63,9 @@ mode = "generated-source-or-bytecode"
 runner = "tools/runners/wasmtime-wasm.sh"
 runtime = "Wasmtime/Cranelift"
 source = "workloads/hashwx-fixed-v1/implementations/wasm-fixed"
+
+[rpython-jitdriver]
+mode = "idiomatic"
+runner = "tools/runners/rpython-jitdriver.sh"
+runtime = "RPython meta-JIT"
+source = "workloads/hashwx-fixed-v1/implementations/rpython-jitdriver"

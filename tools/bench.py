@@ -70,6 +70,11 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
             "-c",
             "import importlib.metadata; print('wasmtime ' + importlib.metadata.version('wasmtime'))",
         ], env)
+    if impl == "rpython-jitdriver":
+        binary = env.get("MUSEUM_RPYTHON_HASHWX")
+        if not binary:
+            return "unavailable"
+        return command_output([binary, "--version"], env)
     return "unknown"
 
 
