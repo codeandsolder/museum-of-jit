@@ -77,13 +77,15 @@ export SCCACHE_START_SERVER=0
 export SCCACHE_NO_AUTO_START_SERVER=1
 
 "$SCCACHE_BIN" --show-stats > "$BUILD_DIR/sccache-before.txt"
+pushd "$BUILD_DIR" >/dev/null
 set +e
 "$RUNTIME_ROOT/$PYPY2_DIR/bin/pypy" \
     "$RUNTIME_ROOT/$RPYTHON_DIR/rpython/bin/rpython" \
-    -Ojit --make-jobs=1 --output="$OUTPUT" --cc="$BUILD_DIR/cc-sccache" \
+    -Ojit --make-jobs=1 --output="$(basename "$OUTPUT")" --cc="$BUILD_DIR/cc-sccache" \
     "$TARGET" 2>&1 | tee "$LOG"
 translate_status=${PIPESTATUS[0]}
 set -e
+popd >/dev/null
 "$SCCACHE_BIN" --show-stats > "$BUILD_DIR/sccache-after.txt"
 
 if "$RG_BIN" -qi 'compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$LOG"; then
