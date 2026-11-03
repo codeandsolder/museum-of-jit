@@ -252,6 +252,17 @@ chmod +x "$BUILD_DIR/build-python"
 
 mkdir -p "$OBJDIR"
 
+# Keep configure and compiler discovery inside the pinned toolchain/sysroot.
+# These caller-controlled variables can otherwise inject build-host headers,
+# libraries, config answers, or Python modules even when --sysroot is present.
+unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS
+unset CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH
+unset LIBRARY_PATH COMPILER_PATH GCC_EXEC_PREFIX LD_LIBRARY_PATH CONFIG_SITE
+unset PYTHONPATH PYTHONHOME
+unset OPENSSL_CFLAGS OPENSSL_LIBS OPENSSL_LDFLAGS OPENSSL_INCLUDES
+unset PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR
+unset SCCACHE_SERVER_PORT SCCACHE_SERVER_UDS SCCACHE_DIRECT
+
 export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 export LLVM_VERSION=21
 export LLVM_TOOLS_INSTALL_DIR="$LLVM_FACADE"
@@ -262,7 +273,6 @@ export CXX="$BUILD_DIR/cxx-sccache"
 export AR="$AR_REAL" RANLIB="$RANLIB_REAL" NM="$NM_REAL" STRIP="$STRIP_REAL"
 export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/x86_64-linux-gnu/pkgconfig:$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
-unset PKG_CONFIG_PATH
 
 "$SCCACHE_BIN" --show-stats > "$BUILD_DIR/sccache-before.txt"
 if [[ -n "$PROBE_PORT" ]]; then
