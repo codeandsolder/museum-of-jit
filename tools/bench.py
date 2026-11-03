@@ -54,6 +54,9 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
     if impl.startswith("java-"):
         return command_output([env.get("MUSEUM_JAVA", "java"), "-version"], env)
+    if impl == "cranelift-direct":
+        binary = env.get("MUSEUM_CRANELIFT_BIN")
+        return command_output([binary, "--version"], env) if binary else "Cranelift 0.137.1 (build in runner)"
     if impl == "cpython-jit":
         return command_output([env.get("MUSEUM_CPYTHON", "python3"), "--version"], env)
     if impl == "pypy-intop":
