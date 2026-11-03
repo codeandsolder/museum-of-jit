@@ -10,7 +10,7 @@ RUNTIME_ROOT="$(realpath -m "$1")"
 BUILD_DIR="$(realpath -m "$2")"
 SYSROOT="$(realpath "$3")"
 PREFIX="$BUILD_DIR/install"
-OBJDIR="$BUILD_DIR/obj"
+OBJDIR="$(realpath -m "${MUSEUM_CPYTHON_OBJDIR:-$BUILD_DIR/obj}")"
 
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
     echo "the pinned CPython JIT toolchain currently supports Linux x86_64 only" >&2
@@ -119,6 +119,20 @@ if [[ "$BUILD_DIR" == / ]]; then
     echo "refusing to use / as BUILD_DIR" >&2
     exit 64
 fi
+case "$OBJDIR" in
+    /)
+        echo "refusing unsafe OBJDIR: $OBJDIR" >&2
+        exit 64
+        ;;
+esac
+for protected_path in "$BUILD_DIR" "$RUNTIME_ROOT" "$SYSROOT"; do
+    case "$protected_path" in
+        "$OBJDIR"|"$OBJDIR"/*)
+            echo "refusing OBJDIR that contains protected path $protected_path: $OBJDIR" >&2
+            exit 64
+            ;;
+    esac
+done
 
 SYSROOT_LIBC="$(find "$SYSROOT/lib" "$SYSROOT/usr/lib" -type f -name 'libc.so.6' -print -quit 2>/dev/null || true)"
 SYSROOT_FEATURES="$SYSROOT/usr/include/features.h"
@@ -136,6 +150,7 @@ BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
     "$CXX_REAL" --version | head -n 1
     printf 'configure=--enable-optimizations --with-lto=full --enable-experimental-jit=yes --with-ensurepip=no\n'
     printf 'cflags_jit=--sysroot=%s\n' "$SYSROOT"
+    printf 'objdir=%s\n' "$OBJDIR"
 } > "$BUILD_KEY_NEXT"
 
 if [[ -f "$BUILD_KEY" ]] && cmp -s "$BUILD_KEY" "$BUILD_KEY_NEXT"; then
@@ -256,6 +271,18 @@ fi
 CONFIGURE_LOG="$BUILD_DIR/configure.log"
 BUILD_LOG="$BUILD_DIR/build.log"
 MAKEFILE_AUDIT="$BUILD_DIR/makefile-audit.txt"
+SCCACHE_FAILURE_PATTERN='MUSEUM_SCCACHE_UNRECOVERED:|sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly'
+
+sccache_log_failed() {
+    local log
+    for log in "$@"; do
+        [[ -f "$log" ]] || continue
+        if "$RG_BIN" -qi "$SCCACHE_FAILURE_PATTERN" "$log"; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 trim_space() {
     local value=$1
@@ -363,7 +390,7 @@ if (( reuse_build == 0 )) || [[ ! -f Makefile || ! -f pyconfig.h ]]; then
         2>&1 | tee "$CONFIGURE_LOG"
     configure_status=${PIPESTATUS[0]}
     set -e
-    if "$RG_BIN" -qi 'MUSEUM_SCCACHE_UNRECOVERED:|sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$CONFIGURE_LOG"; then
+    if sccache_log_failed "$CONFIGURE_LOG" "$OBJDIR/config.log"; then
         popd >/dev/null
         echo "configure observed an sccache infrastructure failure; rejecting feature detection" >&2
         exit 70
@@ -393,7 +420,7 @@ if [[ -n "$PROBE_PORT" ]]; then
         "$SCCACHE_BIN" --show-stats > "$BUILD_DIR/sccache-probe-after.txt"
 fi
 
-if "$RG_BIN" -qi 'MUSEUM_SCCACHE_UNRECOVERED:|sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$BUILD_LOG"; then
+if sccache_log_failed "$BUILD_LOG"; then
     echo "build observed an sccache infrastructure failure; rejecting artifact" >&2
     exit 70
 fi
