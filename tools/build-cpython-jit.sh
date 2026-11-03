@@ -161,6 +161,16 @@ for tool in as ld ar ranlib nm strip objdump readelf; do
 done
 BINUTILS_VERSION="$("$SYSROOT_LOADER" --library-path "$SYSROOT_BINUTIL_LIBPATH" \
     "$(sysroot_binutil_target as)" --version | head -n 1)"
+read -r BINUTILS_FINGERPRINT _ < <(
+    {
+        if [[ -f "$SYSROOT_DPKG_STATUS" ]]; then sha256sum "$SYSROOT_DPKG_STATUS"; fi
+        sha256sum "$SYSROOT_LOADER" "$SYSROOT_BFD_LIB"
+        for tool in as ld ar ranlib nm strip objdump readelf; do
+            sha256sum "$(sysroot_binutil_target "$tool")"
+        done
+    } | sha256sum
+)
+SCCACHE_C_CACHE_BUSTER="museum-cpython-binutils-$BINUTILS_FINGERPRINT"
 
 read -r BUILDER_SHA256 _ < <(sha256sum "$(realpath "$0")")
 BUILD_KEY="$BUILD_DIR/build-key.txt"
@@ -178,6 +188,8 @@ BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
         sha256sum "$(sysroot_binutil_target "$tool")"
     done
     printf 'binutils_version=%s\n' "$BINUTILS_VERSION"
+    printf 'binutils_fingerprint=%s\n' "$BINUTILS_FINGERPRINT"
+    printf 'sccache_c_custom_cache_buster=%s\n' "$SCCACHE_C_CACHE_BUSTER"
     printf 'cc=%s\n' "$CC_REAL"
     "$CC_REAL" --version | head -n 1
     printf 'cxx=%s\n' "$CXX_REAL"
@@ -236,6 +248,8 @@ done
 BINUTILS_AUDIT="$BUILD_DIR/binutils-audit.txt"
 {
     printf 'BINUTILS_VERSION=%s\n' "$BINUTILS_VERSION"
+    printf 'BINUTILS_FINGERPRINT=%s\n' "$BINUTILS_FINGERPRINT"
+    printf 'SCCACHE_C_CUSTOM_CACHE_BUSTER=%s\n' "$SCCACHE_C_CACHE_BUSTER"
     for tool in as ld; do
         gcc_program="$("$CC_REAL" -print-prog-name="$tool")"
         if [[ "$gcc_program" == /* ]]; then
@@ -357,8 +371,9 @@ unset LIBRARY_PATH COMPILER_PATH GCC_EXEC_PREFIX LD_LIBRARY_PATH CONFIG_SITE
 unset PYTHONPATH PYTHONHOME
 unset OPENSSL_CFLAGS OPENSSL_LIBS OPENSSL_LDFLAGS OPENSSL_INCLUDES
 unset PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR
-unset SCCACHE_SERVER_PORT SCCACHE_SERVER_UDS SCCACHE_DIRECT
+unset SCCACHE_SERVER_PORT SCCACHE_SERVER_UDS SCCACHE_DIRECT SCCACHE_C_CUSTOM_CACHE_BUSTER
 export PATH="$BINUTILS_FACADE/bin:$PATH"
+export SCCACHE_C_CUSTOM_CACHE_BUSTER="$SCCACHE_C_CACHE_BUSTER"
 
 export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 export LLVM_VERSION=21
@@ -672,6 +687,8 @@ fi
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
     printf 'binutils_version=%s\n' "$BINUTILS_VERSION"
     printf 'binutils_facade=%s\n' "$BINUTILS_FACADE"
+    printf 'binutils_fingerprint=%s\n' "$BINUTILS_FINGERPRINT"
+    printf 'sccache_c_custom_cache_buster=%s\n' "$SCCACHE_C_CACHE_BUSTER"
     printf 'sysroot=%s\n' "$SYSROOT"
     printf 'cc=%s\n' "$CC_REAL"
     "$CC_REAL" --version | head -n 1 | sed 's/^/cc_version=/'
