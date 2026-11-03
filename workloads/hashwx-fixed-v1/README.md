@@ -25,6 +25,21 @@ tools/build-rpython-jitdriver.sh /path/to/runtime-root /path/to/build-dir
 
 The translation is forced to one make job, compiles generated C through the host's existing `sccache` client with server auto-start disabled, and rejects an artifact if the translation log reports local sccache fallback. The resulting `hashwx-rpython-jit` is supplied to the benchmark runner as `MUSEUM_RPYTHON_HASHWX`.
 
+### Native Cranelift IR JIT
+
+The `cranelift-direct` adapter parses the canonical `program.json` and emits the complete fixed program as native Cranelift IR, without a bytecode interpreter or WebAssembly frontend. This is a distinct backend from the `wasmtime-wasm` adapter, which compiles the same algorithm after lowering it to the 14,166-byte shared WebAssembly module. Its `hash(u64) -> u64` JIT function runs inside a Rust host measurement loop, whereas Wasmtime's `bench` loop runs inside Wasm. Compare their rates with that boundary difference in mind.
+
+The pinned implementation uses Cranelift **0.137.1**, Rust **1.99**, and the host's existing sccache service. The runner accepts an already compiled binary through `MUSEUM_CRANELIFT_BIN`; otherwise it performs an isolated out-of-tree Cargo build with `--locked --release`, requires a configured sccache wrapper and explicitly disables sccache server auto-start. The JIT holds its executable-memory module alive while calling its native pointer; `BUILD_US` measures parse + IR generation + JIT compilation + finalization separately from `FIRST_US` and timed sample loops. No native code size is reported without a trustworthy source.
+
+Validate every hash for 100,000 deterministic salts (including boundary values) against the independently generated V8/Wasm oracle before accepting benchmark results:
+
+```sh
+uv run --no-project --python 3.13 python tools/validate-cranelift-direct.py \
+    --binary /path/to/museum-hashwx-cranelift-direct --count 100000
+```
+
+The validator uses a temporary directory, does not compile Rust or start any sccache service, compares every 16-digit output exactly, and reports a SHA-256 digest. The compiled binary's diagnostic `--hash-salts SALTS.hex` mode invokes the same native function as the timed benchmark and prints one hash per provided 16-digit salt. These are optional correctness probes, never substituted for the canonical 30k-warmup/7×300k CPU-pinned benchmark.
+
 ### Reproducible CPython 3.15 JIT build
 
 The preserved **experimental** CPython JIT runtime is built out of tree with the pinned CPython 3.15.2 source and LLVM 21.1.8 stencil toolchain. Supply a target-compatible Linux sysroot; all C/C++ and JIT-stencil compilation is forced through the existing sccache service, with daemon autostart disabled:

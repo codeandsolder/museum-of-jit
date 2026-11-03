@@ -9,6 +9,7 @@ use cranelift_jit::{JITBuilder, JITModule};
 use cranelift_module::{Linkage, Module, default_libcall_names};
 use serde::Deserialize;
 use std::error::Error;
+use std::io::{BufRead, Write};
 use std::time::Instant;
 
 const K0: u64 = 0x1716_1514_1312_1110;
@@ -373,14 +374,40 @@ fn count(name: &str, default: u64, allow_zero: bool) -> Result<u64, Box<dyn Erro
     }
 }
 
+fn hash_salts(compiled: &Compiled, input_path: &str) -> Result<(), Box<dyn Error>> {
+    let reader = std::io::BufReader::new(std::fs::File::open(input_path)?);
+    let stdout = std::io::stdout();
+    let mut output = std::io::BufWriter::new(stdout.lock());
+    for (idx, line) in reader.lines().enumerate() {
+        let salt = line?;
+        if salt.len() != 16 || !salt.bytes().all(|ch| ch.is_ascii_hexdigit()) {
+            return Err(format!("invalid hex salt at line {}", idx + 1).into());
+        }
+        let input = u64::from_str_radix(&salt, 16)?;
+        writeln!(output, "{:016x}", compiled.hash(input))?;
+    }
+    output.flush()?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    if std::env::args().skip(1).any(|a| a == "--version") {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.as_slice() == ["--version"] {
         println!(
             "museum-hashwx-cranelift-direct {} / Cranelift 0.137.1",
             env!("CARGO_PKG_VERSION")
         );
         return Ok(());
     }
+    let oracle_input = match args.as_slice() {
+        [] => None,
+        [mode, path] if mode == "--hash-salts" => Some(path.as_str()),
+        _ => {
+            return Err(
+                "usage: museum-hashwx-cranelift-direct [--version | --hash-salts SALTS.HEX]".into(),
+            );
+        }
+    };
     let input = std::env::var("MUSEUM_PROGRAM_JSON")?;
     let warmup = count("MUSEUM_WARMUP", 30_000, true)?;
     let iterations = count("MUSEUM_ITERATIONS", 300_000, false)?;
@@ -395,6 +422,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_us = t0.elapsed().as_secs_f64() * 1e6;
     if check != CORRECT {
         return Err(format!("wrong result: {check:016x} != {CORRECT:016x}").into());
+    }
+    if let Some(path) = oracle_input {
+        return hash_salts(&compiled, path);
     }
     println!("BUILD_US {build_us:.3} FIRST_US {first_us:.3} CHECK {check:016x}");
     for n in 0..warmup {

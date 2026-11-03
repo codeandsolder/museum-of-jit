@@ -18,6 +18,7 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 `workloads/hashwx-fixed-v1/` is the recovered fixed HashWX program used by the 2026-10-30 cross-runtime experiments. It currently has normalized adapters for:
 
 - Rust + dynasm direct x86-64 emission
+- Cranelift 0.137.1 direct native-IR JIT (fully generated HashWX, not a Wasm host)
 - .NET / RyuJIT from `DynamicMethod` IL
 - .NET / RyuJIT static-source ceiling
 - Java / HotSpot straight-line source
