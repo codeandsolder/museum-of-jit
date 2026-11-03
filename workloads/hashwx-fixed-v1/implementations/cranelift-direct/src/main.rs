@@ -6,7 +6,7 @@ use cranelift_codegen::ir::{
 };
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_jit::{JITBuilder, JITModule};
-use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use serde::Deserialize;
 use std::error::Error;
 use std::io::{BufRead, Write};
@@ -238,13 +238,77 @@ fn emit_phase(
     b.seal_block(done);
 }
 
+// Emits the same logical batch loop as the separate Wasm bench(start,count)
+// export: a 64-bit wrapping index, a remaining count, and XOR aggregation.
+// The hash implementation is the exact already validated native JIT function.
+fn define_batch(module: &mut JITModule, hash_id: FuncId) -> Result<FuncId, Box<dyn Error>> {
+    let mut signature = module.make_signature();
+    signature.params.push(AbiParam::new(types::I64));
+    signature.params.push(AbiParam::new(types::I64));
+    signature.returns.push(AbiParam::new(types::I64));
+    let id = module.declare_function("hashwx_batch", Linkage::Local, &signature)?;
+    let mut context = module.make_context();
+    context.func.signature = signature;
+    let hash_ref = module.declare_func_in_func(hash_id, &mut context.func);
+    let frontend_config = module.isa().frontend_config();
+    let mut frontend_context = FunctionBuilderContext::new();
+    {
+        let mut b = FunctionBuilder::new(&mut context.func, &mut frontend_context);
+        let start = b.create_block();
+        b.append_block_params_for_function_params(start);
+        b.switch_to_block(start);
+        b.seal_block(start);
+        let index = b.declare_var(types::I64);
+        let remaining = b.declare_var(types::I64);
+        let sink = b.declare_var(types::I64);
+        let args = b.block_params(start).to_vec();
+        b.def_var(index, args[0]);
+        b.def_var(remaining, args[1]);
+        let zero = b.ins().iconst(types::I64, 0);
+        b.def_var(sink, zero);
+        let header = b.create_block();
+        let body = b.create_block();
+        let done = b.create_block();
+        b.ins().jump(header, &[]);
+        b.switch_to_block(header);
+        let count = b.use_var(remaining);
+        let active = b.ins().icmp_imm_s(IntCC::NotEqual, count, 0);
+        b.ins().brif(active, body, &[], done, &[]);
+        b.switch_to_block(body);
+        b.seal_block(body);
+        let idx = b.use_var(index);
+        let call = b.ins().call(hash_ref, &[idx]);
+        let hashed = b.inst_results(call)[0];
+        let acc = b.use_var(sink);
+        let acc = b.ins().bxor(acc, hashed);
+        b.def_var(sink, acc);
+        let next_index = b.ins().iadd_imm_s(idx, 1);
+        b.def_var(index, next_index);
+        let current_count = b.use_var(remaining);
+        let next_count = b.ins().iadd_imm_s(current_count, -1);
+        b.def_var(remaining, next_count);
+        b.ins().jump(header, &[]);
+        b.seal_block(header);
+        b.switch_to_block(done);
+        b.seal_block(done);
+        let result = b.use_var(sink);
+        b.ins().return_(&[result]);
+        b.finalize(frontend_config);
+    }
+    module.define_function(id, &mut context)?;
+    module.clear_context(&mut context);
+    Ok(id)
+}
+
 struct Compiled {
+    // Owns the executable regions backing both native function pointers.
     _module: JITModule,
     entry: unsafe extern "C" fn(u64) -> u64,
+    batch_entry: Option<unsafe extern "C" fn(u64, u64) -> u64>,
 }
 
 impl Compiled {
-    fn build(corpus: &Corpus) -> Result<Self, Box<dyn Error>> {
+    fn build(corpus: &Corpus, batch_mode: bool) -> Result<Self, Box<dyn Error>> {
         // The raw JITBuilder default is opt_level=none; use the optimizing
         // compilation policy for a meaningful native-vs-Wasm codegen comparison.
         let jit_builder =
@@ -347,18 +411,35 @@ impl Compiled {
         }
         module.define_function(function, &mut context)?;
         module.clear_context(&mut context);
+        let batch_id = if batch_mode {
+            Some(define_batch(&mut module, function)?)
+        } else {
+            None
+        };
         module.finalize_definitions()?;
         let ptr = module.get_finalized_function(function);
         let entry =
             unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(u64) -> u64>(ptr) };
+        let batch_entry = batch_id.map(|id| {
+            let ptr = module.get_finalized_function(id);
+            unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(u64, u64) -> u64>(ptr) }
+        });
         Ok(Self {
             _module: module,
             entry,
+            batch_entry,
         })
     }
     #[inline]
     fn hash(&self, salt: u64) -> u64 {
         unsafe { (self.entry)(salt) }
+    }
+    #[inline]
+    fn batch(&self, start: u64, count: u64) -> u64 {
+        let entry = self
+            .batch_entry
+            .expect("batch entry must be compiled in batch mode");
+        unsafe { entry(start, count) }
     }
 }
 
@@ -392,6 +473,42 @@ fn hash_salts(compiled: &Compiled, input_path: &str) -> Result<(), Box<dyn Error
     Ok(())
 }
 
+// A correctness-only interface: compare the JIT-local loop to an independent
+// Rust host reduction of the same generated hash, including count=0 and wrap.
+fn batch_cases(compiled: &Compiled, path: &str) -> Result<(), Box<dyn Error>> {
+    let reader = std::io::BufReader::new(std::fs::File::open(path)?);
+    let stdout = std::io::stdout();
+    let mut output = std::io::BufWriter::new(stdout.lock());
+    for (line_no, line) in reader.lines().enumerate() {
+        let line = line?;
+        let fields = line.split_whitespace().collect::<Vec<_>>();
+        if fields.len() != 2
+            || fields.iter().any(|field| {
+                field.len() != 16 || !field.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+        {
+            return Err(format!("invalid start/count at line {}", line_no + 1).into());
+        }
+        let start = u64::from_str_radix(fields[0], 16)?;
+        let count = u64::from_str_radix(fields[1], 16)?;
+        let jit = compiled.batch(start, count);
+        let mut host = 0u64;
+        for offset in 0..count {
+            host ^= compiled.hash(start.wrapping_add(offset));
+        }
+        if jit != host {
+            return Err(format!(
+                "batch/host mismatch at line {}: {jit:016x} != {host:016x}",
+                line_no + 1
+            )
+            .into());
+        }
+        writeln!(output, "{jit:016x}")?;
+    }
+    output.flush()?;
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.as_slice() == ["--version"] {
@@ -401,13 +518,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         return Ok(());
     }
-    let oracle_input = match args.as_slice() {
-        [] => None,
-        [mode, path] if mode == "--hash-salts" => Some(path.as_str()),
+    let (batch_mode, oracle_input, batch_input) = match args.as_slice() {
+        [] => (false, None, None),
+        [mode] if mode == "--batch" => (true, None, None),
+        [mode, path] if mode == "--hash-salts" => (false, Some(path.as_str()), None),
+        [mode, path] if mode == "--batch-cases" => (true, None, Some(path.as_str())),
         _ => {
-            return Err(
-                "usage: museum-hashwx-cranelift-direct [--version | --hash-salts SALTS.HEX]".into(),
-            );
+            return Err("usage: museum-hashwx-cranelift-direct \
+            [--version | --batch | --hash-salts SALTS.hex | --batch-cases CASES.hex]"
+                .into());
         }
     };
     let input = std::env::var("MUSEUM_PROGRAM_JSON")?;
@@ -417,7 +536,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let t0 = Instant::now();
     let corpus: Corpus = serde_json::from_str(&std::fs::read_to_string(input)?)?;
     validate(&corpus)?;
-    let compiled = Compiled::build(&corpus)?;
+    let compiled = Compiled::build(&corpus, batch_mode)?;
     let build_us = t0.elapsed().as_secs_f64() * 1e6;
     let t0 = Instant::now();
     let check = compiled.hash(123_456);
@@ -428,16 +547,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(path) = oracle_input {
         return hash_salts(&compiled, path);
     }
+    if let Some(path) = batch_input {
+        return batch_cases(&compiled, path);
+    }
+    println!("MODE {}", if batch_mode { "jit-batch" } else { "direct" });
     println!("BUILD_US {build_us:.3} FIRST_US {first_us:.3} CHECK {check:016x}");
-    for n in 0..warmup {
-        std::hint::black_box(compiled.hash(n));
+    if batch_mode {
+        std::hint::black_box(compiled.batch(0, warmup));
+    } else {
+        for n in 0..warmup {
+            std::hint::black_box(compiled.hash(n));
+        }
     }
     for _ in 0..samples {
         let t0 = Instant::now();
-        let mut sink = 0u64;
-        for n in 0..iterations {
-            sink ^= std::hint::black_box(compiled.hash(n));
-        }
+        let sink = if batch_mode {
+            compiled.batch(0, iterations)
+        } else {
+            let mut value = 0u64;
+            for n in 0..iterations {
+                value ^= std::hint::black_box(compiled.hash(n));
+            }
+            value
+        };
+        std::hint::black_box(sink);
         let elapsed = t0.elapsed().as_secs_f64();
         println!("RATE {:.3} sink={sink:016x}", iterations as f64 / elapsed);
     }

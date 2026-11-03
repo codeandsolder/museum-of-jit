@@ -54,7 +54,7 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
     if impl.startswith("java-"):
         return command_output([env.get("MUSEUM_JAVA", "java"), "-version"], env)
-    if impl == "cranelift-direct":
+    if impl in ("cranelift-direct", "cranelift-batch"):
         binary = env.get("MUSEUM_CRANELIFT_BIN")
         return command_output([binary, "--version"], env) if binary else "Cranelift 0.137.1 (build in runner)"
     if impl == "cpython-jit":
@@ -146,6 +146,10 @@ def parse_output(text: str) -> dict:
 
 
 def implementation_evidence(impl: str, text: str) -> dict:
+    if impl == "cranelift-batch":
+        if not re.search(r"\bMODE\s+jit-batch\b", text):
+            raise ValueError("Cranelift batch adapter did not execute the JIT-local batch loop")
+        return {"jit_batch_internal": True}
     if impl != "cpython-jit":
         return {}
 

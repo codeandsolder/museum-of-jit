@@ -19,6 +19,7 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 
 - Rust + dynasm direct x86-64 emission
 - Cranelift 0.137.1 direct native-IR JIT (fully generated HashWX, not a Wasm host)
+- Cranelift 0.137.1 native in-JIT batch loop (separate adapter, no per-hash Rust/JIT boundary)
 - .NET / RyuJIT from `DynamicMethod` IL
 - .NET / RyuJIT static-source ceiling
 - Java / HotSpot straight-line source

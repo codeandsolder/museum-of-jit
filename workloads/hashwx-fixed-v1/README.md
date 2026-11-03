@@ -40,6 +40,23 @@ uv run --no-project --python 3.13 python tools/validate-cranelift-direct.py \
 
 The validator uses a temporary directory, does not compile Rust or start any sccache service, compares every 16-digit output exactly, and reports a SHA-256 digest. The compiled binary's diagnostic `--hash-salts SALTS.hex` mode invokes the same native function as the timed benchmark and prints one hash per provided 16-digit salt. These are optional correctness probes, never substituted for the canonical 30k-warmup/7×300k CPU-pinned benchmark.
 
+### Cranelift native in-JIT batch comparison
+
+The separate `cranelift-batch` adapter emits a second native Cranelift function `bench(start: u64, count: u64) -> u64`, with a counted loop *inside JIT code* which invokes the **same** fully generated fixed-program `hash(u64) -> u64` JIT function. The accumulator, incremented salt, and remaining count are all Cranelift IR variables, and the salt addition wraps at 64 bits. This matches the Wasm `bench(start,count)` export's loop semantics while removing Rust-to-JIT entry overhead per hash. The normal `cranelift-direct` adapter still invokes hash once per salt from the Rust benchmark loop, and does not compile the extra batch function.
+
+Both modes are provided by the same pinned Cranelift 0.137.1 source and Cargo.lock. The distinct `tools/runners/cranelift-batch.sh` sets `MUSEUM_CRANELIFT_BATCH=1` and delegates to the same sccache-required runner; a precompiled binary from `MUSEUM_CRANELIFT_BIN` is supported. Batch-mode output must report `MODE jit-batch`, enforced by the harness, so the new adapter cannot silently benchmark the direct host-loop path.
+
+The batch adapter's diagnostic `--batch-cases CASES.hex` accepts one 16-hex-digit `start count` pair per line, runs each case in the native JIT, independently checks the same range using the native hash function from a host loop, then emits the 16-digit sink. To also compare against **independently compiled Wasm** across zero-length, boundary, overflowing-salt, random, and full 300k ranges:
+
+```sh
+uv run --no-project --python 3.13 python tools/validate-cranelift-batch.py \
+    --binary /path/to/museum-hashwx-cranelift-direct --random-cases 512
+```
+
+This validator creates disposable oracle files outside the repository and does not compile Rust or start cache services. The `--hash-salts` validator for the original single-hash function is still required; a matching aggregate sink alone is never sufficient proof. The full accepted fixed-program run is always CPU0, 30k warmup, seven ×300k samples with the canonical `1842ddbd4c0fefed` sink.
+
+A crucial interpretation limit remains: putting the batch loop in native Cranelift IR eliminates *host-to-JIT calls per hash*, but it still emits an internal call from batch to hash. Wasmtime may inline its Wasm `hash` call or apply different memory/stack lowering optimizations. Native-vs-Wasm performance differences therefore need more than the call-boundary comparison to explain completely.
+
 ### Reproducible CPython 3.15 JIT build
 
 The preserved **experimental** CPython JIT runtime is built out of tree with the pinned CPython 3.15.2 source and LLVM 21.1.8 stencil toolchain. Supply a target-compatible Linux sysroot; all C/C++ and JIT-stencil compilation is forced through the existing sccache service, with daemon autostart disabled:

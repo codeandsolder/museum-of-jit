@@ -75,3 +75,9 @@ mode = "direct-ir-or-machine-code"
 runner = "tools/runners/cranelift-direct.sh"
 runtime = "Cranelift native JIT"
 source = "workloads/hashwx-fixed-v1/implementations/cranelift-direct"
+
+[cranelift-batch]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/cranelift-batch.sh"
+runtime = "Cranelift native JIT (internal batch)"
+source = "workloads/hashwx-fixed-v1/implementations/cranelift-direct"
