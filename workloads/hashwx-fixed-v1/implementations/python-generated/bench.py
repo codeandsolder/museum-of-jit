@@ -175,10 +175,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--engine", choices=("auto", "cpython", "pypy"), default="auto")
     ap.add_argument("--dump-source")
+    ap.add_argument("--trace-executors", action="store_true", help="record installed CPython JIT executors outside timed samples")
     args = ap.parse_args()
     engine = args.engine
     if engine == "auto":
         engine = "pypy" if platform.python_implementation() == "PyPy" else "cpython"
+    if args.trace_executors and engine != "cpython":
+        ap.error("--trace-executors only supports the CPython implementation")
     if engine == "pypy":
         try:
             from __pypy__ import intop
@@ -227,13 +230,17 @@ def main() -> None:
         jit_state = str(bool(jit.is_enabled())).lower()
     print(f"ENGINE {engine} IMPL {platform.python_implementation()} VERSION {platform.python_version()} JIT {jit_state}")
     print(f"BUILD_US {build_us:.3f} SOURCE_BYTES {len(source.encode())} FIRST_US {first_us:.3f} CHECK {check:016x}")
-    for _ in range(samples):
+    if args.trace_executors:
+        print(f"JIT_EXECUTORS_AFTER_WARMUP {count_cpython_executors(hash_one)}")
+    for sample_index in range(samples):
         sink = 0
         t0 = time.perf_counter_ns()
         for n in range(iterations):
             sink ^= hash_one(n, mem)
         dt = (time.perf_counter_ns() - t0) / 1e9
         print(f"RATE {iterations/dt:.3f} sink={sink & MASK:016x}")
+        if args.trace_executors:
+            print(f"JIT_EXECUTORS_AFTER_SAMPLE {sample_index + 1} {count_cpython_executors(hash_one)}")
     if engine == "cpython" and jit_state == "true":
         executor_count = count_cpython_executors(hash_one)
         if executor_count is None:
