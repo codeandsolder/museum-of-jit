@@ -31,7 +31,7 @@ LLVM_SHA256=b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
 LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/$LLVM_ARCHIVE"
 LLVM_DIR=LLVM-21.1.8-Linux-X64
 
-for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp; do
+for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp; do
     command -v "$tool" >/dev/null || {
         echo "required tool not found: $tool" >&2
         exit 69
@@ -147,21 +147,64 @@ else
     mv "$BUILD_KEY_NEXT" "$BUILD_KEY"
 fi
 
+SCCACHE_RUN="$BUILD_DIR/sccache-run"
+cat > "$SCCACHE_RUN" <<EOF_SCCACHE_RUN
+#!/usr/bin/env bash
+set -euo pipefail
+if (( \$# < 2 )); then
+    echo "usage: \$0 PORT COMPILER [ARGS...]" >&2
+    exit 64
+fi
+port=\$1
+compiler=\$2
+shift 2
+export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
+if [[ -n "\$port" ]]; then
+    export SCCACHE_SERVER_PORT="\$port"
+    unset SCCACHE_SERVER_UDS
+fi
+errfile=\$(mktemp "\${TMPDIR:-/tmp}/museum-sccache.XXXXXX")
+trap 'rm -f "\$errfile"' EXIT
+attempt=1
+while :; do
+    : > "\$errfile"
+    set +e
+    "$SCCACHE_BIN" "\$compiler" "\$@" 2>"\$errfile"
+    status=\$?
+    set -e
+    if (( status != 2 )); then
+        cat "\$errfile" >&2
+        if (( attempt > 1 )); then
+            echo "MUSEUM_SCCACHE_RECOVERED: succeeded on attempt \$attempt" >&2
+        fi
+        exit "\$status"
+    fi
+    if (( attempt >= 5 )); then
+        cat "\$errfile" >&2
+        echo "MUSEUM_SCCACHE_UNRECOVERED: sccache client failed 5 times" >&2
+        exit "\$status"
+    fi
+    sleep 0.25
+    ((attempt += 1))
+done
+EOF_SCCACHE_RUN
+chmod +x "$SCCACHE_RUN"
+
 write_compiler_wrapper() {
     local path=$1 compiler=$2
     cat > "$path" <<EOF_WRAPPER
 #!/usr/bin/env bash
 set -euo pipefail
-export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
-probe_port='$PROBE_PORT'
-if [[ -n "\$probe_port" ]]; then
+probe_port=''
+configured_probe_port='$PROBE_PORT'
+if [[ -n "\$configured_probe_port" ]]; then
     for arg in "\$@"; do
         case "\$arg" in
-            *conftest*) export SCCACHE_SERVER_PORT="\$probe_port"; unset SCCACHE_SERVER_UDS; break ;;
+            *conftest*) probe_port="\$configured_probe_port"; break ;;
         esac
     done
 fi
-exec "$SCCACHE_BIN" "$compiler" --sysroot="$SYSROOT" "\$@"
+exec "$SCCACHE_RUN" "\$probe_port" "$compiler" --sysroot="$SYSROOT" "\$@"
 EOF_WRAPPER
     chmod +x "$path"
 }
@@ -174,13 +217,8 @@ mkdir -p "$LLVM_FACADE/bin"
 cat > "$LLVM_FACADE/bin/clang" <<EOF_CLANG
 #!/usr/bin/env bash
 set -euo pipefail
-export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 jit_port='$JIT_PORT'
-if [[ -n "\$jit_port" ]]; then
-    export SCCACHE_SERVER_PORT="\$jit_port"
-    unset SCCACHE_SERVER_UDS
-fi
-exec "$SCCACHE_BIN" "$RUNTIME_ROOT/$LLVM_DIR/bin/clang" "\$@"
+exec "$SCCACHE_RUN" "\$jit_port" "$RUNTIME_ROOT/$LLVM_DIR/bin/clang" "\$@"
 EOF_CLANG
 chmod +x "$LLVM_FACADE/bin/clang"
 ln -sfn clang "$LLVM_FACADE/bin/clang-21"
@@ -217,6 +255,102 @@ fi
 
 CONFIGURE_LOG="$BUILD_DIR/configure.log"
 BUILD_LOG="$BUILD_DIR/build.log"
+MAKEFILE_AUDIT="$BUILD_DIR/makefile-audit.txt"
+
+trim_space() {
+    local value=$1
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+make_var() {
+    local key=$1 line
+    line="$("$RG_BIN" -N -m1 "^${key}=" Makefile)" || return 1
+    trim_space "${line#*=}"
+}
+
+require_contains() {
+    local label=$1 value=$2 needle=$3
+    if [[ "$value" != *"$needle"* ]]; then
+        printf 'generated Makefile invariant failed: %s lacks %q\n' "$label" "$needle" >&2
+        printf '%s=%s\n' "$label" "$value" >&2
+        return 1
+    fi
+}
+
+audit_makefile() {
+    [[ -f Makefile && -f pyconfig.h ]] || {
+        echo "configure completed without Makefile/pyconfig.h" >&2
+        return 1
+    }
+
+    local make_cc make_cxx pgo_gen pgo_use prof_merger profile_task cflags_nodist ldflags_nodist
+    make_cc="$(make_var CC)" || return 1
+    make_cxx="$(make_var CXX)" || return 1
+    pgo_gen="$(make_var PGO_PROF_GEN_FLAG)" || return 1
+    pgo_use="$(make_var PGO_PROF_USE_FLAG)" || return 1
+    prof_merger="$(make_var LLVM_PROF_MERGER)" || return 1
+    profile_task="$(make_var PROFILE_TASK)" || return 1
+    cflags_nodist="$(make_var CONFIGURE_CFLAGS_NODIST)" || return 1
+    ldflags_nodist="$(make_var CONFIGURE_LDFLAGS_NODIST)" || return 1
+
+    [[ "$make_cc" == "$CC" ]] || {
+        printf 'generated Makefile CC mismatch: expected %s, got %s\n' "$CC" "$make_cc" >&2
+        return 1
+    }
+    [[ "$make_cxx" == "$CXX" ]] || {
+        printf 'generated Makefile CXX mismatch: expected %s, got %s\n' "$CXX" "$make_cxx" >&2
+        return 1
+    }
+    require_contains PGO_PROF_GEN_FLAG "$pgo_gen" '-fprofile-generate' || return 1
+    require_contains PGO_PROF_USE_FLAG "$pgo_use" '-fprofile-use' || return 1
+    require_contains PGO_PROF_USE_FLAG "$pgo_use" '-fprofile-correction' || return 1
+    [[ "$prof_merger" == true ]] || {
+        printf 'expected GCC PGO LLVM_PROF_MERGER=true, got %s\n' "$prof_merger" >&2
+        return 1
+    }
+    [[ "$profile_task" == "-m test --pgo --timeout=\$(TESTTIMEOUT)" ]] || {
+        printf 'unexpected PROFILE_TASK: %s\n' "$profile_task" >&2
+        return 1
+    }
+    "$RG_BIN" -q '^all:[[:space:]]+profile-opt$' Makefile || {
+        echo "generated Makefile default target is not profile-opt" >&2
+        return 1
+    }
+    require_contains CONFIGURE_CFLAGS_NODIST "$cflags_nodist" '-flto' || return 1
+    require_contains CONFIGURE_CFLAGS_NODIST "$cflags_nodist" '-D_Py_TIER2=1' || return 1
+    require_contains CONFIGURE_CFLAGS_NODIST "$cflags_nodist" '-D_Py_JIT' || return 1
+    require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-flto' || return 1
+    require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-fuse-linker-plugin' || return 1
+    require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-ffat-lto-objects' || return 1
+
+    "$RG_BIN" -Fq -- "--cflags=\"--sysroot=$SYSROOT\"" Makefile || {
+        echo "generated JIT command lost the Debian sysroot" >&2
+        return 1
+    }
+    "$RG_BIN" -Fq -- '--llvm-version="21"' Makefile || {
+        echo "generated JIT command is not pinned to LLVM 21" >&2
+        return 1
+    }
+    "$RG_BIN" -Fq -- "--llvm-tools-install-dir=\"$LLVM_FACADE\"" Makefile || {
+        echo "generated JIT command does not use the sccache-backed LLVM facade" >&2
+        return 1
+    }
+
+    printf 'CC=%s\n' "$make_cc"
+    printf 'CXX=%s\n' "$make_cxx"
+    printf 'PGO_PROF_GEN_FLAG=%s\n' "$pgo_gen"
+    printf 'PGO_PROF_USE_FLAG=%s\n' "$pgo_use"
+    printf 'LLVM_PROF_MERGER=%s\n' "$prof_merger"
+    printf 'PROFILE_TASK=%s\n' "$profile_task"
+    printf 'DEFAULT_TARGET=profile-opt\n'
+    printf 'CONFIGURE_CFLAGS_NODIST=%s\n' "$cflags_nodist"
+    printf 'CONFIGURE_LDFLAGS_NODIST=%s\n' "$ldflags_nodist"
+    printf 'JIT_SYSROOT=%s\n' "$SYSROOT"
+    printf 'LLVM_TOOLS_INSTALL_DIR=%s\n' "$LLVM_FACADE"
+}
+
 pushd "$OBJDIR" >/dev/null
 if (( reuse_build == 0 )) || [[ ! -f Makefile || ! -f pyconfig.h ]]; then
     set +e
@@ -229,7 +363,7 @@ if (( reuse_build == 0 )) || [[ ! -f Makefile || ! -f pyconfig.h ]]; then
         2>&1 | tee "$CONFIGURE_LOG"
     configure_status=${PIPESTATUS[0]}
     set -e
-    if "$RG_BIN" -qi 'sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$CONFIGURE_LOG"; then
+    if "$RG_BIN" -qi 'MUSEUM_SCCACHE_UNRECOVERED:|sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$CONFIGURE_LOG"; then
         popd >/dev/null
         echo "configure observed an sccache infrastructure failure; rejecting feature detection" >&2
         exit 70
@@ -241,6 +375,8 @@ if (( reuse_build == 0 )) || [[ ! -f Makefile || ! -f pyconfig.h ]]; then
 else
     echo "reusing matching configure output in $OBJDIR"
 fi
+
+audit_makefile | tee "$MAKEFILE_AUDIT"
 
 set +e
 {
@@ -257,7 +393,7 @@ if [[ -n "$PROBE_PORT" ]]; then
         "$SCCACHE_BIN" --show-stats > "$BUILD_DIR/sccache-probe-after.txt"
 fi
 
-if "$RG_BIN" -qi 'sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$BUILD_LOG"; then
+if "$RG_BIN" -qi 'MUSEUM_SCCACHE_UNRECOVERED:|sccache: error:|compiling locally instead|failed to connect to sccache server|server looks like it shut down unexpectedly' "$BUILD_LOG"; then
     echo "build observed an sccache infrastructure failure; rejecting artifact" >&2
     exit 70
 fi
