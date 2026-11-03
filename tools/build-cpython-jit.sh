@@ -31,7 +31,7 @@ LLVM_SHA256=b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
 LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/$LLVM_ARCHIVE"
 LLVM_DIR=LLVM-21.1.8-Linux-X64
 
-for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp cp; do
+for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp cp patch; do
     command -v "$tool" >/dev/null || {
         echo "required tool not found: $tool" >&2
         exit 69
@@ -78,6 +78,35 @@ for llvm_tool in clang llvm-readobj llvm-objdump llvm-dwarfdump; do
         exit 65
     }
 done
+
+# GCC 14 gives inconsistent PGO generation/use CFGs for the four UNARY_FUNC
+# macro expansions in CPython 3.15.2. Apply the exact tested, semantics-
+# preserving expansion before configuring or compiling; never suppress GCC's
+# coverage-mismatch diagnostic or reuse profiles from the unpatched source.
+SOURCE_PATCH="$(dirname "$(realpath "$0")")/patches/cpython-3.15.2-gcc14-pgo-unary.patch"
+SOURCE_PATCH_SHA256=e224e014e5211cb527b0589e830cda24e8b40d346c1ea48ac80734a18cd7d2e6
+ABSTRACT_UPSTREAM_SHA256=000c079b34d6d9a6074cead81c04ab3e46e3682942acdce6786096bc43fc6b41
+ABSTRACT_PATCHED_SHA256=e5125a03e60efbddf5af715bd3ab14d79ab65f19d7c99c2deabd556cc7ea102f
+ABSTRACT_SOURCE="$RUNTIME_ROOT/$PYTHON_DIR/Objects/abstract.c"
+printf '%s  %s\n' "$SOURCE_PATCH_SHA256" "$SOURCE_PATCH" | sha256sum --check --status || {
+    echo "CPython GCC PGO source patch has changed" >&2
+    exit 65
+}
+read -r abstract_sha _ < <(sha256sum "$ABSTRACT_SOURCE")
+case "$abstract_sha" in
+    "$ABSTRACT_UPSTREAM_SHA256")
+        (cd "$RUNTIME_ROOT/$PYTHON_DIR" && patch --batch --fuzz=0 -p1 < "$SOURCE_PATCH") ||
+            { echo "CPython GCC PGO source patch failed" >&2; exit 65; }
+        ;;
+    "$ABSTRACT_PATCHED_SHA256")
+        ;;
+    *)
+        echo "CPython abstract.c does not match the pinned upstream or patched revision" >&2
+        exit 65
+        ;;
+esac
+printf '%s  %s\n' "$ABSTRACT_PATCHED_SHA256" "$ABSTRACT_SOURCE" |
+    sha256sum --check --status || { echo "CPython GCC PGO patched-source checksum failed" >&2; exit 65; }
 
 SCCACHE_BIN="$(command -v sccache)"
 UV_BIN="$(command -v uv)"
@@ -178,6 +207,8 @@ BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
 {
     printf 'builder_sha256=%s\n' "$BUILDER_SHA256"
     printf 'python_sha256=%s\n' "$PYTHON_SHA256"
+    printf 'source_patch_sha256=%s\n' "$SOURCE_PATCH_SHA256"
+    printf 'abstract_patched_sha256=%s\n' "$ABSTRACT_PATCHED_SHA256"
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
     printf 'sysroot=%s\n' "$SYSROOT"
     if [[ -n "$SYSROOT_LIBC" ]]; then sha256sum "$SYSROOT_LIBC"; fi
@@ -681,6 +712,8 @@ fi
     printf 'builder_sha256=%s\n' "$BUILDER_SHA256"
     printf 'python_version=3.15.2\n'
     printf 'python_sha256=%s\n' "$PYTHON_SHA256"
+    printf 'source_patch_sha256=%s\n' "$SOURCE_PATCH_SHA256"
+    printf 'abstract_patched_sha256=%s\n' "$ABSTRACT_PATCHED_SHA256"
     printf 'llvm_version=21.1.8\n'
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
     printf 'binutils_version=%s\n' "$BINUTILS_VERSION"
