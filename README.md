@@ -24,6 +24,8 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 - Java / HotSpot split helpers, including the `@ForceInline` experiment
 - CPython JIT generated Python
 - PyPy generated Python using `__pypy__.intop`
+- V8 and Wasmtime over the same generated fixed-program WebAssembly module
+- RPython/PyPy tracing meta-JIT over a fixed bytecode interpreter
 
 The complete recovered C#/Java/Rust scratch source is under `archive/hashwx-fixed-v1/`, including variants that lost. They are evidence, not recommended implementations.
 
