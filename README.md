@@ -22,7 +22,7 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 - .NET / RyuJIT static-source ceiling
 - Java / HotSpot straight-line source
 - Java / HotSpot split helpers, including the `@ForceInline` experiment
-- CPython JIT generated Python
+- CPython 3.15 experimental JIT generated Python (**completed negative-result exhibit**; reproducible build retained, performance work stopped)
 - PyPy generated Python using `__pypy__.intop`
 - V8 and Wasmtime over the same generated fixed-program WebAssembly module
 - RPython/PyPy tracing meta-JIT over a fixed bytecode interpreter
@@ -49,4 +49,6 @@ The result format is documented by `schema/result.schema.json`. A future Salad/f
 
 ## First Zen 5 snapshot
 
-The first curated cold-storage run on an AMD EPYC 9655 lands in `results/epyc-9655-zen5-2026-10-31.json`: direct Rust/dynasm is 442.4 kH/s median, .NET 10.0.403 dynamic-pointer is 412.1 kH/s (93.1% of direct emission), and static C# is 290.2 kH/s. See `results/README.md` for rejected/timeout bring-up notes.
+The first curated cold-storage run on an AMD EPYC 9655 lands in `results/epyc-9655-zen5-2026-10-31.json`: direct Rust/dynasm is 442.4 kH/s median, .NET 10.0.403 dynamic-pointer is 412.1 kH/s (93.1% of direct emission), and static C# is 290.2 kH/s. See `results/README.md` for accepted, rejected, and historical experiments.
+
+The reproducibly built CPython 3.15 tier-2 JIT was investigated and retired as a HashWX performance candidate: it regressed substantially relative to the same runtime with the JIT disabled, and both trailed direct native emission by orders of magnitude. The source, builder, and raw diagnostic measurements remain available; no noncanonical CPython measurement was added to the leaderboard. See [`results/diagnostics/README.md`](results/diagnostics/README.md) for the trace and policy experiments.
