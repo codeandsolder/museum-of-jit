@@ -72,7 +72,7 @@ acquire_xz() {
 
 acquire_xz "$PYTHON_URL" "$PYTHON_ARCHIVE" "$PYTHON_SHA256" "$PYTHON_DIR" configure
 acquire_xz "$LLVM_URL" "$LLVM_ARCHIVE" "$LLVM_SHA256" "$LLVM_DIR" bin/clang
-for llvm_tool in clang clang++ llvm-profdata llvm-readobj llvm-objdump llvm-dwarfdump; do
+for llvm_tool in clang clang++ llvm-profdata llvm-ar llvm-ranlib llvm-readobj llvm-objdump llvm-dwarfdump; do
     [[ -x "$RUNTIME_ROOT/$LLVM_DIR/bin/$llvm_tool" ]] || {
         echo "LLVM archive is incomplete: missing bin/$llvm_tool" >&2
         exit 65
@@ -246,11 +246,13 @@ for tool in as ld ld.bfd ar ranlib nm strip objdump readelf; do
 done
 ln -sfn "$LLD_REAL" "$BINUTILS_FACADE/bin/ld.lld"
 ln -sfn "$RUNTIME_ROOT/$LLVM_DIR/bin/llvm-profdata" "$BINUTILS_FACADE/bin/llvm-profdata"
+ln -sfn "$RUNTIME_ROOT/$LLVM_DIR/bin/llvm-ar" "$BINUTILS_FACADE/bin/llvm-ar"
+ln -sfn "$RUNTIME_ROOT/$LLVM_DIR/bin/llvm-ranlib" "$BINUTILS_FACADE/bin/llvm-ranlib"
 
 AS_REAL="$BINUTILS_FACADE/bin/as"
 LD_REAL="$BINUTILS_FACADE/bin/ld.lld"
-AR_REAL="$BINUTILS_FACADE/bin/ar"
-RANLIB_REAL="$BINUTILS_FACADE/bin/ranlib"
+AR_REAL="$BINUTILS_FACADE/bin/llvm-ar"
+RANLIB_REAL="$BINUTILS_FACADE/bin/llvm-ranlib"
 NM_REAL="$BINUTILS_FACADE/bin/nm"
 STRIP_REAL="$BINUTILS_FACADE/bin/strip"
 OBJDUMP_REAL="$BINUTILS_FACADE/bin/objdump"
