@@ -32,3 +32,15 @@ GraalVM 25.0.4 straight-line Java did not complete the standard 30k-warmup/7×30
 The V8 and Wasmtime rows execute the exact same 14,166-byte generated WebAssembly module. Its measured loop runs inside Wasm, so the throughput figures do not include one host-language call per hash. Before promotion, the module's exported `hash()` matched the released `hashwx-rs` 0.1.0 Wasm emitter for 100,000 deterministic inputs. V8 compile+instantiate latency was 300.444 µs; Wasmtime was 9,581.362 µs with parallel compilation explicitly disabled.
 
 The Java runs preserve all samples because the first measured sample is visibly colder, especially on OpenJDK 21. The previously tested `@ForceInline` split variant was slightly worse than the ordinary Graal split in the diagnostic run and is not promoted as a separate canonical result.
+
+## EPYC 9655 / Zen 5 — 2026-11-03
+
+`epyc-9655-zen5-2026-11-03.json` adds the direct RPython/PyPy tracing meta-JIT exhibit, pinned to one logical CPU (`cpu_affinity = [0]`). The translated runtime interprets the canonical fixed HashWX bytecode under an explicit `JitDriver`; the bytecode image is generated from `program.json`, promoted as immutable runtime state, and the eight-instruction program body is marked `unroll_safe` so specialization happens at program boundaries rather than at every opcode.
+
+| implementation / runtime | median H/s | relative to Rust/dynasm | sample range H/s |
+|---|---:|---:|---:|
+| `rpython-jitdriver` — PyPy RPython 8.0.1 | 75,356 | 17.0% | 63,121–78,653 |
+
+The accepted run uses the standard 30,000 warmup hashes and seven samples of 300,000 hashes. Throughput still rises across the measured samples (63.1 → 78.7 kH/s at the high end), so all samples are retained rather than pretending the meta-JIT has a sharp warmup boundary. A same-shape `jit-summary` diagnostic recorded 75 loops and 8,969 bridges: the workload's data-dependent bounded program-repeat control flow remains a poor fit for PyPy's tracing strategy even after moving the merge point to one per program iteration.
+
+A follow-up experiment made the branch counter itself green to turn those exits into bounded specialized states. It was rejected and reverted: the translated binary was correct, but a 30k-warmup/300k-sample diagnostic spent over a minute compiling/warming and never reached the measured sample before termination. The curated row therefore represents the simpler general interpreter shape, not a corpus-specific JIT-state explosion.
