@@ -209,13 +209,14 @@ fn emit_program(
 fn emit_phase(
     b: &mut FunctionBuilder<'_>,
     regs: &[Variable; 9],
-    bc: Variable,
-    rep: Variable,
     sp: Variable,
     base: Value,
     programs: &[Program],
     memory: bool,
 ) {
+    // Both counters are phase-local: neither escapes to the next phase.
+    let bc = b.declare_var(types::I64);
+    let rep = b.declare_var(types::I64);
     let four = constant(b, 4);
     put(b, rep, four);
     let header = b.create_block();
@@ -261,8 +262,6 @@ impl Compiled {
             b.switch_to_block(start);
             b.seal_block(start);
             let regs: [Variable; 9] = std::array::from_fn(|_| b.declare_var(types::I64));
-            let bc = b.declare_var(types::I64);
-            let rep = b.declare_var(types::I64);
             let sp = b.declare_var(types::I64);
             let scratch = b.create_sized_stack_slot(StackSlotData::new(
                 StackSlotKind::ExplicitSlot,
@@ -331,8 +330,8 @@ impl Compiled {
             b.ins().store(MemFlagsData::new(), r8, base, 16_384);
             let sp_start = constant(&mut b, 16_384);
             put(&mut b, sp, sp_start);
-            emit_phase(&mut b, &regs, bc, rep, sp, base, &corpus.programs, false);
-            emit_phase(&mut b, &regs, bc, rep, sp, base, &corpus.programs, true);
+            emit_phase(&mut b, &regs, sp, base, &corpus.programs, false);
+            emit_phase(&mut b, &regs, sp, base, &corpus.programs, true);
             sip(&mut b, &regs, [0, 1, 2, 3]);
             sip(&mut b, &regs, [4, 5, 6, 7]);
             let r3 = get(&mut b, regs[3]);
