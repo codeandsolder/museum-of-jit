@@ -24,3 +24,13 @@ tools/build-rpython-jitdriver.sh /path/to/runtime-root /path/to/build-dir
 ```
 
 The translation is forced to one make job, compiles generated C through the host's existing `sccache` client with server auto-start disabled, and rejects an artifact if the translation log reports local sccache fallback. The resulting `hashwx-rpython-jit` is supplied to the benchmark runner as `MUSEUM_RPYTHON_HASHWX`.
+
+### Reproducible CPython 3.15 JIT build
+
+The curated CPython JIT runtime is built out of tree with the pinned CPython 3.15.2 source and LLVM 21.1.8 stencil toolchain. Supply a target-compatible Linux sysroot; all C/C++ and JIT-stencil compilation is forced through the existing sccache service, with daemon autostart disabled:
+
+```sh
+tools/build-cpython-jit.sh /path/to/runtime-root /path/to/build-dir /path/to/sysroot
+```
+
+The builder enables PGO, full LTO, and `--enable-experimental-jit`, installs under the build directory, verifies that `PYTHON_JIT=1` produces a real tier-2 executor, and records the maximum referenced GLIBC symbol version. Set `MUSEUM_CPYTHON_MAX_GLIBC` to make a target ABI ceiling fatal. `MUSEUM_SCCACHE_PROBE_PORT` and `MUSEUM_SCCACHE_JIT_PORT` may route tiny configure probes or JIT stencil compilation to an already-running sccache endpoint; the script never starts a daemon. Configure and build logs are rejected on any sccache infrastructure error so Autoconf cannot silently misclassify missing cache service as missing platform features.
