@@ -64,3 +64,21 @@ The accepted EPYC 9655 run was pinned to **CPU0**, with **30,000 warmup hashes**
 | `cranelift-direct` 0.137.1, `opt_level=speed` | **331,732** | 317,111–335,667 | 9,516 | **75.0%** |
 
 An independent same-day **Wasmtime 50.0.1** CPU0 control using the same 30k/7×300k dimensions yielded **367,426 H/s** median versus **331,732 H/s** for optimized direct IR. A raw `JITBuilder::new()` policy diagnostic, subsequently found to default to `opt_level=none`, yielded **335,470 H/s**. Both controls are retained in `results/diagnostics/`, not promoted as duplicate canonical leaderboard rows. The unoptimized-to-optimized difference is small and should not be overinterpreted; the more important finding is that **native Cranelift IR is not faster than its Wasmtime/Wasm path here**. The native adapter's measured loop is in Rust calling the JIT entry point per hash; Wasmtime's batch loop is inside the Wasm module, so the roughly 9.7% direct-vs-Wasmtime same-day difference cannot be assigned exclusively to compiler backend code quality. Native `BUILD_US` includes JSON parsing, IR emission and compilation; Wasmtime measures module construction and instantiation. Raw diagnostic data, exact methods and hashes are below.
+
+## EPYC 9655 / Zen 5 — native Cranelift in-JIT batch loop (2026-11-04)
+
+`epyc-9655-zen5-cranelift-batch-2026-11-04.json` is the first accepted CPU0 measurement of `cranelift-batch`: a **separate adapter** that emits a native `bench(start, count) -> sink` Cranelift function whose 64-bit counted loop and XOR accumulator execute *inside the JIT*, calling the **same native HashWX `hash` function** as the already curated `cranelift-direct` adapter. Unlike the per-hash Rust host loop, the generated `bench` function crosses the host/JIT boundary only once per sample. It is deliberately distinct from rewriting or inlining HashWX into the loop, which might change machine-code costs.
+
+The new batch function matched an independent native-host fold **and** the independently emitted Wasm `bench` export for **627 differential cases** (including empty batches, wraparound starts, random ranges, and 300,000 hashes), all outputs byte-for-byte (SHA-256 `90d845d5d8fb5720a0c5e35e0f6194ac555fdddd5c01aa8260c1c9c35a87cb01`). The exact same release executable also passed the existing **100,000-salt single-hash oracle** (SHA-256 `f9a9a50baa9201bd847fc39e8f2b88036883de0a298b322dd46197029a987cc3`). Batch-mode attestation `MODE jit-batch` is required by the harness; the Cranelift version is 0.137.1 with explicit `opt_level=speed`.
+
+The accepted EPYC 9655 CPU0 run uses **30,000 warmup hashes and seven samples of 300,000 hashes**, each with the expected `1842ddbd4c0fefed` sink. This accepted first run has median **315,342.408 hashes/s** (range **294,252.779–320,323.507**), and `BUILD_US=9753.065` (both JIT functions generated and finalized). The accepted source revision is `1a9b92c`; the checksummed native executable was transferred directly from Acer to cold-storage (SHA-256 `252454017ac9a446797a5e71e4dc45b1ff5fa40ab89e5c5d9f2ca163ddd7acc7`).
+
+Two more batch runs and matched fresh controls on the same CPU0, all 30k/7×300k with correct sinks, are in the single `results/diagnostics/cranelift-batch-controls-cpu0-2026-11-04.json` file:
+
+| implementation | run medians, hashes/s | median of run medians, hashes/s |
+|---|---|---:|
+| Native JIT-internal batch | **315,342**, 323,380, 318,382 | **318,382** |
+| Native Rust per-hash host loop (same executable) | 303,469, 321,397 | **312,433** |
+| Wasmtime 50.0.1 in-Wasm batch loop | 353,026, 357,376 | **355,201** |
+
+The modest **~1.9%** difference between the median-of-medians for native batch and native direct is *smaller than observed run-to-run variation* and did not hold across every comparison. Therefore, **moving the loop inside native Cranelift does not establish a robust speed improvement**. Wasmtime remains faster in both matched runs; the typical ~12% gap cannot be attributed to Rust/JIT call boundaries alone. Wasmtime may optimize or inline the `hash` call and lower its memory/stack or control flow differently; those mechanisms were not established by this experiment. The accepted result is the first chronological batch run, not a cherry-picked repeat. The six follow-up control records remain diagnostic rather than additional canonical leaderboard rows.
