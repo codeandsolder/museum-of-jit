@@ -85,3 +85,19 @@ taskset -c 0 /srv/scratch/museum-jit-runtimes/cpython-3.15.2-clang21-pgo-r2/bin/
   workloads/hashwx-fixed-v1/implementations/python-generated/bench.py \
   --engine cpython --trace-executors
 ```
+
+### Side-exit initial threshold experiment (same 30k/7×5k protocol)
+
+The default CPython 3.15.2 `PYTHON_JIT_SIDE_EXIT_INITIAL_VALUE=4000` was compared with its maximum supported setting, `8191`, on the same cold-storage CPU0 and accepted runtime. The raw tuned run is `cpython-clang21-side-exit-max-warm30k-7x5k-2026-11-03.txt`. All seven tuned samples passed the identical `e2f0befa35d3dd61` timed sink and the canonical correctness check.
+
+| 30k warmup + 7×5k | Default threshold 4000 | Max threshold 8191 |
+| --- | ---: | ---: |
+| Median hashes/s | 533.417 | **615.840** |
+| Installed executors after warmup | 81 | 69 |
+| Installed executors after last sample | 126 | 78 |
+| New installed executors during samples | 45 | 9 |
+| First/last sample hashes/s | 553.443 / 447.567 | 702.217 / 571.212 |
+
+The higher threshold improves the median by **15.45%** and substantially slows executor population growth, consistent with side-exit-driven compilation contributing to overhead. It does **not** establish how much of the remaining throughput penalty comes from compilation vs running JIT executors; even the tuned JIT remains below the same-binary non-JIT control median of 1185.772 H/s (measured at 7×10k, so treat rates as a diagnostic comparison, not a matched 7×5k experiment).
+
+Reproduce with `PYTHON_JIT=1 PYTHON_JIT_SIDE_EXIT_INITIAL_VALUE=8191` added to the 30k/7×5k `--trace-executors` invocation above. Investigation: [issue #13](https://github.com/codeandsolder/museum-of-jit/issues/13).
