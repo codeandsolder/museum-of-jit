@@ -59,3 +59,29 @@ PYTHON_JIT=0 MUSEUM_WARMUP=30000 MUSEUM_ITERATIONS=10000 MUSEUM_SAMPLES=7 \
 taskset -c 0 /srv/scratch/museum-jit-runtimes/cpython-3.15.2-clang21-pgo-r2/bin/python3.15 \
   workloads/hashwx-fixed-v1/implementations/python-generated/bench.py --engine cpython
 ```
+
+### Installed CPython executor growth (diagnostic PR #12)
+
+`cpython-clang21-executor-trace-warm30k-7x5k-2026-11-03.txt` repeats the same CPU0 correctness-checked generated source with 30k warmup, 7 × 5k measured hashes, and **opt-in** `--trace-executors`. The additional `get_executor` enumerations occur **after** warmup and **after** each timed sample, never inside the timed intervals. The program source and core benchmark execution remain unchanged. This run used the exact tracer source revision `44bb521`; the temporary cold-storage fixture was removed afterward.
+
+| Stage | Installed executors in `hash_one` | H/s during preceding sample |
+| --- | ---: | ---: |
+| after warmup | 81 | — |
+| after sample 1 | 86 | 553.443 |
+| after sample 2 | 89 | 548.782 |
+| after sample 3 | 94 | 523.987 |
+| after sample 4 | 103 | 537.517 |
+| after sample 5 | 109 | 533.417 |
+| after sample 6 | 120 | 492.193 |
+| after sample 7 | 126 | 447.567 |
+
+Every sample had identical sink `e2f0befa35d3dd61`; the canonical correctness probe passed. Executor count rose **45 (+55.6%) after warmup** while throughput fell ~19% from first to last sample. This demonstrates continued executor installation into the measured function and coincident throughput degradation, but **does not yet quantify compilation cost, side exits, or the effectiveness of individual executors**. Because samples are only 5k long, this is not directly a throughput match for the 7×10k control above or a canonical leaderboard entry.
+
+Reproduce with the accepted Clang21 runtime on cold-storage's CPU 0 and repository source containing `--trace-executors`:
+
+```sh
+PYTHON_JIT=1 MUSEUM_WARMUP=30000 MUSEUM_ITERATIONS=5000 MUSEUM_SAMPLES=7 \
+taskset -c 0 /srv/scratch/museum-jit-runtimes/cpython-3.15.2-clang21-pgo-r2/bin/python3.15 \
+  workloads/hashwx-fixed-v1/implementations/python-generated/bench.py \
+  --engine cpython --trace-executors
+```
