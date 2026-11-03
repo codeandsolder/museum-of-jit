@@ -26,3 +26,36 @@ taskset -c 0 uv run --no-project --python 3 tools/bench.py \
 ```
 
 Raw JSON preserves individual samples, revision, affinity, sink, elapsed time and runtime provenance.
+
+## CPython 3.15.2 Clang21 JIT pathology — 2026-11-03
+
+Host: cold-storage AMD EPYC 9655 / Debian 13, CPU affinity exactly `[0]`. Acer-built runtime copied with matching executable SHA256 into `/srv/scratch/museum-jit-runtimes/cpython-3.15.2-clang21-pgo-r2`; compiler Clang 21.1.8, LLVM native InstrProf PGO, full LTO, audited LLD 23.1.4. The r2 build completed 43 Python PGO training files (9,709 tests run, 462 skipped), confirmed actual tier-2 executor execution, relocation, and maximum referenced GLIBC 2.38.
+
+All runs used the identical generated Python HashWX implementation. Correctness check `fd5d450b767035c5` passed; both long-running experiments generated the same sink `2041e16568b783d8` in all seven samples.
+
+| Diagnostic file | JIT | Warmup | Samples | Median H/s | Full sample series H/s |
+| --- | --- | ---: | --- | ---: | --- |
+| `cpython-clang21-pilot-2026-11-03.json` | On, 66 installed executors | 300 | 1 × 3,000 | 975.832 | 975.832 |
+| `cpython-clang21-warm30k-7x10k-2026-11-03.json` | On, 204 installed executors at end | 30,000 | 7 × 10,000 | 458.485 | 572.634, 537.340, 509.105, 458.485, 434.908, 417.647, 415.612 |
+| `cpython-clang21-jit-disabled-warm30k-7x10k-2026-11-03.txt` | Off (same binary) | 30,000 | 7 × 10,000 | 1,185.772 | 1,157.389, 1,169.645, 1,189.112, 1,191.196, 1,185.772, 1,189.272, 1,172.450 |
+
+At the same 30k/7×10k configuration, **turning the JIT off was 2.59× faster by median**. JIT throughput declined 27.4% from its first to last measured sample, while the non-JIT throughput remained comparatively stable. The number of installed executors suggests aggressive specialization, but the result does **not** by itself establish whether the decline comes from code generation, side exits, tracing, cache behavior, or work done by executors. Investigate before proposing a JIT policy change.
+
+The `3k`/`10k` sample configurations are diagnostics, *not* the canonical uniform 30k warmup / 7×300k benchmark. Extrapolating the latter from the declining rates would be misleading; no CPython leaderboard row has been accepted. The baseline control is raw stdout rather than a harness JSON because the ordinary orchestrator intentionally rejects CPython JIT-disabled runs as invalid for its `cpython-jit` implementation.
+
+Reproduce the JIT-enabled run on cold-storage:
+
+```sh
+MUSEUM_CPYTHON=/srv/scratch/museum-jit-runtimes/cpython-3.15.2-clang21-pgo-r2/bin/python3.15 \
+PYTHON_JIT=1 MUSEUM_WARMUP=30000 MUSEUM_ITERATIONS=10000 MUSEUM_SAMPLES=7 \
+MUSEUM_RUN_TIMEOUT=440 taskset -c 0 uv run --no-project --python 3.13 \
+  python tools/bench.py --impl cpython-jit
+```
+
+Reproduce the same-binary JIT-disabled control:
+
+```sh
+PYTHON_JIT=0 MUSEUM_WARMUP=30000 MUSEUM_ITERATIONS=10000 MUSEUM_SAMPLES=7 \
+taskset -c 0 /srv/scratch/museum-jit-runtimes/cpython-3.15.2-clang21-pgo-r2/bin/python3.15 \
+  workloads/hashwx-fixed-v1/implementations/python-generated/bench.py --engine cpython
+```
