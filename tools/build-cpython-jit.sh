@@ -136,6 +136,7 @@ done
 
 SYSROOT_LIBC="$(find "$SYSROOT/lib" "$SYSROOT/usr/lib" -type f -name 'libc.so.6' -print -quit 2>/dev/null || true)"
 SYSROOT_FEATURES="$SYSROOT/usr/include/features.h"
+SYSROOT_DPKG_STATUS="$SYSROOT/var/lib/dpkg/status"
 BUILD_KEY="$BUILD_DIR/build-key.txt"
 BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
 {
@@ -144,11 +145,12 @@ BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
     printf 'sysroot=%s\n' "$SYSROOT"
     if [[ -n "$SYSROOT_LIBC" ]]; then sha256sum "$SYSROOT_LIBC"; fi
     if [[ -f "$SYSROOT_FEATURES" ]]; then sha256sum "$SYSROOT_FEATURES"; fi
+    if [[ -f "$SYSROOT_DPKG_STATUS" ]]; then sha256sum "$SYSROOT_DPKG_STATUS"; fi
     printf 'cc=%s\n' "$CC_REAL"
     "$CC_REAL" --version | head -n 1
     printf 'cxx=%s\n' "$CXX_REAL"
     "$CXX_REAL" --version | head -n 1
-    printf 'configure=--enable-optimizations --with-lto=full --enable-experimental-jit=yes --with-ensurepip=no\n'
+    printf 'configure=--enable-optimizations --with-lto=full --enable-experimental-jit=yes --with-ensurepip=no --with-openssl=%s/usr\n' "$SYSROOT"
     printf 'cflags_jit=--sysroot=%s\n' "$SYSROOT"
     printf 'objdir=%s\n' "$OBJDIR"
 } > "$BUILD_KEY_NEXT"
@@ -352,6 +354,11 @@ audit_makefile() {
     require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-fuse-linker-plugin' || return 1
     require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-ffat-lto-objects' || return 1
 
+    "$RG_BIN" -Fq -- "'--with-openssl=$SYSROOT/usr'" Makefile || {
+        echo "generated configure arguments lost the sysroot-scoped OpenSSL policy" >&2
+        return 1
+    }
+
     "$RG_BIN" -Fq -- "--cflags=\"--sysroot=$SYSROOT\"" Makefile || {
         echo "generated JIT command lost the Debian sysroot" >&2
         return 1
@@ -364,6 +371,20 @@ audit_makefile() {
         echo "generated JIT command does not use the sccache-backed LLVM facade" >&2
         return 1
     }
+
+    local host_root_flags
+    host_root_flags="$(
+        "$RG_BIN" -n \
+            -e '(^|[[:space:]=])-[IL]/(usr|lib|lib64|opt)(/|[[:space:]])' \
+            -e '(^|[[:space:]=])-isystem[[:space:]]+/(usr|lib|lib64|opt)(/|[[:space:]])' \
+            -e '(^|[[:space:]=])-Wl,-rpath(=|,)/(usr|lib|lib64|opt)(/|[[:space:]])' \
+            Makefile || true
+    )"
+    if [[ -n "$host_root_flags" ]]; then
+        echo "generated Makefile contains host-root include/library/rpath flags outside the Debian sysroot" >&2
+        printf '%s\n' "$host_root_flags" >&2
+        return 1
+    fi
 
     printf 'CC=%s\n' "$make_cc"
     printf 'CXX=%s\n' "$make_cxx"
@@ -387,6 +408,7 @@ if (( reuse_build == 0 )) || [[ ! -f Makefile || ! -f pyconfig.h ]]; then
         --with-lto=full \
         --enable-experimental-jit=yes \
         --with-ensurepip=no \
+        --with-openssl="$SYSROOT/usr" \
         2>&1 | tee "$CONFIGURE_LOG"
     configure_status=${PIPESTATUS[0]}
     set -e
