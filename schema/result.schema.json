@@ -151,6 +151,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "jit_enabled": {
+          "type": "boolean"
+        },
+        "jit_executors": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "additionalProperties": true

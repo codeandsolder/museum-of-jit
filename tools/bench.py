@@ -142,6 +142,25 @@ def parse_output(text: str) -> dict:
     }
 
 
+def implementation_evidence(impl: str, text: str) -> dict:
+    if impl != "cpython-jit":
+        return {}
+
+    state = re.search(r"\bJIT\s+(true|false|n/a|unknown)\b", text)
+    if state is None:
+        raise ValueError("CPython JIT benchmark produced no JIT state")
+    if state.group(1) != "true":
+        raise ValueError(f"CPython JIT was not enabled (JIT {state.group(1)})")
+
+    executors = re.search(r"\bJIT_EXECUTORS\s+(\d+)\b", text)
+    if executors is None:
+        raise ValueError("CPython JIT benchmark produced no executor count")
+    executor_count = int(executors.group(1))
+    if executor_count < 1:
+        raise ValueError("CPython JIT benchmark installed no tier-2 executors")
+    return {"jit_enabled": True, "jit_executors": executor_count}
+
+
 def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: str) -> dict:
     runner = ROOT / spec["runner"]
     if not runner.is_file():
@@ -193,6 +212,7 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
         return result
     try:
         parsed = parse_output(proc.stdout)
+        evidence = implementation_evidence(impl, proc.stdout)
     except ValueError as exc:
         result = base | {
             "status": "invalid", "exit_code": proc.returncode, "error": str(exc),
@@ -207,6 +227,7 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
         "code_bytes": parsed["code_bytes"], "check": parsed["check"], "samples": parsed["samples"],
         "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
     }
+    result["runtime"].update(evidence)
     rates = [x["hashes_per_second"] for x in result["samples"]]
     print(f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}", file=sys.stderr)
     return result
