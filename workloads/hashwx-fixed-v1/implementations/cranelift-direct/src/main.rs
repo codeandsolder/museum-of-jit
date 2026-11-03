@@ -245,7 +245,10 @@ struct Compiled {
 
 impl Compiled {
     fn build(corpus: &Corpus) -> Result<Self, Box<dyn Error>> {
-        let jit_builder = JITBuilder::new(default_libcall_names())?;
+        // The raw JITBuilder default is opt_level=none; use the optimizing
+        // compilation policy for a meaningful native-vs-Wasm codegen comparison.
+        let jit_builder =
+            JITBuilder::with_flags(&[("opt_level", "speed")], default_libcall_names())?;
         let mut module = JITModule::new(jit_builder);
         let mut signature = module.make_signature();
         signature.params.push(AbiParam::new(types::I64));
