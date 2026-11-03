@@ -107,6 +107,25 @@ def emit_op(lines: list[str], ins: dict, memory: bool, engine: str, indent: str)
         raise ValueError(op)
 
 
+def count_cpython_executors(hash_one) -> int | None:
+    try:
+        import _opcode
+    except ImportError:
+        return None
+    get_executor = getattr(_opcode, "get_executor", None)
+    if get_executor is None:
+        return None
+    executor_ids = set()
+    code = hash_one.__code__
+    for offset in range(0, len(code.co_code), 2):
+        try:
+            executor = get_executor(code, offset)
+        except ValueError:
+            continue
+        executor_ids.add(id(executor))
+    return len(executor_ids)
+
+
 def generate(programs: list[dict], engine: str) -> str:
     lines = ["def hash_one(salt,mem):"]
     i = "    "
@@ -176,7 +195,7 @@ def main() -> None:
     t0 = time.perf_counter_ns()
     source = generate(programs, engine)
     code = compile(source, "<museum-hashwx-generated>", "exec", optimize=2)
-    exec(code, ns)
+    exec(code, ns)  # noqa: S102 - generated source is the benchmark input.
     build_us = (time.perf_counter_ns() - t0) / 1000.0
     if args.dump_source:
         Path(args.dump_source).write_text(source)
@@ -205,10 +224,7 @@ def main() -> None:
     jit = getattr(sys, "_jit", None)
     jit_state = "n/a"
     if jit is not None:
-        try:
-            jit_state = str(bool(jit.is_enabled())).lower()
-        except Exception:
-            jit_state = "unknown"
+        jit_state = str(bool(jit.is_enabled())).lower()
     print(f"ENGINE {engine} IMPL {platform.python_implementation()} VERSION {platform.python_version()} JIT {jit_state}")
     print(f"BUILD_US {build_us:.3f} SOURCE_BYTES {len(source.encode())} FIRST_US {first_us:.3f} CHECK {check:016x}")
     for _ in range(samples):
@@ -218,6 +234,12 @@ def main() -> None:
             sink ^= hash_one(n, mem)
         dt = (time.perf_counter_ns() - t0) / 1e9
         print(f"RATE {iterations/dt:.3f} sink={sink & MASK:016x}")
+    if engine == "cpython" and jit_state == "true":
+        executor_count = count_cpython_executors(hash_one)
+        if executor_count is None:
+            print("JIT_EXECUTORS unavailable")
+        else:
+            print(f"JIT_EXECUTORS {executor_count}")
 
 
 if __name__ == "__main__":
