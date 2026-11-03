@@ -437,11 +437,14 @@ audit_makefile() {
         return 1
     }
 
-    local make_cc make_cxx make_ar make_readelf pgo_gen pgo_use prof_merger profile_task cflags_nodist ldflags_nodist
+    local make_cc make_cxx make_ar pgo_gen pgo_use prof_merger profile_task cflags_nodist ldflags_nodist
     make_cc="$(make_var CC)" || return 1
     make_cxx="$(make_var CXX)" || return 1
     make_ar="$(make_var AR)" || return 1
-    make_readelf="$(make_var READELF)" || return 1
+    # CPython 3.15.2 leaves READELF=@READELF@ in the generated Makefile and
+    # never references that variable from a build rule. The pinned readelf
+    # facade is executed during binutils preflight, so do not require an
+    # impossible Makefile substitution here.
     pgo_gen="$(make_var PGO_PROF_GEN_FLAG)" || return 1
     pgo_use="$(make_var PGO_PROF_USE_FLAG)" || return 1
     prof_merger="$(make_var LLVM_PROF_MERGER)" || return 1
@@ -459,10 +462,6 @@ audit_makefile() {
     }
     [[ "$make_ar" == "$AR" ]] || {
         printf 'generated Makefile AR mismatch: expected %s, got %s\n' "$AR" "$make_ar" >&2
-        return 1
-    }
-    [[ "$make_readelf" == "$READELF" ]] || {
-        printf 'generated Makefile READELF mismatch: expected %s, got %s\n' "$READELF" "$make_readelf" >&2
         return 1
     }
     require_contains PGO_PROF_GEN_FLAG "$pgo_gen" '-fprofile-generate' || return 1
@@ -522,7 +521,6 @@ audit_makefile() {
     printf 'CC=%s\n' "$make_cc"
     printf 'CXX=%s\n' "$make_cxx"
     printf 'AR=%s\n' "$make_ar"
-    printf 'READELF=%s\n' "$make_readelf"
     printf 'PGO_PROF_GEN_FLAG=%s\n' "$pgo_gen"
     printf 'PGO_PROF_USE_FLAG=%s\n' "$pgo_use"
     printf 'LLVM_PROF_MERGER=%s\n' "$prof_merger"
