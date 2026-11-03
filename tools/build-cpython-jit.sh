@@ -95,16 +95,11 @@ pick_sysroot_tool() {
 
 CC_REAL="${MUSEUM_CPYTHON_CC:-$(pick_sysroot_tool gcc)}"
 CXX_REAL="${MUSEUM_CPYTHON_CXX:-$(pick_sysroot_tool g++)}"
-AR_REAL="${MUSEUM_CPYTHON_AR:-$(pick_sysroot_tool gcc-ar)}"
-RANLIB_REAL="${MUSEUM_CPYTHON_RANLIB:-$(pick_sysroot_tool gcc-ranlib)}"
-NM_REAL="${MUSEUM_CPYTHON_NM:-$(pick_sysroot_tool gcc-nm)}"
-STRIP_REAL="${MUSEUM_CPYTHON_STRIP:-$(command -v strip)}"
-OBJDUMP_REAL="${MUSEUM_CPYTHON_OBJDUMP:-$(command -v objdump)}"
 MAKE_JOBS="${MUSEUM_CPYTHON_MAKE_JOBS:-4}"
 PROBE_PORT="${MUSEUM_SCCACHE_PROBE_PORT:-}"
 JIT_PORT="${MUSEUM_SCCACHE_JIT_PORT:-$PROBE_PORT}"
 
-for tool in "$CC_REAL" "$CXX_REAL" "$AR_REAL" "$RANLIB_REAL" "$NM_REAL" "$STRIP_REAL" "$OBJDUMP_REAL"; do
+for tool in "$CC_REAL" "$CXX_REAL"; do
     [[ -x "$tool" ]] || {
         echo "required tool is not executable: $tool" >&2
         exit 69
@@ -137,15 +132,52 @@ done
 SYSROOT_LIBC="$(find "$SYSROOT/lib" "$SYSROOT/usr/lib" -type f -name 'libc.so.6' -print -quit 2>/dev/null || true)"
 SYSROOT_FEATURES="$SYSROOT/usr/include/features.h"
 SYSROOT_DPKG_STATUS="$SYSROOT/var/lib/dpkg/status"
+SYSROOT_LOADER="$SYSROOT/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+SYSROOT_BINUTIL_LIBPATH="$SYSROOT/usr/lib/x86_64-linux-gnu:$SYSROOT/lib/x86_64-linux-gnu:$SYSROOT/usr/lib:$SYSROOT/lib"
+SYSROOT_BFD_LIB="$(find "$SYSROOT/usr/lib/x86_64-linux-gnu" -maxdepth 1 -type f -name 'libbfd-*-system.so' -print -quit 2>/dev/null || true)"
+
+sysroot_binutil_target() {
+    local name=$1
+    case "$name" in
+        ld|ld.bfd) printf '%s/usr/bin/x86_64-linux-gnu-ld.bfd\n' "$SYSROOT" ;;
+        *) printf '%s/usr/bin/x86_64-linux-gnu-%s\n' "$SYSROOT" "$name" ;;
+    esac
+}
+
+[[ -x "$SYSROOT_LOADER" && -f "$SYSROOT_BFD_LIB" ]] || {
+    echo "sysroot is missing its dynamic loader or private binutils library" >&2
+    exit 69
+}
+for tool in as ld ar ranlib nm strip objdump readelf; do
+    target="$(sysroot_binutil_target "$tool")"
+    [[ -x "$target" ]] || {
+        echo "sysroot binutil is missing or not executable: $target" >&2
+        exit 69
+    }
+    "$SYSROOT_LOADER" --library-path "$SYSROOT_BINUTIL_LIBPATH" "$target" --version >/dev/null 2>&1 || {
+        echo "sysroot binutil cannot run through the sysroot loader: $target" >&2
+        exit 69
+    }
+done
+BINUTILS_VERSION="$("$SYSROOT_LOADER" --library-path "$SYSROOT_BINUTIL_LIBPATH" \
+    "$(sysroot_binutil_target as)" --version | head -n 1)"
+
+read -r BUILDER_SHA256 _ < <(sha256sum "$(realpath "$0")")
 BUILD_KEY="$BUILD_DIR/build-key.txt"
 BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
 {
+    printf 'builder_sha256=%s\n' "$BUILDER_SHA256"
     printf 'python_sha256=%s\n' "$PYTHON_SHA256"
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
     printf 'sysroot=%s\n' "$SYSROOT"
     if [[ -n "$SYSROOT_LIBC" ]]; then sha256sum "$SYSROOT_LIBC"; fi
     if [[ -f "$SYSROOT_FEATURES" ]]; then sha256sum "$SYSROOT_FEATURES"; fi
     if [[ -f "$SYSROOT_DPKG_STATUS" ]]; then sha256sum "$SYSROOT_DPKG_STATUS"; fi
+    sha256sum "$SYSROOT_LOADER" "$SYSROOT_BFD_LIB"
+    for tool in as ld ar ranlib nm strip objdump readelf; do
+        sha256sum "$(sysroot_binutil_target "$tool")"
+    done
+    printf 'binutils_version=%s\n' "$BINUTILS_VERSION"
     printf 'cc=%s\n' "$CC_REAL"
     "$CC_REAL" --version | head -n 1
     printf 'cxx=%s\n' "$CXX_REAL"
@@ -163,6 +195,70 @@ else
     rm -rf "${OBJDIR:?}" "${PREFIX:?}"
     mv "$BUILD_KEY_NEXT" "$BUILD_KEY"
 fi
+
+BINUTILS_FACADE="$BUILD_DIR/binutils-tools"
+rm -rf "${BINUTILS_FACADE:?}"
+mkdir -p "$BINUTILS_FACADE/bin"
+cat > "$BINUTILS_FACADE/bin/sysroot-binutil" <<EOF_BINUTIL
+#!/usr/bin/env bash
+set -euo pipefail
+name=\${0##*/}
+name=\${name#x86_64-linux-gnu-}
+case "\$name" in
+    ld|ld.bfd) target="$SYSROOT/usr/bin/x86_64-linux-gnu-ld.bfd" ;;
+    as|ar|ranlib|nm|strip|objdump|readelf) target="$SYSROOT/usr/bin/x86_64-linux-gnu-\$name" ;;
+    *) echo "unsupported sysroot binutil wrapper name: \$name" >&2; exit 64 ;;
+esac
+exec "$SYSROOT_LOADER" --library-path "$SYSROOT_BINUTIL_LIBPATH" "\$target" "\$@"
+EOF_BINUTIL
+chmod +x "$BINUTILS_FACADE/bin/sysroot-binutil"
+for tool in as ld ld.bfd ar ranlib nm strip objdump readelf; do
+    ln -sfn sysroot-binutil "$BINUTILS_FACADE/bin/$tool"
+    ln -sfn sysroot-binutil "$BINUTILS_FACADE/bin/x86_64-linux-gnu-$tool"
+done
+
+AS_REAL="$BINUTILS_FACADE/bin/as"
+LD_REAL="$BINUTILS_FACADE/bin/ld"
+AR_REAL="$BINUTILS_FACADE/bin/ar"
+RANLIB_REAL="$BINUTILS_FACADE/bin/ranlib"
+NM_REAL="$BINUTILS_FACADE/bin/nm"
+STRIP_REAL="$BINUTILS_FACADE/bin/strip"
+OBJDUMP_REAL="$BINUTILS_FACADE/bin/objdump"
+READELF_REAL="$BINUTILS_FACADE/bin/readelf"
+
+for tool in "$AS_REAL" "$LD_REAL" "$AR_REAL" "$RANLIB_REAL" "$NM_REAL" "$STRIP_REAL" "$OBJDUMP_REAL" "$READELF_REAL"; do
+    "$tool" --version >/dev/null 2>&1 || {
+        echo "pinned sysroot binutil facade cannot run: $tool" >&2
+        exit 69
+    }
+done
+
+BINUTILS_AUDIT="$BUILD_DIR/binutils-audit.txt"
+{
+    printf 'BINUTILS_VERSION=%s\n' "$BINUTILS_VERSION"
+    for tool in as ld; do
+        gcc_program="$("$CC_REAL" -print-prog-name="$tool")"
+        if [[ "$gcc_program" == /* ]]; then
+            resolved_program="$(realpath "$gcc_program")"
+            expected_program="$(realpath "$BINUTILS_FACADE/bin/$tool")"
+        else
+            resolved_program="$(PATH="$BINUTILS_FACADE/bin:$PATH" command -v "$gcc_program")"
+            expected_program="$BINUTILS_FACADE/bin/$tool"
+        fi
+        [[ "$resolved_program" == "$expected_program" ]] || {
+            printf 'GCC %s program escaped pinned facade: expected %s, got %s\n' \
+                "$tool" "$expected_program" "$resolved_program" >&2
+            exit 69
+        }
+        printf 'GCC_%s_PROGRAM=%s\n' "${tool^^}" "$resolved_program"
+    done
+    printf 'AR=%s\n' "$AR_REAL"
+    printf 'RANLIB=%s\n' "$RANLIB_REAL"
+    printf 'NM=%s\n' "$NM_REAL"
+    printf 'STRIP=%s\n' "$STRIP_REAL"
+    printf 'OBJDUMP=%s\n' "$OBJDUMP_REAL"
+    printf 'READELF=%s\n' "$READELF_REAL"
+} > "$BINUTILS_AUDIT"
 
 SCCACHE_RUN="$BUILD_DIR/sccache-run"
 cat > "$SCCACHE_RUN" <<EOF_SCCACHE_RUN
@@ -252,7 +348,7 @@ chmod +x "$BUILD_DIR/build-python"
 
 mkdir -p "$OBJDIR"
 
-# Keep configure and compiler discovery inside the pinned toolchain/sysroot.
+# Keep configure, compiler, and binutils discovery inside the pinned toolchain/sysroot.
 # These caller-controlled variables can otherwise inject build-host headers,
 # libraries, config answers, or Python modules even when --sysroot is present.
 unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS
@@ -262,6 +358,7 @@ unset PYTHONPATH PYTHONHOME
 unset OPENSSL_CFLAGS OPENSSL_LIBS OPENSSL_LDFLAGS OPENSSL_INCLUDES
 unset PKG_CONFIG_PATH PKG_CONFIG_SYSROOT_DIR PKG_CONFIG_LIBDIR
 unset SCCACHE_SERVER_PORT SCCACHE_SERVER_UDS SCCACHE_DIRECT
+export PATH="$BINUTILS_FACADE/bin:$PATH"
 
 export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 export LLVM_VERSION=21
@@ -270,7 +367,8 @@ export CFLAGS_JIT="--sysroot=$SYSROOT"
 export PYTHON_FOR_REGEN="$BUILD_DIR/build-python"
 export CC="$BUILD_DIR/cc-sccache"
 export CXX="$BUILD_DIR/cxx-sccache"
-export AR="$AR_REAL" RANLIB="$RANLIB_REAL" NM="$NM_REAL" STRIP="$STRIP_REAL"
+export AS="$AS_REAL" LD="$LD_REAL" AR="$AR_REAL" RANLIB="$RANLIB_REAL"
+export NM="$NM_REAL" STRIP="$STRIP_REAL" OBJDUMP="$OBJDUMP_REAL" READELF="$READELF_REAL"
 export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
 export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/x86_64-linux-gnu/pkgconfig:$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
 
@@ -324,9 +422,11 @@ audit_makefile() {
         return 1
     }
 
-    local make_cc make_cxx pgo_gen pgo_use prof_merger profile_task cflags_nodist ldflags_nodist
+    local make_cc make_cxx make_ar make_readelf pgo_gen pgo_use prof_merger profile_task cflags_nodist ldflags_nodist
     make_cc="$(make_var CC)" || return 1
     make_cxx="$(make_var CXX)" || return 1
+    make_ar="$(make_var AR)" || return 1
+    make_readelf="$(make_var READELF)" || return 1
     pgo_gen="$(make_var PGO_PROF_GEN_FLAG)" || return 1
     pgo_use="$(make_var PGO_PROF_USE_FLAG)" || return 1
     prof_merger="$(make_var LLVM_PROF_MERGER)" || return 1
@@ -340,6 +440,14 @@ audit_makefile() {
     }
     [[ "$make_cxx" == "$CXX" ]] || {
         printf 'generated Makefile CXX mismatch: expected %s, got %s\n' "$CXX" "$make_cxx" >&2
+        return 1
+    }
+    [[ "$make_ar" == "$AR" ]] || {
+        printf 'generated Makefile AR mismatch: expected %s, got %s\n' "$AR" "$make_ar" >&2
+        return 1
+    }
+    [[ "$make_readelf" == "$READELF" ]] || {
+        printf 'generated Makefile READELF mismatch: expected %s, got %s\n' "$READELF" "$make_readelf" >&2
         return 1
     }
     require_contains PGO_PROF_GEN_FLAG "$pgo_gen" '-fprofile-generate' || return 1
@@ -398,6 +506,8 @@ audit_makefile() {
 
     printf 'CC=%s\n' "$make_cc"
     printf 'CXX=%s\n' "$make_cxx"
+    printf 'AR=%s\n' "$make_ar"
+    printf 'READELF=%s\n' "$make_readelf"
     printf 'PGO_PROF_GEN_FLAG=%s\n' "$pgo_gen"
     printf 'PGO_PROF_USE_FLAG=%s\n' "$pgo_use"
     printf 'LLVM_PROF_MERGER=%s\n' "$prof_merger"
@@ -555,10 +665,13 @@ if [[ -n "${MUSEUM_CPYTHON_MAX_GLIBC:-}" ]]; then
 fi
 
 {
+    printf 'builder_sha256=%s\n' "$BUILDER_SHA256"
     printf 'python_version=3.15.2\n'
     printf 'python_sha256=%s\n' "$PYTHON_SHA256"
     printf 'llvm_version=21.1.8\n'
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
+    printf 'binutils_version=%s\n' "$BINUTILS_VERSION"
+    printf 'binutils_facade=%s\n' "$BINUTILS_FACADE"
     printf 'sysroot=%s\n' "$SYSROOT"
     printf 'cc=%s\n' "$CC_REAL"
     "$CC_REAL" --version | head -n 1 | sed 's/^/cc_version=/'
