@@ -72,41 +72,19 @@ acquire_xz() {
 
 acquire_xz "$PYTHON_URL" "$PYTHON_ARCHIVE" "$PYTHON_SHA256" "$PYTHON_DIR" configure
 acquire_xz "$LLVM_URL" "$LLVM_ARCHIVE" "$LLVM_SHA256" "$LLVM_DIR" bin/clang
-for llvm_tool in clang llvm-readobj llvm-objdump llvm-dwarfdump; do
+for llvm_tool in clang clang++ llvm-profdata llvm-ar llvm-ranlib llvm-readobj llvm-objdump llvm-dwarfdump; do
     [[ -x "$RUNTIME_ROOT/$LLVM_DIR/bin/$llvm_tool" ]] || {
         echo "LLVM archive is incomplete: missing bin/$llvm_tool" >&2
         exit 65
     }
 done
 
-# GCC 14 gives inconsistent PGO generation/use CFGs for the four UNARY_FUNC
-# macro expansions in CPython 3.15.2. Apply the exact tested, semantics-
-# preserving expansion before configuring or compiling; never suppress GCC's
-# coverage-mismatch diagnostic or reuse profiles from the unpatched source.
-SOURCE_PATCH="$(dirname "$(realpath "$0")")/patches/cpython-3.15.2-gcc14-pgo-unary.patch"
-SOURCE_PATCH_SHA256=e224e014e5211cb527b0589e830cda24e8b40d346c1ea48ac80734a18cd7d2e6
-ABSTRACT_UPSTREAM_SHA256=000c079b34d6d9a6074cead81c04ab3e46e3682942acdce6786096bc43fc6b41
-ABSTRACT_PATCHED_SHA256=e5125a03e60efbddf5af715bd3ab14d79ab65f19d7c99c2deabd556cc7ea102f
+# Clang 21 native InstrProf bypasses the failing GCC 14 PGO path.
+# Always use the unmodified, checksum-pinned CPython release sources.
 ABSTRACT_SOURCE="$RUNTIME_ROOT/$PYTHON_DIR/Objects/abstract.c"
-printf '%s  %s\n' "$SOURCE_PATCH_SHA256" "$SOURCE_PATCH" | sha256sum --check --status || {
-    echo "CPython GCC PGO source patch has changed" >&2
-    exit 65
-}
-read -r abstract_sha _ < <(sha256sum "$ABSTRACT_SOURCE")
-case "$abstract_sha" in
-    "$ABSTRACT_UPSTREAM_SHA256")
-        (cd "$RUNTIME_ROOT/$PYTHON_DIR" && patch --batch --fuzz=0 -p1 < "$SOURCE_PATCH") ||
-            { echo "CPython GCC PGO source patch failed" >&2; exit 65; }
-        ;;
-    "$ABSTRACT_PATCHED_SHA256")
-        ;;
-    *)
-        echo "CPython abstract.c does not match the pinned upstream or patched revision" >&2
-        exit 65
-        ;;
-esac
-printf '%s  %s\n' "$ABSTRACT_PATCHED_SHA256" "$ABSTRACT_SOURCE" |
-    sha256sum --check --status || { echo "CPython GCC PGO patched-source checksum failed" >&2; exit 65; }
+ABSTRACT_UPSTREAM_SHA256=000c079b34d6d9a6074cead81c04ab3e46e3682942acdce6786096bc43fc6b41
+printf '%s  %s\n' "$ABSTRACT_UPSTREAM_SHA256" "$ABSTRACT_SOURCE" |
+    sha256sum --check --status || { echo "CPython abstract.c differs from upstream" >&2; exit 65; }
 
 SCCACHE_BIN="$(command -v sccache)"
 UV_BIN="$(command -v uv)"
@@ -122,8 +100,13 @@ pick_sysroot_tool() {
     fi
 }
 
-CC_REAL="${MUSEUM_CPYTHON_CC:-$(pick_sysroot_tool gcc)}"
-CXX_REAL="${MUSEUM_CPYTHON_CXX:-$(pick_sysroot_tool g++)}"
+CC_REAL="$RUNTIME_ROOT/$LLVM_DIR/bin/clang"
+CXX_REAL="$RUNTIME_ROOT/$LLVM_DIR/bin/clang++"
+LLD_REAL=/usr/bin/ld.lld
+[[ -x "$LLD_REAL" ]] || { echo "required LLD missing: $LLD_REAL" >&2; exit 69; }
+LLD_SHA256="$(sha256sum "$(realpath "$LLD_REAL")" | cut -d' ' -f1)"
+LLD_VERSION="$("$LLD_REAL" --version)"
+CLANG_SHA256="$(sha256sum "$(realpath "$CC_REAL")" | cut -d' ' -f1)"
 MAKE_JOBS="${MUSEUM_CPYTHON_MAKE_JOBS:-4}"
 PROBE_PORT="${MUSEUM_SCCACHE_PROBE_PORT:-}"
 JIT_PORT="${MUSEUM_SCCACHE_JIT_PORT:-$PROBE_PORT}"
@@ -199,7 +182,7 @@ read -r BINUTILS_FINGERPRINT _ < <(
         done
     } | sha256sum
 )
-SCCACHE_C_CACHE_BUSTER="museum-cpython-binutils-$BINUTILS_FINGERPRINT"
+SCCACHE_C_CACHE_BUSTER="museum-cpython-clang-$CLANG_SHA256-lld-$LLD_SHA256-binutils-$BINUTILS_FINGERPRINT"
 
 read -r BUILDER_SHA256 _ < <(sha256sum "$(realpath "$0")")
 BUILD_KEY="$BUILD_DIR/build-key.txt"
@@ -207,8 +190,10 @@ BUILD_KEY_NEXT="$BUILD_DIR/build-key.next"
 {
     printf 'builder_sha256=%s\n' "$BUILDER_SHA256"
     printf 'python_sha256=%s\n' "$PYTHON_SHA256"
-    printf 'source_patch_sha256=%s\n' "$SOURCE_PATCH_SHA256"
-    printf 'abstract_patched_sha256=%s\n' "$ABSTRACT_PATCHED_SHA256"
+    printf 'abstract_upstream_sha256=%s\n' "$ABSTRACT_UPSTREAM_SHA256"
+    printf 'clang_sha256=%s\n' "$CLANG_SHA256"
+    printf 'lld_sha256=%s\n' "$LLD_SHA256"
+    printf 'lld_version=%s\n' "$LLD_VERSION"
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
     printf 'sysroot=%s\n' "$SYSROOT"
     if [[ -n "$SYSROOT_LIBC" ]]; then sha256sum "$SYSROOT_LIBC"; fi
@@ -259,11 +244,15 @@ for tool in as ld ld.bfd ar ranlib nm strip objdump readelf; do
     ln -sfn sysroot-binutil "$BINUTILS_FACADE/bin/$tool"
     ln -sfn sysroot-binutil "$BINUTILS_FACADE/bin/x86_64-linux-gnu-$tool"
 done
+ln -sfn "$LLD_REAL" "$BINUTILS_FACADE/bin/ld.lld"
+ln -sfn "$RUNTIME_ROOT/$LLVM_DIR/bin/llvm-profdata" "$BINUTILS_FACADE/bin/llvm-profdata"
+ln -sfn "$RUNTIME_ROOT/$LLVM_DIR/bin/llvm-ar" "$BINUTILS_FACADE/bin/llvm-ar"
+ln -sfn "$RUNTIME_ROOT/$LLVM_DIR/bin/llvm-ranlib" "$BINUTILS_FACADE/bin/llvm-ranlib"
 
 AS_REAL="$BINUTILS_FACADE/bin/as"
-LD_REAL="$BINUTILS_FACADE/bin/ld"
-AR_REAL="$BINUTILS_FACADE/bin/ar"
-RANLIB_REAL="$BINUTILS_FACADE/bin/ranlib"
+LD_REAL="$BINUTILS_FACADE/bin/ld.lld"
+AR_REAL="$BINUTILS_FACADE/bin/llvm-ar"
+RANLIB_REAL="$BINUTILS_FACADE/bin/llvm-ranlib"
 NM_REAL="$BINUTILS_FACADE/bin/nm"
 STRIP_REAL="$BINUTILS_FACADE/bin/strip"
 OBJDUMP_REAL="$BINUTILS_FACADE/bin/objdump"
@@ -281,22 +270,17 @@ BINUTILS_AUDIT="$BUILD_DIR/binutils-audit.txt"
     printf 'BINUTILS_VERSION=%s\n' "$BINUTILS_VERSION"
     printf 'BINUTILS_FINGERPRINT=%s\n' "$BINUTILS_FINGERPRINT"
     printf 'SCCACHE_C_CUSTOM_CACHE_BUSTER=%s\n' "$SCCACHE_C_CACHE_BUSTER"
-    for tool in as ld; do
-        gcc_program="$("$CC_REAL" -print-prog-name="$tool")"
-        if [[ "$gcc_program" == /* ]]; then
-            resolved_program="$(realpath "$gcc_program")"
-            expected_program="$(realpath "$BINUTILS_FACADE/bin/$tool")"
-        else
-            resolved_program="$(PATH="$BINUTILS_FACADE/bin:$PATH" command -v "$gcc_program")"
-            expected_program="$BINUTILS_FACADE/bin/$tool"
-        fi
-        [[ "$resolved_program" == "$expected_program" ]] || {
-            printf 'GCC %s program escaped pinned facade: expected %s, got %s\n' \
-                "$tool" "$expected_program" "$resolved_program" >&2
-            exit 69
-        }
-        printf 'GCC_%s_PROGRAM=%s\n' "${tool^^}" "$resolved_program"
-    done
+    printf 'CLANG=%s\nLLD=%s\nLLD_VERSION=%s\n' "$CC_REAL" "$LLD_REAL" "$LLD_VERSION"
+    printf 'CLANG_SHA256=%s\nLLD_SHA256=%s\n' "$CLANG_SHA256" "$LLD_SHA256"
+    printf '%s\n' 'int main(void) { return 0; }' > "$BUILD_DIR/linker-audit.c"
+    "$CC_REAL" --sysroot="$SYSROOT" --gcc-toolchain="$SYSROOT/usr" \
+        -B"$BINUTILS_FACADE/bin" -fuse-ld=lld -### \
+        "$BUILD_DIR/linker-audit.c" -o "$BUILD_DIR/linker-audit" 2> "$BUILD_DIR/linker-driver.txt"
+    "$RG_BIN" -Fq "$BINUTILS_FACADE/bin/ld.lld" "$BUILD_DIR/linker-driver.txt" || {
+        echo "Clang linker driver did not select the audited LLD" >&2
+        exit 69
+    }
+    rm -f "$BUILD_DIR/linker-audit.c"
     printf 'AR=%s\n' "$AR_REAL"
     printf 'RANLIB=%s\n' "$RANLIB_REAL"
     printf 'NM=%s\n' "$NM_REAL"
@@ -362,7 +346,7 @@ if [[ -n "\$configured_probe_port" ]]; then
         esac
     done
 fi
-exec "$SCCACHE_RUN" "\$probe_port" "$compiler" --sysroot="$SYSROOT" "\$@"
+exec "$SCCACHE_RUN" "\$probe_port" "$compiler" --sysroot="$SYSROOT" --gcc-toolchain="$SYSROOT/usr" -B"$BINUTILS_FACADE/bin" -fuse-ld=lld "\$@"
 EOF_WRAPPER
     chmod +x "$path"
 }
@@ -495,13 +479,10 @@ audit_makefile() {
         printf 'generated Makefile AR mismatch: expected %s, got %s\n' "$AR" "$make_ar" >&2
         return 1
     }
-    require_contains PGO_PROF_GEN_FLAG "$pgo_gen" '-fprofile-generate' || return 1
-    require_contains PGO_PROF_USE_FLAG "$pgo_use" '-fprofile-use' || return 1
-    require_contains PGO_PROF_USE_FLAG "$pgo_use" '-fprofile-correction' || return 1
-    [[ "$prof_merger" == true ]] || {
-        printf 'expected GCC PGO LLVM_PROF_MERGER=true, got %s\n' "$prof_merger" >&2
-        return 1
-    }
+    require_contains PGO_PROF_GEN_FLAG "$pgo_gen" '-fprofile-instr-generate' || return 1
+    require_contains PGO_PROF_USE_FLAG "$pgo_use" '-fprofile-instr-use=' || return 1
+    require_contains LLVM_PROF_MERGER "$prof_merger" 'llvm-profdata' || return 1
+    require_contains LLVM_PROF_MERGER "$prof_merger" 'merge' || return 1
     [[ "$profile_task" == "-m test --pgo --timeout=\$(TESTTIMEOUT)" ]] || {
         printf 'unexpected PROFILE_TASK: %s\n' "$profile_task" >&2
         return 1
@@ -514,8 +495,6 @@ audit_makefile() {
     require_contains CONFIGURE_CFLAGS_NODIST "$cflags_nodist" '-D_Py_TIER2=1' || return 1
     require_contains CONFIGURE_CFLAGS_NODIST "$cflags_nodist" '-D_Py_JIT' || return 1
     require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-flto' || return 1
-    require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-fuse-linker-plugin' || return 1
-    require_contains CONFIGURE_LDFLAGS_NODIST "$ldflags_nodist" '-ffat-lto-objects' || return 1
 
     "$RG_BIN" -Fq -- "'--with-openssl=$SYSROOT/usr'" Makefile || {
         echo "generated configure arguments lost the sysroot-scoped OpenSSL policy" >&2
@@ -712,8 +691,10 @@ fi
     printf 'builder_sha256=%s\n' "$BUILDER_SHA256"
     printf 'python_version=3.15.2\n'
     printf 'python_sha256=%s\n' "$PYTHON_SHA256"
-    printf 'source_patch_sha256=%s\n' "$SOURCE_PATCH_SHA256"
-    printf 'abstract_patched_sha256=%s\n' "$ABSTRACT_PATCHED_SHA256"
+    printf 'abstract_upstream_sha256=%s\n' "$ABSTRACT_UPSTREAM_SHA256"
+    printf 'clang_sha256=%s\n' "$CLANG_SHA256"
+    printf 'lld_sha256=%s\n' "$LLD_SHA256"
+    printf 'lld_version=%s\n' "$LLD_VERSION"
     printf 'llvm_version=21.1.8\n'
     printf 'llvm_sha256=%s\n' "$LLVM_SHA256"
     printf 'binutils_version=%s\n' "$BINUTILS_VERSION"
