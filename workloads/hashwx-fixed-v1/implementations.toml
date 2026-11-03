@@ -69,3 +69,9 @@ mode = "meta-jit-interpreter"
 runner = "tools/runners/rpython-jitdriver.sh"
 runtime = "RPython meta-JIT"
 source = "workloads/hashwx-fixed-v1/implementations/rpython-jitdriver"
+
+[cranelift-direct]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/cranelift-direct.sh"
+runtime = "Cranelift native JIT"
+source = "workloads/hashwx-fixed-v1/implementations/cranelift-direct"
