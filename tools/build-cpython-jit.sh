@@ -31,7 +31,7 @@ LLVM_SHA256=b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
 LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/$LLVM_ARCHIVE"
 LLVM_DIR=LLVM-21.1.8-Linux-X64
 
-for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp; do
+for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp cp; do
     command -v "$tool" >/dev/null || {
         echo "required tool not found: $tool" >&2
         exit 69
@@ -390,11 +390,6 @@ if (( reuse_build == 0 )) || [[ ! -f Makefile || ! -f pyconfig.h ]]; then
         2>&1 | tee "$CONFIGURE_LOG"
     configure_status=${PIPESTATUS[0]}
     set -e
-    if sccache_log_failed "$CONFIGURE_LOG" "$OBJDIR/config.log"; then
-        popd >/dev/null
-        echo "configure observed an sccache infrastructure failure; rejecting feature detection" >&2
-        exit 70
-    fi
     if (( configure_status != 0 )); then
         popd >/dev/null
         exit "$configure_status"
@@ -403,12 +398,20 @@ else
     echo "reusing matching configure output in $OBJDIR"
 fi
 
+# A reused configure result is just as provenance-sensitive as a fresh one.
+# Autoconf redirects compiler stderr to config.log, so the human transcript
+# alone cannot prove that feature detection was infrastructure-clean.
+if sccache_log_failed "$CONFIGURE_LOG" "$OBJDIR/config.log"; then
+    popd >/dev/null
+    echo "configure observed an sccache infrastructure failure; rejecting feature detection" >&2
+    exit 70
+fi
+
 audit_makefile | tee "$MAKEFILE_AUDIT"
 
 set +e
 {
-    make -j"$MAKE_JOBS"
-    make -j"$MAKE_JOBS" install
+    make -j"$MAKE_JOBS" && make -j"$MAKE_JOBS" install
 } 2>&1 | tee "$BUILD_LOG"
 build_status=${PIPESTATUS[0]}
 set -e
@@ -465,6 +468,38 @@ print("jit_executors", len({id(executor) for executor in executors}))
 assert executors, "hot-loop smoke test installed no tier-2 executor"
 PY
 
+# Prove the installed prefix can be relocated without duplicating its payload.
+# A hard-link mirror gives the runtime a genuinely different pathname while
+# PYTHONDONTWRITEBYTECODE prevents the smoke test from mutating linked files.
+RELOC_ROOT="$(mktemp -d "$BUILD_DIR/.reloc.XXXXXX")"
+cleanup_reloc() {
+    rm -rf -- "$RELOC_ROOT"
+}
+trap cleanup_reloc EXIT
+cp -al "$PREFIX/." "$RELOC_ROOT/"
+PYTHONDONTWRITEBYTECODE=1 PYTHONHOME="$RELOC_ROOT" PYTHON_JIT=1 \
+    "$RELOC_ROOT/bin/python3.15" - "$RELOC_ROOT" <<'PY' | tee "$BUILD_DIR/relocation-smoke.txt"
+import json
+import math
+import pathlib
+import sys
+
+expected = pathlib.Path(sys.argv[1]).resolve()
+assert pathlib.Path(sys.prefix).resolve() == expected, (sys.prefix, expected)
+assert pathlib.Path(sys.exec_prefix).resolve() == expected, (sys.exec_prefix, expected)
+assert pathlib.Path(json.__file__).resolve().is_relative_to(expected)
+assert pathlib.Path(math.__file__).resolve().is_relative_to(expected)
+assert sys._jit.is_available(), "relocated runtime lost JIT availability"
+assert sys._jit.is_enabled(), "PYTHON_JIT=1 did not enable relocated runtime JIT"
+print("relocated_prefix", expected)
+print("stdlib", pathlib.Path(json.__file__).resolve())
+print("extension", pathlib.Path(math.__file__).resolve())
+print("jit_available", sys._jit.is_available())
+print("jit_enabled", sys._jit.is_enabled())
+PY
+cleanup_reloc
+trap - EXIT
+
 GLIBC_VERSIONS="$BUILD_DIR/glibc-versions.txt"
 : > "$GLIBC_VERSIONS"
 while IFS= read -r -d '' artifact; do
@@ -474,8 +509,12 @@ while IFS= read -r -d '' artifact; do
 done < <(find "$PREFIX" -type f -print0) | sort -Vu > "$GLIBC_VERSIONS"
 
 max_glibc="$(sed -n 's/^GLIBC_//p' "$GLIBC_VERSIONS" | sort -V | tail -n 1)"
-printf 'max_glibc=%s\n' "${max_glibc:-none}" | tee "$BUILD_DIR/abi-summary.txt"
-if [[ -n "${MUSEUM_CPYTHON_MAX_GLIBC:-}" && -n "$max_glibc" ]]; then
+if [[ -z "$max_glibc" ]]; then
+    echo "ELF ABI scan found no GLIBC symbol versions in the installed runtime" >&2
+    exit 70
+fi
+printf 'max_glibc=%s\n' "$max_glibc" | tee "$BUILD_DIR/abi-summary.txt"
+if [[ -n "${MUSEUM_CPYTHON_MAX_GLIBC:-}" ]]; then
     highest="$(printf '%s\n%s\n' "$MUSEUM_CPYTHON_MAX_GLIBC" "$max_glibc" | sort -V | tail -n 1)"
     if [[ "$highest" != "$MUSEUM_CPYTHON_MAX_GLIBC" ]]; then
         echo "artifact requires GLIBC_$max_glibc, above requested GLIBC_$MUSEUM_CPYTHON_MAX_GLIBC" >&2
@@ -493,7 +532,10 @@ fi
     "$CC_REAL" --version | head -n 1 | sed 's/^/cc_version=/'
     "$RUNTIME_ROOT/$LLVM_DIR/bin/clang" --version | head -n 1 | sed 's/^/clang_version=/'
     printf 'make_jobs=%s\n' "$MAKE_JOBS"
-    printf 'max_glibc=%s\n' "${max_glibc:-none}"
+    printf 'objdir=%s\n' "$OBJDIR"
+    printf 'sccache_probe_port=%s\n' "${PROBE_PORT:-default}"
+    printf 'sccache_jit_port=%s\n' "${JIT_PORT:-default}"
+    printf 'max_glibc=%s\n' "$max_glibc"
 } > "$BUILD_DIR/build-manifest.txt"
 
 printf 'installed CPython JIT: %s\n' "$PREFIX"
