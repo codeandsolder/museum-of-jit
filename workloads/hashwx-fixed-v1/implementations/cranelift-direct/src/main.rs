@@ -184,17 +184,21 @@ fn emit_program(
     for ins in &p.instructions {
         instruction(b, regs, base, ins, memory);
     }
-    let count = get(b, bc);
-    let has_budget = b.ins().icmp_imm_s(IntCC::NotEqual, count, 0);
-    let continue_loop = if p.unconditional {
-        has_budget
-    } else {
+    // Keep the two early-exit conditions as *branches*, exactly like Wasm.
+    // Materializing (budget != 0) && (branch_bit == 0) used to generate two
+    // SETcc instructions per conditional program, obscuring branch lowering.
+    if !p.unconditional {
         let branch_register = get(b, regs[p.instructions[0].dst as usize]);
         let bit = b.ins().band_imm_s(branch_register, 32);
-        let bit_clear = b.ins().icmp_imm_s(IntCC::Equal, bit, 0);
-        b.ins().band(has_budget, bit_clear)
-    };
-    b.ins().brif(continue_loop, retry, &[], done, &[]);
+        let bit_set = b.ins().icmp_imm_s(IntCC::NotEqual, bit, 0);
+        let check_budget = b.create_block();
+        b.ins().brif(bit_set, done, &[], check_budget, &[]);
+        b.switch_to_block(check_budget);
+        b.seal_block(check_budget);
+    }
+    let count = get(b, bc);
+    let has_budget = b.ins().icmp_imm_s(IntCC::NotEqual, count, 0);
+    b.ins().brif(has_budget, retry, &[], done, &[]);
     b.switch_to_block(retry);
     b.seal_block(retry);
     let count = get(b, bc);
@@ -241,7 +245,10 @@ fn emit_phase(
 // Emits the same logical batch loop as the separate Wasm bench(start,count)
 // export: a 64-bit wrapping index, a remaining count, and XOR aggregation.
 // The hash implementation is the exact already validated native JIT function.
-fn define_batch(module: &mut JITModule, hash_id: FuncId) -> Result<FuncId, Box<dyn Error>> {
+fn define_batch(
+    module: &mut JITModule,
+    hash_id: FuncId,
+) -> Result<(FuncId, usize), Box<dyn Error>> {
     let mut signature = module.make_signature();
     signature.params.push(AbiParam::new(types::I64));
     signature.params.push(AbiParam::new(types::I64));
@@ -296,8 +303,13 @@ fn define_batch(module: &mut JITModule, hash_id: FuncId) -> Result<FuncId, Box<d
         b.finalize(frontend_config);
     }
     module.define_function(id, &mut context)?;
+    let code_len = context
+        .compiled_code()
+        .ok_or("batch JIT compiled code unavailable")?
+        .code_buffer()
+        .len();
     module.clear_context(&mut context);
-    Ok(id)
+    Ok((id, code_len))
 }
 
 struct Compiled {
@@ -305,6 +317,9 @@ struct Compiled {
     _module: JITModule,
     entry: unsafe extern "C" fn(u64) -> u64,
     batch_entry: Option<unsafe extern "C" fn(u64, u64) -> u64>,
+    // Compiled-code byte lengths reported by Cranelift, not guessed from pointer distances.
+    hash_code_len: usize,
+    batch_code_len: Option<usize>,
 }
 
 impl Compiled {
@@ -410,11 +425,17 @@ impl Compiled {
             b.finalize(frontend_config);
         }
         module.define_function(function, &mut context)?;
+        let hash_code_len = context
+            .compiled_code()
+            .ok_or("hash JIT compiled code unavailable")?
+            .code_buffer()
+            .len();
         module.clear_context(&mut context);
-        let batch_id = if batch_mode {
-            Some(define_batch(&mut module, function)?)
+        let (batch_id, batch_code_len) = if batch_mode {
+            let (id, len) = define_batch(&mut module, function)?;
+            (Some(id), Some(len))
         } else {
-            None
+            (None, None)
         };
         module.finalize_definitions()?;
         let ptr = module.get_finalized_function(function);
@@ -428,8 +449,35 @@ impl Compiled {
             _module: module,
             entry,
             batch_entry,
+            hash_code_len,
+            batch_code_len,
         })
     }
+    /// Write the *relocated, finalized* machine-code bytes, not a CLIF preview.
+    /// Enabled only by an explicit diagnostic CLI flag; never invoked during timing.
+    fn dump_code(&self, directory: &std::path::Path) -> Result<(), Box<dyn Error>> {
+        std::fs::create_dir_all(directory)?;
+        let hash_ptr = self.entry as *const u8;
+        // SAFETY: JITModule owns finalized executable memory and `hash_code_len`
+        // comes from the actual compiled code buffer, before context clearing.
+        let hash = unsafe { std::slice::from_raw_parts(hash_ptr, self.hash_code_len) };
+        std::fs::write(directory.join("hash.bin"), hash)?;
+        if let (Some(entry), Some(len)) = (self.batch_entry, self.batch_code_len) {
+            // SAFETY: same finalized JITModule ownership guarantee as the hash.
+            let batch = unsafe { std::slice::from_raw_parts(entry as *const u8, len) };
+            std::fs::write(directory.join("batch.bin"), batch)?;
+        }
+        std::fs::write(
+            directory.join("manifest.txt"),
+            format!(
+                "engine=cranelift-native-0.137.1\nopt_level=speed\nhash_bytes={}\nbatch_bytes={}\n",
+                self.hash_code_len,
+                self.batch_code_len.unwrap_or(0)
+            ),
+        )?;
+        Ok(())
+    }
+
     #[inline]
     fn hash(&self, salt: u64) -> u64 {
         unsafe { (self.entry)(salt) }
@@ -518,14 +566,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         return Ok(());
     }
+    let dump_path = match args.as_slice() {
+        [mode, path] if mode == "--dump-code" => Some(std::path::Path::new(path)),
+        _ => None,
+    };
     let (batch_mode, oracle_input, batch_input) = match args.as_slice() {
         [] => (false, None, None),
         [mode] if mode == "--batch" => (true, None, None),
         [mode, path] if mode == "--hash-salts" => (false, Some(path.as_str()), None),
+        [mode, _path] if mode == "--dump-code" => (true, None, None),
         [mode, path] if mode == "--batch-cases" => (true, None, Some(path.as_str())),
         _ => {
             return Err("usage: museum-hashwx-cranelift-direct \
-            [--version | --batch | --hash-salts SALTS.hex | --batch-cases CASES.hex]"
+            [--version | --batch | --hash-salts SALTS.hex | --batch-cases CASES.hex | --dump-code OUTPUT_DIR]"
                 .into());
         }
     };
@@ -543,6 +596,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let first_us = t0.elapsed().as_secs_f64() * 1e6;
     if check != CORRECT {
         return Err(format!("wrong result: {check:016x} != {CORRECT:016x}").into());
+    }
+    if let Some(path) = dump_path {
+        compiled.dump_code(path)?;
+        println!(
+            "DUMP_CODE hash={} batch={} directory={}",
+            compiled.hash_code_len,
+            compiled.batch_code_len.unwrap_or(0),
+            path.display()
+        );
+        return Ok(());
     }
     if let Some(path) = oracle_input {
         return hash_salts(&compiled, path);

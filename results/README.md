@@ -82,3 +82,26 @@ Two more batch runs and matched fresh controls on the same CPU0, all 30k/7×300k
 | Wasmtime 50.0.1 in-Wasm batch loop | 353,026, 357,376 | **355,201** |
 
 The modest **~1.9%** difference between the median-of-medians for native batch and native direct is *smaller than observed run-to-run variation* and did not hold across every comparison. Therefore, **moving the loop inside native Cranelift does not establish a robust speed improvement**. Wasmtime remains faster in both matched runs; the typical ~12% gap cannot be attributed to Rust/JIT call boundaries alone. Wasmtime may optimize or inline the `hash` call and lower its memory/stack or control flow differently; those mechanisms were not established by this experiment. The accepted result is the first chronological batch run, not a cherry-picked repeat. The six follow-up control records remain diagnostic rather than additional canonical leaderboard rows.
+
+## EPYC 9655 / Zen 5 — native Cranelift branch lowering (2026-11-04)
+
+**Current optimized native Cranelift result:** `epyc-9655-zen5-cranelift-branch-2026-11-04.json` contains *two* accepted CPU0 runs, one `cranelift-batch` and one `cranelift-direct`, compiled with Cranelift **0.137.1**, `opt_level=speed`, source revision **`280af67`**. Both meet **30,000 warmup / seven × 300,000-hash samples**, with all sinks `1842ddbd4c0fefed`. The native binary SHA256 on Acer and cold-storage is `5bf75f0c86a2bee00285a59c6930aba2f7fce6f21b036da487718a3fa32724a9`. The compiled hash passed 100,000 per-input checks against independently emitted Wasm; the JIT-local batch passed 627 independent three-way batch cases, including a full 300k range and wrapping starts.
+
+| Native Cranelift implementation (first accepted run) | Median H/s | First-run range H/s | Difference from the earlier native exhibit |
+|---|---:|---:|---|
+| `cranelift-batch` after sequential branch exits | **352,504** | 348,924–364,025 | Earlier batch: 315,342 H/s |
+| `cranelift-direct` after sequential branch exits | **359,416** | 352,579–368,022 | Earlier direct: 331,732 H/s |
+
+The key change is a **general semantic-preserving improvement in generated control flow**, not a special-cased HashWX result. Previously the native emitter combined two branch conditions into a Boolean-AND before `brif`; Cranelift emitted **124 `setcc` instructions** in the hash function. Emitting sequential early-exit branches instead (as the validated Wasm emitter does) removes every `setcc`; native compiled-hash code falls from **20,488 bytes / 4,213 decoded instructions** to **19,944 bytes / 4,083 instructions**. Both native and Wasmtime use the same 262 BMI2 `rorx` instructions. The actual emitted machine code was extracted from native `JITModule` finalized executable memory using an explicit `--dump-code` flag and from Wasmtime 50.0.1's serialized native ELF (not the Wasm bytecode). The Wasmtime batch function contains a real native call to the hash function, so **inlining was not the explanation** for Wasmtime's initial lead.
+
+For a closer controlled comparison than the two accepted first runs, the **10 other complete CPU0 experiments** (each 30k/7×300k, all checks/sinks correct) are preserved in `results/diagnostics/cranelift-branch-controls-cpu0-2026-11-04.json`. Combining *all* 12 runs' per-run medians, including the two accepted first runs, gives:
+
+| Control group | Independent run medians, H/s | Aggregate of run medians, H/s |
+|---|---|---:|
+| Original native batch | 329,227; 330,529 | **329,878** (mean of two) |
+| Branch-optimized native batch | 352,504; 366,347; 363,055; 364,914 | **363,984** (median of four) |
+| Original native direct | 326,160; 300,809 | **313,484** (mean of two) |
+| Branch-optimized native direct | 359,416; 348,498 | **353,957** (mean of two) |
+| Wasmtime 50.0.1 in-Wasm batch | 359,221; 368,339 | **363,780** (mean of two) |
+
+Branch-optimized batch is **10.3% faster** than its interleaved baseline aggregate; branch-optimized direct is **12.9% faster** than its matched baseline aggregate. The optimized native batch and Wasmtime now differ by **0.06%** in these run-median aggregates—much smaller than observed run variation. **The supported result is throughput parity, not a reliable native win.** The old historical exhibit datasets remain intact, with their original source revisions and provenance. See `results/diagnostics/README.md` for full code-size counts, disassembly and reproduction instructions.
