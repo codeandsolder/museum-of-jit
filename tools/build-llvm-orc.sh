@@ -7,7 +7,7 @@ command -v "$config" >/dev/null || { echo "LLVM 21.1.8 development toolchain una
 version="$("$config" --version)"
 [[ "$version" == 21.1.8 ]] || { echo "LLVM 21.1.8 required; found $version" >&2; exit 69; }
 # The pinned LLVM21 toolchain contains LLVM-bitcode static archive members.
-# Use its Clang compiler and Acer's already installed LLD23 linker, ALWAYS
+# Use matching Clang and LLD from that toolchain, ALWAYS
 # through the existing managed sccache client, never an uncached invocation.
 client=/usr/local/libexec/sccache-client
 compiler="$(dirname "$(readlink -f "$config")")/clang++"
@@ -20,10 +20,20 @@ export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 # on newer Acer userspace. Use the exact Debian13 library from the target,
 # inside this project's build prefix, not a global SONAME compatibility link.
 extra_ldflags=()
+# Cross-distribution linking must resolve versioned libc/math symbols against
+# the *target* libm, not the build host's potentially newer glibc. This is a
+# linker search path only; no foreign glibc or dynamic loader is bundled.
+if [[ -n "${MUSEUM_LLVM_TARGET_LIBM_DIR:-}" ]];then
+  [[ -f "$MUSEUM_LLVM_TARGET_LIBM_DIR/libm.so" ]] || {
+    echo 'MUSEUM_LLVM_TARGET_LIBM_DIR must contain target-compatible libm.so' >&2
+    exit 69
+  }
+  extra_ldflags+=("-L$MUSEUM_LLVM_TARGET_LIBM_DIR")
+fi
 if [[ -n "${MUSEUM_LLVM_LINK_LIBDIR:-}" ]];then
   [[ -d "$MUSEUM_LLVM_LINK_LIBDIR" ]] || { echo 'LLVM link library directory unavailable' >&2; exit 69; }
   export LD_LIBRARY_PATH="$MUSEUM_LLVM_LINK_LIBDIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  extra_ldflags=("-L$MUSEUM_LLVM_LINK_LIBDIR")
+  extra_ldflags+=("-L$MUSEUM_LLVM_LINK_LIBDIR")
 fi
 read -r -a cflags <<<"$("$config" --cxxflags)"
 read -r -a ldflags <<<"$("$config" --ldflags)"
