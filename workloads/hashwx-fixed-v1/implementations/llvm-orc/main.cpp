@@ -1,4 +1,4 @@
-// Fixed HashWX, compiled into native x86-64 by LLVM 23 ORC LLJIT.
+// Fixed HashWX, compiled into native x86-64 by LLVM 21 ORC LLJIT.
 // Neither the hash nor the measured batch loop interprets bytecode at runtime.
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Config/llvm-config.h"
