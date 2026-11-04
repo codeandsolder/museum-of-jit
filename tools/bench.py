@@ -54,6 +54,9 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
     if impl.startswith("java-"):
         return command_output([env.get("MUSEUM_JAVA", "java"), "-version"], env)
+    if impl == "llvm-orc":
+        binary = env.get("MUSEUM_LLVM_ORC_BIN")
+        return command_output([binary, "--version"], env) if binary else "LLVM ORC 23.1.4 (build in runner)"
     if impl in ("cranelift-direct", "cranelift-batch"):
         binary = env.get("MUSEUM_CRANELIFT_BIN")
         return command_output([binary, "--version"], env) if binary else "Cranelift 0.137.1 (build in runner)"
@@ -146,6 +149,10 @@ def parse_output(text: str) -> dict:
 
 
 def implementation_evidence(impl: str, text: str) -> dict:
+    if impl == "llvm-orc":
+        if not re.search(r"\bENGINE\s+llvm-orc\b", text) or not re.search(r"\bMODE\s+jit-batch\b", text):
+            raise ValueError("LLVM ORC adapter did not attest to the native JIT-internal batch mode")
+        return {"jit_batch_internal": True, "llvm_ir_optimization": "O2", "llvm_codegen": "Aggressive"}
     if impl == "cranelift-batch":
         if not re.search(r"\bMODE\s+jit-batch\b", text):
             raise ValueError("Cranelift batch adapter did not execute the JIT-local batch loop")

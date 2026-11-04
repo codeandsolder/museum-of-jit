@@ -81,3 +81,9 @@ mode = "direct-ir-or-machine-code"
 runner = "tools/runners/cranelift-batch.sh"
 runtime = "Cranelift native JIT (internal batch)"
 source = "workloads/hashwx-fixed-v1/implementations/cranelift-direct"
+
+[llvm-orc]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/llvm-orc.sh"
+runtime = "LLVM ORC LLJIT (O2 IR / Aggressive codegen)"
+source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
