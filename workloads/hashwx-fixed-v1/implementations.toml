@@ -87,3 +87,21 @@ mode = "direct-ir-or-machine-code"
 runner = "tools/runners/llvm-orc.sh"
 runtime = "LLVM ORC LLJIT (O2 IR / Aggressive codegen)"
 source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+
+[llvm-orc-o0]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/llvm-orc-o0.sh"
+runtime = "LLVM ORC LLJIT O0 IR / Aggressive codegen"
+source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+
+[llvm-orc-o1]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/llvm-orc-o1.sh"
+runtime = "LLVM ORC LLJIT O1 IR / Aggressive codegen"
+source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+
+[llvm-orc-o3]
+mode = "direct-ir-or-machine-code"
+runner = "tools/runners/llvm-orc-o3.sh"
+runtime = "LLVM ORC LLJIT O3 IR / Aggressive codegen"
+source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
