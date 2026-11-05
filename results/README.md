@@ -2,6 +2,56 @@
 
 Tracked result files contain only accepted benchmark runs. Failed bring-up attempts, smoke tests, and invalid measurements stay out of the curated dataset.
 
+## EPYC 9655 / Zen 5 — challenge-sha256-v1 (2026-11-05)
+
+Two accepted CPU0 runs of the *separate* SHA-256 nonce-search exhibit,
+not comparable to the fixed HashWX H/s leaderboard. Each uses a 42-byte
+fixed prefix, 9-digit ASCII decimal nonce, SHA-256 compression of one
+padded block, independent expected check `b4b920f70c0de8df`,
+**1,000,000 warmup candidates and seven samples of 10,000,000 each**.
+Every .NET backend in each run has identical digest-XOR sinks; all modes
+match the independent full SHA-256 oracle. Every recorded `cpu_affinity`
+is `[0]`.
+
+| implementation | default .NET (256-bit, 8 lanes) | .NET width=512 (16 lanes) |
+| --- | ---: | ---: |
+| `dotnet-challenge-portable` | 29,814,683 H/s | **58,435,098 H/s** |
+| `dotnet-challenge-scalar` | 6,019,490 H/s | 6,151,654 H/s |
+| `dotnet-challenge-bcl` | 2,394,579 H/s | 2,586,145 H/s |
+| `rust-challenge-simd` | not run | **118,171,267 H/s** |
+
+Canonical files:
+
+- `epyc-9655-zen5-challenge-sha256-256-2026-11-05.json` — .NET runtime
+  10.0.403 without override, 8 u32 SIMD lanes.
+- `epyc-9655-zen5-challenge-sha256-512-2026-11-05.json` — same source,
+  explicit `DOTNET_MaxVectorTBitWidth=512`, 16 u32 SIMD lanes, plus
+  Rust production SIMD pinned to `challenge-disasterer` `f2e5b20`.
+  The cross-built static x86_64-musl Rust binary is exactly
+  SHA-256 `739eae5661a12d0221977208793f99862fbca4abb62c040fefeb6914adb8b019`;
+  compiled on Acer with canonical sccache, Rust nightly-2026-11-03,
+  target-feature=+crt-static, relocation-model=static, link-arg=-static.
+  This executable passed the SHA-256 oracle on cold-storage and selected
+  the production AVX-512 16-lane backend. Raw data preserves the
+  prebuilt binary hash and compiler identity.
+
+C# native portable SIMD scales by **1.96×** from 256 to 512 bits on
+the same Zen 5 host with no code changes, and reaches **49.5%** of the
+actual Rust production SIMD solver's median at 512 bits. The Rust
+production solver is a *hit-only fast path*, skipping digest
+feedforward/materialization for non-matches; C# computes two digest
+words on every candidate for an XOR sink. Therefore the ratio compares
+real implementations, **not identical machine-instruction mixes**.
+The BCL row includes whole-message formatting and library-call overhead,
+rather than comparing SHA-256 compression implementations alone.
+
+The earlier 7×300k cold runs and unpinned Acer runs are diagnostics
+only; the longer CPU0 results above are canonical. The separately tested
+fully unrolled portable C# rounds regressed on Acer (around 6.6 vs
+20.5 MH/s on the same CPU4), so they were not retained as an active
+backend. Full workload/reproduction instructions:
+[`workloads/challenge-sha256-v1/README.md`](../workloads/challenge-sha256-v1/README.md).
+
 ## EPYC 9655 / Zen 5 — 2026-10-31
 
 `epyc-9655-zen5-2026-10-31.json` is the first Museum dataset from cold-storage (`AMD EPYC 9655 96-Core Processor`, Debian 13). All entries use `hashwx-fixed-v1` corpus SHA-256 `6fbc50324ca77396e097be37705e68bc24e6b3267c308e7cd5f50568195be94b`.

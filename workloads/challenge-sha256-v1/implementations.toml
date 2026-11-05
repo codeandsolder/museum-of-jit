@@ -1,0 +1,23 @@
+[dotnet-challenge-portable]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-challenge-portable.sh"
+runtime = ".NET/RyuJIT portable System.Numerics.Vector"
+source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
+
+[dotnet-challenge-scalar]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-challenge-scalar.sh"
+runtime = ".NET/RyuJIT scalar integer SHA-256"
+source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
+
+[dotnet-challenge-bcl]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-challenge-bcl.sh"
+runtime = ".NET SHA256.HashData (native-crypto library)"
+source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
+
+[rust-challenge-simd]
+mode = "idiomatic"
+runner = "tools/runners/rust-challenge-simd.sh"
+runtime = "Rust challenge-solvers production portable SIMD"
+source = "workloads/challenge-sha256-v1/implementations/rust-challenge-simd"
