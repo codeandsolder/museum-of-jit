@@ -1,0 +1,27 @@
+{
+  "algorithm": "SHA-256",
+  "shape": "one final padded block; prefix + ASCII decimal nonce",
+  "prefix_ascii": "challenge-disasterer|sha256|xxxxxxxxxxxxxx",
+  "nonce_digits": 9,
+  "nonce_layout": "nonce = (10 + lane)*10000000 + inner; lane 0..15; inner 0..9999999",
+  "expected_check": "b4b920f70c0de8df",
+  "oracle_cases": [
+    {
+      "nonce": 100000000,
+      "sha256": "b4b920f70c0de8df916d823a25ebe2c57ddf4b16eb378124c25188c1e92aedf3"
+    },
+    {
+      "nonce": 100000001,
+      "sha256": "bc0da57633d919a3870433186776b8c905f56555a2e94339550938499ba4eda1"
+    },
+    {
+      "nonce": 170012345,
+      "sha256": "6a4b7d8741238a66b1f7be48d5b2e79fd2cd183e84d8941a3020fc3e15133ace"
+    },
+    {
+      "nonce": 259999999,
+      "sha256": "ad92efa7724831fb6a9ad8cc4b92b1aa0b194de075e0dd5875c42fcc529874b7"
+    }
+  ],
+  "challenge_solver_source": "codeandsolder/challenge-disasterer f2e5b20d55747c52eaa73e14d8dedb885d4e0055"
+}

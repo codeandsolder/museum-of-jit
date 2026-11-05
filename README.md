@@ -34,6 +34,13 @@ The complete recovered C#/Java/Rust scratch source is under `archive/hashwx-fixe
 
 `workloads/hashwx-seeded-v1/` records the pinned canonical HashWX/HashX and `hashwx-rs` references used by the production release gate. Wasm/V8/Wasmtime and HashX are being folded into the same result format rather than pretending they are the exact same fixed-program micro-workload.
 
+`workloads/challenge-sha256-v1/` adds a portable C# `Vector<uint>`
+SHA-256 nonce-solving comparison against scalar RyuJIT, .NET's
+`SHA256.HashData` library, and the actual pinned Rust production
+`challenge-solvers` SIMD backend. See its
+[workload definition](workloads/challenge-sha256-v1/README.md) for scope
+and benchmark limitations.
+
 ## Running
 
 Use `uv`; the orchestration code has no third-party Python dependencies.
@@ -42,6 +49,7 @@ Use `uv`; the orchestration code has no third-party Python dependencies.
 uv run --no-project --python 3 tools/bench.py --list
 uv run --no-project --python 3 tools/bench.py --impl rust-dynasm
 uv run --no-project --python 3 tools/bench.py --impl all --output results/my-host.json
+uv run --no-project --python 3 tools/bench.py --workload challenge-sha256-v1 --list
 ```
 
 Runtime-specific binaries can be supplied with environment variables documented by each runner. `tools/runtime-lock.toml` records the versions used for curated runs. Benchmark dimensions are controlled uniformly by `MUSEUM_WARMUP`, `MUSEUM_ITERATIONS`, and `MUSEUM_SAMPLES`; the orchestrator validates them and records the exact values in each result. Java runners also accept `MUSEUM_JAVAC_RELEASE` so a newer `javac` can emit bytecode for an older JVM when comparing runtimes.

@@ -15,8 +15,7 @@ import uuid
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKLOAD = ROOT / "workloads/hashwx-fixed-v1"
-CONFIG = WORKLOAD / "implementations.toml"
+DEFAULT_WORKLOAD = "hashwx-fixed-v1"
 EXPECTED_CHECK = "fd5d450b767035c5"
 
 BENCH_DEFAULTS = {
@@ -50,6 +49,8 @@ def command_output(argv: list[str], env=None) -> str:
 def runtime_version(impl: str, env: dict[str, str]) -> str:
     if impl == "rust-dynasm":
         return command_output(["rustc", "+1.99.0", "--version"], env)
+    if impl == "rust-challenge-simd":
+        return command_output(["rustc", "+nightly-2026-11-03", "--version"], env)
     if impl.startswith("dotnet-"):
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
     if impl.startswith("java-"):
@@ -126,13 +127,13 @@ def host_info() -> dict:
     }
 
 
-def parse_output(text: str) -> dict:
+def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
     checks = re.findall(r"\bCHECK\s+([0-9a-fA-F]{16})\b", text)
     rates = [(float(rate), sink.lower()) for rate, sink in re.findall(r"\bRATE\s+([0-9]+(?:\.[0-9]+)?)\s+sink=([0-9a-fA-F]{16})", text)]
     if not checks:
         raise ValueError("benchmark produced no CHECK line")
-    if checks[-1].lower() != EXPECTED_CHECK:
-        raise ValueError(f"wrong CHECK {checks[-1]}, expected {EXPECTED_CHECK}")
+    if checks[-1].lower() != expected_check:
+        raise ValueError(f"wrong CHECK {checks[-1]}, expected {expected_check}")
     if not rates:
         raise ValueError("benchmark produced no RATE lines")
     def number(name: str):
@@ -151,6 +152,22 @@ def parse_output(text: str) -> dict:
 
 
 def implementation_evidence(impl: str, text: str) -> dict:
+    if impl == "rust-challenge-simd":
+        match = re.findall(r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text)
+        if len(match) != 1:
+            raise ValueError("missing production Rust SIMD backend attestation")
+        return {"simd_lanes": int(match[0]), "backend": "production-portable-simd"}
+    dotnet_challenge_modes = {
+        "dotnet-challenge-portable": "portable",
+        "dotnet-challenge-scalar": "scalar",
+        "dotnet-challenge-bcl": "bcl",
+    }
+    if impl in dotnet_challenge_modes:
+        match = re.findall(r"(?m)^ENGINE dotnet MODE (\S+) VECTOR_LANES (\d+)$", text)
+        expected_mode = dotnet_challenge_modes[impl]
+        if len(match) != 1 or match[0][0] != expected_mode:
+            raise ValueError(f"missing or wrong .NET challenge backend attestation for {impl}")
+        return {"simd_lanes": int(match[0][1]), "backend": expected_mode}
     if impl == "llvm-orc" or impl in ("llvm-orc-o0", "llvm-orc-o1", "llvm-orc-o3"):
         expected_policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
         mode = re.findall(r"(?m)^MODE (\S+)$", text)
@@ -181,7 +198,11 @@ def implementation_evidence(impl: str, text: str) -> dict:
     return {"jit_enabled": True, "jit_executors": executor_count}
 
 
-def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: str) -> dict:
+def run_one(
+    impl: str, spec: dict, env: dict[str, str], host: dict,
+    corpus_sha: str, workload_id: str = DEFAULT_WORKLOAD,
+    expected_check: str = EXPECTED_CHECK,
+) -> dict:
     runner = ROOT / spec["runner"]
     if not runner.is_file():
         raise FileNotFoundError(runner)
@@ -194,7 +215,7 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
         "run_id": str(uuid.uuid4()),
         "timestamp_utc": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
         "host": host,
-        "workload": {"id": "hashwx-fixed-v1", "corpus_sha256": corpus_sha},
+        "workload": {"id": workload_id, "corpus_sha256": corpus_sha},
         "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
         "runtime": {"name": spec["runtime"], "version": runtime_version(impl, env), "command": [str(runner.relative_to(ROOT))]},
         "warmup_iterations": int(env["MUSEUM_WARMUP"]),
@@ -231,7 +252,7 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
         print(f"{impl:24s} FAILED exit={proc.returncode}", file=sys.stderr)
         return result
     try:
-        parsed = parse_output(proc.stdout)
+        parsed = parse_output(proc.stdout, expected_check)
         evidence = implementation_evidence(impl, proc.stdout)
     except ValueError as exc:
         result = base | {
@@ -256,10 +277,17 @@ def run_one(impl: str, spec: dict, env: dict[str, str], host: dict, corpus_sha: 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Museum of JIT benchmark orchestrator")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--workload", default=DEFAULT_WORKLOAD)
     parser.add_argument("--impl", action="append", default=[])
     parser.add_argument("--output")
     args = parser.parse_args()
-    specs = tomllib.loads(CONFIG.read_text())
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.workload):
+        raise SystemExit(f"invalid workload name: {args.workload!r}")
+    workload = ROOT / "workloads" / args.workload
+    config = workload / "implementations.toml"
+    if not config.is_file():
+        raise SystemExit(f"unknown workload: {args.workload}")
+    specs = tomllib.loads(config.read_text())
     if args.list:
         for name, spec in specs.items():
             print(f"{name:24s} {spec['mode']:32s} {spec['runtime']}")
@@ -271,9 +299,16 @@ def main() -> None:
         raise SystemExit(f"unknown implementation(s): {', '.join(unknown)}")
     env = os.environ.copy()
     normalize_benchmark_env(env)
-    corpus_sha = hashlib.sha256((WORKLOAD / "program.json").read_bytes()).hexdigest()
+    fixture = workload / "fixture.json"
+    if fixture.is_file():
+        expected_check = json.loads(fixture.read_text())["expected_check"]
+        corpus_file = fixture
+    else:
+        expected_check = EXPECTED_CHECK
+        corpus_file = workload / "program.json"
+    corpus_sha = hashlib.sha256(corpus_file.read_bytes()).hexdigest()
     host = host_info()
-    results = [run_one(name, specs[name], env, host, corpus_sha) for name in names]
+    results = [run_one(name, specs[name], env, host, corpus_sha, args.workload, expected_check) for name in names]
     rendered = json.dumps(results, indent=2) + "\n"
     if args.output:
         out = Path(args.output)

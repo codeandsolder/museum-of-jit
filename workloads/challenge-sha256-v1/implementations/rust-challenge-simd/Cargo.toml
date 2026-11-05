@@ -1,0 +1,8 @@
+[package]
+name = "museum-challenge-sha256-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+challenge-solvers = { git = "https://github.com/codeandsolder/challenge-disasterer", rev = "f2e5b20d55747c52eaa73e14d8dedb885d4e0055", default-features = false, features = ["std", "portable-simd", "compare-64bit"] }
