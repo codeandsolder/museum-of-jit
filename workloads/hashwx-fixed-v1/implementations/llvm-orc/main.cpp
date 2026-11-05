@@ -338,7 +338,27 @@ struct Compiled {
   JitBatch batch;
 };
 
-Compiled compile(const Corpus &corpus) {
+// IR optimization is independent of the native machine-code optimization
+// level: always keep CodeGenOptLevel::Aggressive for a controlled comparison.
+struct IrPolicy {
+  llvm::OptimizationLevel level;
+  std::string_view name;
+};
+
+IrPolicy requested_ir_policy() {
+  const char *value = std::getenv("MUSEUM_LLVM_IR_OPT");
+  if (value == nullptr || std::string_view(value) == "O2")
+    return {llvm::OptimizationLevel::O2, "O2"};
+  if (std::string_view(value) == "O0")
+    return {llvm::OptimizationLevel::O0, "O0"};
+  if (std::string_view(value) == "O1")
+    return {llvm::OptimizationLevel::O1, "O1"};
+  if (std::string_view(value) == "O3")
+    return {llvm::OptimizationLevel::O3, "O3"};
+  fail("MUSEUM_LLVM_IR_OPT must be exactly O0, O1, O2, or O3");
+}
+
+Compiled compile(const Corpus &corpus, IrPolicy policy) {
   llvm::InitializeNativeTarget();
   llvm::InitializeNativeTargetAsmPrinter();
   auto target = llvm::orc::JITTargetMachineBuilder::detectHost();
@@ -374,7 +394,12 @@ Compiled compile(const Corpus &corpus) {
   pb.registerFunctionAnalyses(fam);
   pb.registerLoopAnalyses(lam);
   pb.crossRegisterProxies(lam, fam, cgam, mam);
-  auto pipeline = pb.buildPerModuleDefaultPipeline(llvm::OptimizationLevel::O2);
+  // O0 has its own valid default pipeline; the optimized pipeline accepts O1+
+  // only. Both paths still produce real native code via ORC with Aggressive
+  // machine codegen. Do not use a skipped pass pipeline as an O0 shortcut.
+  auto pipeline = policy.level == llvm::OptimizationLevel::O0
+                      ? pb.buildO0DefaultPipeline(policy.level)
+                      : pb.buildPerModuleDefaultPipeline(policy.level);
   pipeline.run(*mod, mam);
   if (llvm::verifyModule(*mod, &llvm::errs()))
     fail("optimized LLVM IR verifier rejected module");
@@ -466,9 +491,10 @@ double micros(Clock::time_point t0) {
 } // anonymous namespace
 
 int main(int argc, char **argv) {
+  const auto policy = requested_ir_policy();
   if (argc == 2 && std::string_view(argv[1]) == "--version") {
-    std::cout << "LLVM ORC LLJIT " << LLVM_VERSION_STRING
-              << " / O2 IR / Aggressive codegen\n";
+    std::cout << "LLVM ORC LLJIT " << LLVM_VERSION_STRING << " / "
+              << policy.name << " IR / Aggressive codegen\n";
     return EXIT_SUCCESS;
   }
   const bool hash_file =
@@ -486,7 +512,7 @@ int main(int argc, char **argv) {
   const auto samples = count_from_env("MUSEUM_SAMPLES", 7, false);
   const auto start = Clock::now();
   const auto corpus = parse_corpus(read_text(path));
-  auto compiled = compile(corpus);
+  auto compiled = compile(corpus, policy);
   const auto build_us = micros(start);
   const auto first_start = Clock::now();
   const auto check = compiled.hash(123456);
@@ -502,6 +528,7 @@ int main(int argc, char **argv) {
   }
   std::cout << "ENGINE llvm-orc VERSION " << LLVM_VERSION_STRING << '\n';
   std::cout << "MODE jit-batch\n";
+  std::cout << "IR_OPT " << policy.name << '\n';
   std::cout << "BUILD_US " << std::fixed << std::setprecision(3) << build_us
             << " FIRST_US " << first_us << " CHECK " << std::hex
             << std::setfill('0') << std::setw(16) << check << std::dec << '\n';

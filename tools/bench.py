@@ -54,9 +54,11 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
     if impl.startswith("java-"):
         return command_output([env.get("MUSEUM_JAVA", "java"), "-version"], env)
-    if impl == "llvm-orc":
+    if impl == "llvm-orc" or impl in ("llvm-orc-o0", "llvm-orc-o1", "llvm-orc-o3"):
         binary = env.get("MUSEUM_LLVM_ORC_BIN")
-        return command_output([binary, "--version"], env) if binary else "LLVM ORC 23.1.4 (build in runner)"
+        policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
+        run_env = dict(env, MUSEUM_LLVM_IR_OPT=policy)
+        return command_output([binary, "--version"], run_env) if binary else f"LLVM ORC 21.1.8 / {policy} IR (build in runner)"
     if impl in ("cranelift-direct", "cranelift-batch"):
         binary = env.get("MUSEUM_CRANELIFT_BIN")
         return command_output([binary, "--version"], env) if binary else "Cranelift 0.137.1 (build in runner)"
@@ -149,10 +151,14 @@ def parse_output(text: str) -> dict:
 
 
 def implementation_evidence(impl: str, text: str) -> dict:
-    if impl == "llvm-orc":
-        if not re.search(r"\bENGINE\s+llvm-orc\b", text) or not re.search(r"\bMODE\s+jit-batch\b", text):
-            raise ValueError("LLVM ORC adapter did not attest to the native JIT-internal batch mode")
-        return {"jit_batch_internal": True, "llvm_ir_optimization": "O2", "llvm_codegen": "Aggressive"}
+    if impl == "llvm-orc" or impl in ("llvm-orc-o0", "llvm-orc-o1", "llvm-orc-o3"):
+        expected_policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
+        mode = re.findall(r"(?m)^MODE (\S+)$", text)
+        engine = re.findall(r"(?m)^ENGINE (\S+) VERSION (\S+)$", text)
+        policy = re.findall(r"(?m)^IR_OPT (\S+)$", text)
+        if mode != ["jit-batch"] or len(engine) != 1 or engine[0][0] != "llvm-orc" or policy != [expected_policy]:
+            raise ValueError(f"LLVM ORC adapter must attest to mode=jit-batch and IR_OPT={expected_policy}")
+        return {"jit_batch_internal": True, "llvm_ir_optimization": expected_policy, "llvm_codegen": "Aggressive"}
     if impl == "cranelift-batch":
         if not re.search(r"\bMODE\s+jit-batch\b", text):
             raise ValueError("Cranelift batch adapter did not execute the JIT-local batch loop")
