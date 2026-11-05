@@ -1,0 +1,16 @@
+[package]
+name = "museum-sha256-thread-scaling"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+challenge-solvers = { git = "https://github.com/codeandsolder/challenge-solvers", rev = "3776d8fbce45ae4641719d9ae40f84578be7c228", default-features = false, features = ["std", "portable-simd", "compare-64bit"] }
+libc = "0.2"
+sha2 = "0.11"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
