@@ -63,3 +63,38 @@ nightly-2026-11-03 (portable SIMD requires nightly) with canonical
 sccache. Runners build in ephemeral directories, then clean up.
 Portable C# falls back to software vector operations when hardware
 SIMD is not available, preserving correctness.
+
+## CPU-pinned performance validation
+
+Builds and benchmarks should not be conflated. Pin the main runner to
+one logical CPU, but allow toolchain builds to use an explicit, wider
+CPU set using `MUSEUM_BUILD_CPUSET`. The actual managed and native
+benchmark processes inherit the single-core affinity:
+
+~~~bash
+MUSEUM_BUILD_CPUSET=0-7 MUSEUM_WARMUP=1000000 \
+MUSEUM_ITERATIONS=10000000 MUSEUM_SAMPLES=7 \
+taskset -c 0 uv run --no-project --python 3 tools/bench.py \
+  --workload challenge-sha256-v1 \
+  --impl dotnet-challenge-portable \
+  --impl dotnet-challenge-scalar \
+  --impl dotnet-challenge-bcl \
+  --impl rust-challenge-simd \
+  --output /home/jan/benchmarks/museum-of-jit/challenge-sha256-acer-cpu0.json
+~~~
+
+On AVX-512 systems, execute a second, separately recorded run with
+`DOTNET_MaxVectorTBitWidth=512`. The JIT's actual lane count and this
+override are both stored under the result's runtime metadata. Without
+that override the same .NET 10 portable source can select eight rather
+than sixteen u32 lanes despite AVX-512 support.
+
+Where Rust is unavailable on the benchmark host, compile once on the
+development machine using canonical sccache and a compatible target,
+then set `MUSEUM_CHALLENGE_RUST_BIN` to the executable and
+`MUSEUM_CHALLENGE_RUSTC_VERSION` to the exact rustc version. The
+runner records the executable's SHA-256. The provided executable
+must implement the pinned source and pass the fixed SHA-256 oracle;
+a successful checksum is necessary but not sufficient to establish
+source provenance. No compilation is performed when supplied with a
+prebuilt binary.

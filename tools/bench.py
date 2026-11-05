@@ -50,6 +50,8 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
     if impl == "rust-dynasm":
         return command_output(["rustc", "+1.99.0", "--version"], env)
     if impl == "rust-challenge-simd":
+        if env.get("MUSEUM_CHALLENGE_RUST_BIN"):
+            return env.get("MUSEUM_CHALLENGE_RUSTC_VERSION", "rustc nightly-2026-11-03 (prebuilt)")
         return command_output(["rustc", "+nightly-2026-11-03", "--version"], env)
     if impl.startswith("dotnet-"):
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
@@ -154,9 +156,14 @@ def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
 def implementation_evidence(impl: str, text: str) -> dict:
     if impl == "rust-challenge-simd":
         match = re.findall(r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text)
-        if len(match) != 1:
-            raise ValueError("missing production Rust SIMD backend attestation")
-        return {"simd_lanes": int(match[0]), "backend": "production-portable-simd"}
+        hashes = re.findall(r"(?m)^BINARY_SHA256 ([0-9a-f]{64})$", text)
+        if len(match) != 1 or len(hashes) != 1:
+            raise ValueError("missing Rust SIMD or binary provenance attestation")
+        return {
+            "simd_lanes": int(match[0]),
+            "backend": "production-portable-simd",
+            "binary_sha256": hashes[0],
+        }
     dotnet_challenge_modes = {
         "dotnet-challenge-portable": "portable",
         "dotnet-challenge-scalar": "scalar",
@@ -217,7 +224,18 @@ def run_one(
         "host": host,
         "workload": {"id": workload_id, "corpus_sha256": corpus_sha},
         "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
-        "runtime": {"name": spec["runtime"], "version": runtime_version(impl, env), "command": [str(runner.relative_to(ROOT))]},
+        "runtime": {
+            "name": spec["runtime"], "version": runtime_version(impl, env),
+            "command": [str(runner.relative_to(ROOT))],
+            "jit_configuration": {
+                key: env[key] for key in (
+                    "DOTNET_MaxVectorTBitWidth", "DOTNET_PreferredVectorBitWidth",
+                    "DOTNET_EnableAVX2", "DOTNET_EnableAVX512F",
+                    "DOTNET_EnableHWIntrinsic", "COMPlus_TieredPGO",
+                    "COMPlus_TieredCompilation",
+                ) if key in env
+            },
+        },
         "warmup_iterations": int(env["MUSEUM_WARMUP"]),
         "sample_iterations": int(env["MUSEUM_ITERATIONS"]),
         "sample_count": int(env["MUSEUM_SAMPLES"]),
@@ -253,6 +271,11 @@ def run_one(
         return result
     try:
         parsed = parse_output(proc.stdout, expected_check)
+        if len(parsed["samples"]) != int(env["MUSEUM_SAMPLES"]):
+            raise ValueError(
+                f"sample count {len(parsed['samples'])} does not match "
+                f"MUSEUM_SAMPLES={env['MUSEUM_SAMPLES']}"
+            )
         evidence = implementation_evidence(impl, proc.stdout)
     except ValueError as exc:
         result = base | {

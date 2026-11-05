@@ -24,6 +24,22 @@ class ChallengeSha256WorkloadTest(unittest.TestCase):
                 case["sha256"],
             )
 
+    def test_rust_provenance_requires_exact_binary_sha(self):
+        sha = "a" * 64
+        example = (
+            "BINARY_SHA256 " + sha + "\n"
+            "ENGINE rust-challenge MODE simd VECTOR_LANES 16\n"
+            "CHECK b4b920f70c0de8df\n"
+            "RATE 99999999.9 sink=00000000002dc6c0\n"
+        )
+        evidence = bench.implementation_evidence("rust-challenge-simd", example)
+        self.assertEqual(evidence["binary_sha256"], sha)
+        self.assertEqual(evidence["simd_lanes"], 16)
+        with self.assertRaises(ValueError):
+            bench.implementation_evidence(
+                "rust-challenge-simd", example.replace("BINARY_SHA256 " + sha, "")
+            )
+
     def test_parser_cannot_pass_wrong_workload_or_probe(self):
         output = "ENGINE dotnet MODE portable VECTOR_LANES 8\nCHECK b4b920f70c0de8df\nRATE 123.45 sink=0123456789abcdef\n"
         parsed = bench.parse_output(output, "b4b920f70c0de8df")
