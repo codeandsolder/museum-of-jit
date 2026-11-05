@@ -40,6 +40,24 @@ class ChallengeSha256WorkloadTest(unittest.TestCase):
                 "rust-challenge-simd", example.replace("BINARY_SHA256 " + sha, "")
             )
 
+    def test_match_backend_and_exact_work_count(self):
+        output = (
+            "ENGINE dotnet MODE match VECTOR_LANES 16\\n"
+            "CHECK b4b920f70c0de8df\\n"
+            "RATE 1000000.0 sink=0000000000000400\\n"
+        )
+        output = output.replace("\\n", "\n")
+        evidence = bench.implementation_evidence("dotnet-challenge-match", output)
+        self.assertEqual(evidence["backend"], "match")
+        self.assertEqual(evidence["simd_lanes"], 16)
+        parsed = bench.parse_output(output, "b4b920f70c0de8df")
+        bench.validate_challenge_sink("dotnet-challenge-match", parsed, 1024)
+        bench.validate_challenge_sink("rust-challenge-simd", parsed, 1024)
+        with self.assertRaises(ValueError):
+            bench.validate_challenge_sink("dotnet-challenge-match", parsed, 1025)
+        with self.assertRaises(ValueError):
+            bench.implementation_evidence("dotnet-challenge-portable", output)
+
     def test_parser_cannot_pass_wrong_workload_or_probe(self):
         output = "ENGINE dotnet MODE portable VECTOR_LANES 8\nCHECK b4b920f70c0de8df\nRATE 123.45 sink=0123456789abcdef\n"
         parsed = bench.parse_output(output, "b4b920f70c0de8df")

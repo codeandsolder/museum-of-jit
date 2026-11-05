@@ -2,6 +2,55 @@
 
 Tracked result files contain only accepted benchmark runs. Failed bring-up attempts, smoke tests, and invalid measurements stay out of the curated dataset.
 
+## EPYC SHA-256 target-match control (2026-11-05)
+
+`epyc-9655-zen5-challenge-sha256-match-2026-11-05.json` is an accepted
+separate workload control on CPU0: 1M warmup, 7×10M candidates, SHA-256
+oracle and full attempted-count validation. It uses the *unchanged*
+`challenge-sha256-v1` fixture/corpus hash, production solver pinned to
+`f2e5b20` and verified static Rust binary SHA-256
+`739eae5661a12d0221977208793f99862fbca4abb62c040fefeb6914adb8b019`.
+The result revision is `189eb3d`.
+
+| EPYC 9655 CPU0, AVX-512, 16 lanes | Median hashes/s | Result sink |
+| --- | ---: | --- |
+| Production Rust SIMD, full 64-bit exact target comparison | **121,863,433** | exact attempts |
+| C# portable SIMD, full 64-bit exact target comparison | **59,827,603** | exact attempts |
+| C# portable SIMD, existing digest XOR reduction | **61,570,899** | 64-bit digest XOR |
+
+The target-match paths use the same fixed SHA digest target
+`baddcafe12345678` and identical attempted counts; the new .NET mode
+does not accelerate the existing portable implementation.
+Rust is **2.04×** faster than portable C# in these controlled runs,
+whereas the earlier digest-XOR vs Rust ratio was around 2.02×.
+C# still materializes all eight SHA-256 feedforward words, while Rust's
+production solver only needs the two being compared. This is improved
+comparison semantics, **not a claim of identical instruction work**.
+
+Actual disassembly of C# on .NET 10.0.403 shows a compact ~1149-byte
+`CompressVector` routine with AVX-512 arithmetic but repeated vector
+shifts/ORs for rotates, a 1,024-byte stack schedule clear and
+`SpanHelpers.Memmove` per compression. The matching, specialized
+production Rust AVX-512 solver function
+`solve_single_block::<10,false,4,1>` is ~15.3 KiB and contains
+LLVM-generated vector rotates (`vprold`) and ternary logic, with
+many rounds unrolled. Codegen differences are observed, but have
+not individually been isolated as the cause of the total speed gap.
+
+Two CPU0 A/B runs of a safer C# split-round-loop experiment reproduced
+the oracle and found **no meaningful improvement**: baseline run
+medians 59.02/58.19 MH/s, split-loop 58.72/59.17 MH/s. Reverted.
+Caller-owned scratch, in-place schedule, and unsafe-required
+`SkipLocalsInit` experiments were rejected earlier; see the
+[workload's detailed investigation notes](../workloads/challenge-sha256-v1/README.md).
+
+On Acer Ryzen 4700U (AVX2, CPU4), a separate match-control probe
+found Rust 26.29 MH/s, C# match 17.68 MH/s, C# digest XOR 19.09 MH/s;
+however sample ranges were wide, especially Rust (16.91–28.19 MH/s),
+so this is retained **only as diagnostics**, at
+`results/diagnostics/ryzen-4700u-challenge-sha256-match-cpu4-2026-11-05.json`,
+not promoted to the curated scoreboard.
+
 ## EPYC 9655 / Zen 5 — challenge-sha256-v1 (2026-11-05)
 
 Two accepted CPU0 runs of the *separate* SHA-256 nonce-search exhibit,

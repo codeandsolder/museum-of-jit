@@ -17,6 +17,7 @@ internal static class Program
     private static ulong Run(string mode, int count) => mode switch
     {
         "portable" => Sha256Kernel.RunVector(count),
+        "match" => Sha256Kernel.RunVectorMatch(count),
         "scalar" => Sha256Kernel.RunScalar(count),
         "bcl" => Sha256Kernel.RunBcl(count),
         _ => throw new ArgumentException($"unknown backend: {mode}")
@@ -33,7 +34,7 @@ internal static class Program
                 return 0;
             }
             if (args.Length != 2 || args[0] != "--mode")
-                throw new ArgumentException("usage: ChallengeSha256 --mode portable|scalar|bcl OR --self-test");
+                throw new ArgumentException("usage: ChallengeSha256 --mode portable|match|scalar|bcl OR --self-test");
 
             string mode = args[1];
             Sha256Kernel.SelfTest();
