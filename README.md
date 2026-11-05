@@ -20,7 +20,7 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 - Rust + dynasm direct x86-64 emission
 - Cranelift 0.137.1 direct native-IR JIT (fully generated HashWX, not a Wasm host)
 - Cranelift 0.137.1 native in-JIT batch loop (separate adapter, no per-hash Rust/JIT boundary)
-- LLVM 21.1.8 ORC LLJIT native IR with O2 optimizer and a separate in-JIT batch function
+- LLVM 21.1.8 ORC LLJIT native IR with O0/O1/O2/O3 policies and a generated in-JIT batch function (O0 fastest for this workload)
 - .NET / RyuJIT from `DynamicMethod` IL
 - .NET / RyuJIT static-source ceiling
 - Java / HotSpot straight-line source
