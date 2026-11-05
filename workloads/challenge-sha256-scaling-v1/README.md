@@ -59,3 +59,30 @@ The same statically linked x86_64-musl executable should run on all three.
 Use the validated hash printed in the final results so compilation settings
 and machine code are identical. Separate host topology, exact raw sample
 results, modes, affinity and medians are stored under `results/`.
+
+
+## Accepted measurement, 2026-11-05
+
+The curated machine-readable record is
+`results/sha256-shani-vs-simd-thread-scaling-2026-11-05.json`. It
+retains all 120 raw per-trial attempts, elapsed nanoseconds, computed rates,
+source-log hashes, solver commit and static binary hash. Full table and
+interpretation: [curated results](../../results/README.md).
+
+- **Asus Ryzen 4900HS (8 physical cores, 16 logical):** SHA-NI 40.72,
+  81.79, 154.76, 251.92 MH/s versus AVX2 portable SIMD 30.56, 61.23,
+  115.13, 192.13 MH/s for 1,2,4,8 physical-core-bound workers.
+  SHA-NI wins at each count (31–34%).
+- **Acer Ryzen 4700U (8 cores, no SMT):** SHA-NI 37.77, 75.20, 120.97,
+  192.66 MH/s versus portable AVX2 27.49, 54.90, 89.77, 153.85 MH/s.
+  SHA-NI wins each count (25–37%). Noticeable sample variability.
+- **Cold-storage EPYC 9655 VM (4 exposed vCPUs):** SHA-NI 50.93, 101.14,
+  188.44, 188.69 MH/s versus portable AVX-512 120.06, 238.51, 436.60,
+  449.67 MH/s. AVX-512 wins each count (2.32–2.38×). Eight-thread
+  results are oversubscription, and 4→8 adds no useful throughput.
+
+All tests passed 8-word RustCrypto full SHA-256 independent oracle
+per worker/backend and exact attempted-work validation. This validates
+the **existing** SHA-256 backend dispatch
+`AVX-512 → SHA-NI → AVX2 → scalar` on these Zen 2/Zen 5 machines;
+do not extrapolate to Zen 3/Zen 4 without measurements.
