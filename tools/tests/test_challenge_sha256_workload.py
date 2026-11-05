@@ -58,6 +58,34 @@ class ChallengeSha256WorkloadTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             bench.implementation_evidence("dotnet-challenge-portable", output)
 
+    def test_optimized_mode_attestation_and_work_count(self):
+        for name, mode in (
+            ("dotnet-challenge-optimized", "optimized"),
+            ("dotnet-challenge-match-optimized", "match-optimized"),
+        ):
+            output = (
+                f"ENGINE dotnet MODE {mode} VECTOR_LANES 16\\n"
+                "CHECK b4b920f70c0de8df\\n"
+                "RATE 60000000.0 sink=0000000000000400\\n"
+            ).replace("\\n", "\n")
+            self.assertEqual(
+                bench.implementation_evidence(name, output),
+                {"simd_lanes": 16, "backend": mode},
+            )
+            if mode == "match-optimized":
+                parsed = bench.parse_output(output, "b4b920f70c0de8df")
+                bench.validate_challenge_sink(name, parsed, 1024)
+                with self.assertRaises(ValueError):
+                    bench.validate_challenge_sink(name, parsed, 1025)
+
+    def test_unrolled_source_in_sync(self):
+        import subprocess
+        import sys
+        subprocess.run(
+            [sys.executable, str(ROOT / "tools/generate_challenge_sha256_unrolled.py"), "--check"],
+            check=True, capture_output=True, text=True
+        )
+
     def test_parser_cannot_pass_wrong_workload_or_probe(self):
         output = "ENGINE dotnet MODE portable VECTOR_LANES 8\nCHECK b4b920f70c0de8df\nRATE 123.45 sink=0123456789abcdef\n"
         parsed = bench.parse_output(output, "b4b920f70c0de8df")

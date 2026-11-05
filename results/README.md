@@ -1,5 +1,16 @@
 # Curated results
 
+## Portable C# SHA-256 unrolled AVX-512 experiment — 2026-11-05
+
+Accepted paired CPU0 Zen 5 .NET 10.0.403 A/B (default tiering, opt-in
+512-bit vectors): **target-match 57.10 → 62.70 MH/s (+9.8%)** and
+**digest-XOR 60.09 → 65.75 MH/s (+9.4%)**, same 14×10M samples per
+backend, warmup and exact sinks. Fully portable, source-generated
+unrolled rounds plus method-only `AggressiveOptimization` avoid a
+severe default Tier-0 performance cliff. Original compact loop is
+preserved, and the optimized mode falls back on other widths.
+[Full negative controls and final samples](diagnostics/csharp-sha256-ryujit-20261105/README.md).
+
 ## Rust SHA-NI vs portable-SIMD thread scaling — 2026-11-05
 
 `sha256-shani-vs-simd-thread-scaling-2026-11-05.json` is a curated

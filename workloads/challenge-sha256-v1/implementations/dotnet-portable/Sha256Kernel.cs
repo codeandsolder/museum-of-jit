@@ -12,7 +12,7 @@ namespace Museum.ChallengeSha256;
 /// prefix length 42 deliberately exercises its aligned seven-digit inner loop.
 /// No ISA-specific intrinsics, unsafe code, native dependencies, or dynamic codegen.
 /// </summary>
-internal static class Sha256Kernel
+internal static partial class Sha256Kernel
 {
     internal const int PrefixLength = 42;
     internal const int CandidateLength = PrefixLength + 9;
@@ -398,6 +398,7 @@ internal static class Sha256Kernel
         int width = Vector<uint>.Count;
         Span<Vector<uint>> vblock = stackalloc Vector<uint>[16];
         Span<Vector<uint>> vstate = stackalloc Vector<uint>[8];
+        Span<Vector<uint>> optimizedState = stackalloc Vector<uint>[8];
         Span<uint> laneWords = stackalloc uint[width];
         for (int i = 0; i < 16; i++) vblock[i] = new Vector<uint>(Template[i]);
         foreach (int inner in cases)
@@ -411,13 +412,15 @@ internal static class Sha256Kernel
                     laneWords[lane] = PrefixWord(10 + group + lane);
                 vblock[10] = new Vector<uint>(laneWords);
                 CompressVector(vblock, vstate);
+                CompressVectorUnrolled(vblock, optimizedState);
                 for (int lane = 0; lane < width; lane++)
                 {
                     HashBcl(10 + group + lane, inner, bcl);
                     for (int word = 0; word < 8; word++)
                     {
                         uint expected = BinaryPrimitives.ReadUInt32BigEndian(bcl[(word * 4)..]);
-                        if (vstate[word][lane] != expected)
+                        if (vstate[word][lane] != expected ||
+                            optimizedState[word][lane] != expected)
                             throw new InvalidOperationException($"vector mismatch lane={group + lane} inner={inner} word={word}");
                     }
                 }
@@ -427,7 +430,9 @@ internal static class Sha256Kernel
         {
             ulong expected = RunBcl(count);
             if (RunScalar(count) != expected || RunVector(count) != expected ||
-                RunVectorMatch(count) != (ulong)count)
+                RunVectorOptimized(count) != expected ||
+                RunVectorMatch(count) != (ulong)count ||
+                RunVectorMatchOptimized(count) != (ulong)count)
                 throw new InvalidOperationException($"partial batch mismatch count={count}");
         }
     }

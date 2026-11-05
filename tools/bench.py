@@ -166,6 +166,8 @@ def implementation_evidence(impl: str, text: str) -> dict:
         }
     dotnet_challenge_modes = {
         "dotnet-challenge-portable": "portable",
+        "dotnet-challenge-optimized": "optimized",
+        "dotnet-challenge-match-optimized": "match-optimized",
         "dotnet-challenge-match": "match",
         "dotnet-challenge-scalar": "scalar",
         "dotnet-challenge-bcl": "bcl",
@@ -209,7 +211,7 @@ def implementation_evidence(impl: str, text: str) -> dict:
 def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> None:
     # Hit-only solvers must attest to the complete attempted candidate count;
     # their count sink cannot be compared to the digest-XOR sink.
-    if impl not in ("dotnet-challenge-match", "rust-challenge-simd"):
+    if impl not in ("dotnet-challenge-match", "dotnet-challenge-match-optimized", "rust-challenge-simd"):
         return
     expected = f"{sample_iterations:016x}"
     for index, sample in enumerate(parsed["samples"]):
