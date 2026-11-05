@@ -1,0 +1,1244 @@
+{
+  "schema_version": 1,
+  "benchmark": "challenge-sha256-scaling-v1",
+  "solver_source_commit": "3776d8fbce45ae4641719d9ae40f84578be7c228",
+  "benchmark_source_commit": "5688c2f",
+  "build_rustc": "rustc 1.101.0-nightly (1c3a65069 2026-11-02)",
+  "build_target": "x86_64-unknown-linux-musl",
+  "build_flags": "-C target-feature=+crt-static -C relocation-model=static -C link-arg=-static",
+  "binary_sha256": "33640edd4ec43b1d4180fc7301b7a47ea69be65fdb97c9ee6e3548c10b3f492c",
+  "full_digest_oracle": "SHA256(prefix42 || decimal9); 8 words cross-checked against RustCrypto",
+  "source_notes": "CPU pins are per thread; paired backend order alternates by repeat; read workload README for exact candidate-set coverage.",
+  "hosts": [
+    {
+      "host": "acer-ryzen4700u",
+      "cpu_model": "Model name:                              AMD Ryzen 7 4700U with Radeon Graphics",
+      "logical_cpu_slots": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "actual_logical_cpus": 8,
+      "eight_threads_oversubscribed": false,
+      "simd_lanes": 8,
+      "iterations_per_worker": 80000000,
+      "warmup_per_worker": 1000000,
+      "repetitions": 5,
+      "oracle": "b4b920f70c0de8df",
+      "source_log_sha256": "df8d2bd655ceec99fb9f25afe760290e99eb43f6a0c755ff8258abcf4659482b",
+      "summary": [
+        {
+          "threads": 1,
+          "backend": "sha-ni",
+          "median_hps": 37772103.309,
+          "min_hps": 26569448.814,
+          "max_hps": 39676564.62,
+          "mad_hps": 1904461.310999997
+        },
+        {
+          "threads": 1,
+          "backend": "portable-simd",
+          "median_hps": 27494854.097,
+          "min_hps": 20541418.539,
+          "max_hps": 29653205.553,
+          "mad_hps": 1542189.8729999997
+        },
+        {
+          "threads": 2,
+          "backend": "sha-ni",
+          "median_hps": 75198888.005,
+          "min_hps": 63788429.751,
+          "max_hps": 76409717.027,
+          "mad_hps": 1210829.0219999999
+        },
+        {
+          "threads": 2,
+          "backend": "portable-simd",
+          "median_hps": 54895283.887,
+          "min_hps": 39474078.377,
+          "max_hps": 58037375.9,
+          "mad_hps": 3142092.0129999965
+        },
+        {
+          "threads": 4,
+          "backend": "sha-ni",
+          "median_hps": 120974712.737,
+          "min_hps": 89854143.405,
+          "max_hps": 127826785.604,
+          "mad_hps": 2103388.972000003
+        },
+        {
+          "threads": 4,
+          "backend": "portable-simd",
+          "median_hps": 89766714.825,
+          "min_hps": 85141401.365,
+          "max_hps": 92709220.228,
+          "mad_hps": 2332585.795000002
+        },
+        {
+          "threads": 8,
+          "backend": "sha-ni",
+          "median_hps": 192660934.684,
+          "min_hps": 179281690.254,
+          "max_hps": 205868383.787,
+          "mad_hps": 5769887.240999997
+        },
+        {
+          "threads": 8,
+          "backend": "portable-simd",
+          "median_hps": 153847097.417,
+          "min_hps": 101243707.843,
+          "max_hps": 154671291.09,
+          "mad_hps": 824193.6730000079
+        }
+      ],
+      "samples": [
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 0,
+          "attempts": 80000000,
+          "elapsed_ns": 2347049910,
+          "hashes_per_second": 34085342.48
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 0,
+          "attempts": 80000000,
+          "elapsed_ns": 2930086359,
+          "hashes_per_second": 27302949.537
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 1,
+          "attempts": 80000000,
+          "elapsed_ns": 2909635371,
+          "hashes_per_second": 27494854.097
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 1,
+          "attempts": 80000000,
+          "elapsed_ns": 2117965191,
+          "hashes_per_second": 37772103.309
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 2,
+          "attempts": 80000000,
+          "elapsed_ns": 3010977027,
+          "hashes_per_second": 26569448.814
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 2,
+          "attempts": 80000000,
+          "elapsed_ns": 3894570370,
+          "hashes_per_second": 20541418.539
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 3,
+          "attempts": 80000000,
+          "elapsed_ns": 2755101383,
+          "hashes_per_second": 29037043.97
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 3,
+          "attempts": 80000000,
+          "elapsed_ns": 2066065699,
+          "hashes_per_second": 38720937.112
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 4,
+          "attempts": 80000000,
+          "elapsed_ns": 2016303598,
+          "hashes_per_second": 39676564.62
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 4,
+          "attempts": 80000000,
+          "elapsed_ns": 2697853352,
+          "hashes_per_second": 29653205.553
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 0,
+          "attempts": 160000000,
+          "elapsed_ns": 2508291874,
+          "hashes_per_second": 63788429.751
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 0,
+          "attempts": 160000000,
+          "elapsed_ns": 4053292859,
+          "hashes_per_second": 39474078.377
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 1,
+          "attempts": 160000000,
+          "elapsed_ns": 3206385810,
+          "hashes_per_second": 49900420.436
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 1,
+          "attempts": 160000000,
+          "elapsed_ns": 2185073473,
+          "hashes_per_second": 73224082.383
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 2,
+          "attempts": 160000000,
+          "elapsed_ns": 2127691037,
+          "hashes_per_second": 75198888.005
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 2,
+          "attempts": 160000000,
+          "elapsed_ns": 2914640178,
+          "hashes_per_second": 54895283.887
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 3,
+          "attempts": 160000000,
+          "elapsed_ns": 2842295250,
+          "hashes_per_second": 56292533.297
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 3,
+          "attempts": 160000000,
+          "elapsed_ns": 2097611838,
+          "hashes_per_second": 76277220.171
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 4,
+          "attempts": 160000000,
+          "elapsed_ns": 2093974513,
+          "hashes_per_second": 76409717.027
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 4,
+          "attempts": 160000000,
+          "elapsed_ns": 2756844146,
+          "hashes_per_second": 58037375.9
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 0,
+          "attempts": 320000000,
+          "elapsed_ns": 2503387678,
+          "hashes_per_second": 127826785.604
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 0,
+          "attempts": 320000000,
+          "elapsed_ns": 3451652373,
+          "hashes_per_second": 92709220.228
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 1,
+          "attempts": 320000000,
+          "elapsed_ns": 3506562963,
+          "hashes_per_second": 91257451.635
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 1,
+          "attempts": 320000000,
+          "elapsed_ns": 2645180904,
+          "hashes_per_second": 120974712.737
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 2,
+          "attempts": 320000000,
+          "elapsed_ns": 3561327145,
+          "hashes_per_second": 89854143.405
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 2,
+          "attempts": 320000000,
+          "elapsed_ns": 3758453524,
+          "hashes_per_second": 85141401.365
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 3,
+          "attempts": 320000000,
+          "elapsed_ns": 3564795711,
+          "hashes_per_second": 89766714.825
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 3,
+          "attempts": 320000000,
+          "elapsed_ns": 2691986510,
+          "hashes_per_second": 118871323.765
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 4,
+          "attempts": 320000000,
+          "elapsed_ns": 2627779549,
+          "hashes_per_second": 121775816.439
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 4,
+          "attempts": 320000000,
+          "elapsed_ns": 3659898069,
+          "hashes_per_second": 87434129.03
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 0,
+          "attempts": 640000000,
+          "elapsed_ns": 3321898137,
+          "hashes_per_second": 192660934.684
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 0,
+          "attempts": 640000000,
+          "elapsed_ns": 4154410971,
+          "hashes_per_second": 154053126.777
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 1,
+          "attempts": 640000000,
+          "elapsed_ns": 4295127116,
+          "hashes_per_second": 149006067.275
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 1,
+          "attempts": 640000000,
+          "elapsed_ns": 3263883834,
+          "hashes_per_second": 196085410.067
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 2,
+          "attempts": 640000000,
+          "elapsed_ns": 3108782360,
+          "hashes_per_second": 205868383.787
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 2,
+          "attempts": 640000000,
+          "elapsed_ns": 4159974486,
+          "hashes_per_second": 153847097.417
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 3,
+          "attempts": 640000000,
+          "elapsed_ns": 4137807317,
+          "hashes_per_second": 154671291.09
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 3,
+          "attempts": 640000000,
+          "elapsed_ns": 3424455097,
+          "hashes_per_second": 186891047.443
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 4,
+          "attempts": 640000000,
+          "elapsed_ns": 3569801239,
+          "hashes_per_second": 179281690.254
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 4,
+          "attempts": 640000000,
+          "elapsed_ns": 6321380495,
+          "hashes_per_second": 101243707.843
+        }
+      ]
+    },
+    {
+      "host": "asus-ryzen4900hs",
+      "cpu_model": "Model name:                              AMD Ryzen 9 4900HS with Radeon Graphics",
+      "logical_cpu_slots": [
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14
+      ],
+      "actual_logical_cpus": 16,
+      "eight_threads_oversubscribed": false,
+      "simd_lanes": 8,
+      "iterations_per_worker": 80000000,
+      "warmup_per_worker": 1000000,
+      "repetitions": 5,
+      "oracle": "b4b920f70c0de8df",
+      "source_log_sha256": "6124d03f2f81002b85215efa2bc8dbe76a77883aec6e41374ed53c729f895440",
+      "summary": [
+        {
+          "threads": 1,
+          "backend": "sha-ni",
+          "median_hps": 40721336.057,
+          "min_hps": 40321046.108,
+          "max_hps": 41154739.539,
+          "mad_hps": 217842.95500000566
+        },
+        {
+          "threads": 1,
+          "backend": "portable-simd",
+          "median_hps": 30560770.733,
+          "min_hps": 29918444.642,
+          "max_hps": 30701691.488,
+          "mad_hps": 49678.984999999404
+        },
+        {
+          "threads": 2,
+          "backend": "sha-ni",
+          "median_hps": 81793210.17,
+          "min_hps": 81582192.644,
+          "max_hps": 81870126.93,
+          "mad_hps": 76916.76000000536
+        },
+        {
+          "threads": 2,
+          "backend": "portable-simd",
+          "median_hps": 61232597.765,
+          "min_hps": 60612544.22,
+          "max_hps": 61376951.349,
+          "mad_hps": 68508.888000004
+        },
+        {
+          "threads": 4,
+          "backend": "sha-ni",
+          "median_hps": 154756940.778,
+          "min_hps": 152656117.65,
+          "max_hps": 155134436.148,
+          "mad_hps": 374212.5160000026
+        },
+        {
+          "threads": 4,
+          "backend": "portable-simd",
+          "median_hps": 115126117.427,
+          "min_hps": 113103125.376,
+          "max_hps": 116845516.323,
+          "mad_hps": 674345.1060000062
+        },
+        {
+          "threads": 8,
+          "backend": "sha-ni",
+          "median_hps": 251917702.749,
+          "min_hps": 250571622.092,
+          "max_hps": 254932027.736,
+          "mad_hps": 1346080.6570000052
+        },
+        {
+          "threads": 8,
+          "backend": "portable-simd",
+          "median_hps": 192125438.814,
+          "min_hps": 191027109.248,
+          "max_hps": 192457759.684,
+          "mad_hps": 332320.86999997497
+        }
+      ],
+      "samples": [
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 0,
+          "attempts": 80000000,
+          "elapsed_ns": 1974340417,
+          "hashes_per_second": 40519861.373
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 0,
+          "attempts": 80000000,
+          "elapsed_ns": 2614975394,
+          "hashes_per_second": 30593022.093
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 1,
+          "attempts": 80000000,
+          "elapsed_ns": 2617735027,
+          "hashes_per_second": 30560770.733
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 1,
+          "attempts": 80000000,
+          "elapsed_ns": 1943883035,
+          "hashes_per_second": 41154739.539
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 2,
+          "attempts": 80000000,
+          "elapsed_ns": 1984075507,
+          "hashes_per_second": 40321046.108
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 2,
+          "attempts": 80000000,
+          "elapsed_ns": 2605719624,
+          "hashes_per_second": 30701691.488
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 3,
+          "attempts": 80000000,
+          "elapsed_ns": 2621997294,
+          "hashes_per_second": 30511091.748
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 3,
+          "attempts": 80000000,
+          "elapsed_ns": 1964572083,
+          "hashes_per_second": 40721336.057
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 4,
+          "attempts": 80000000,
+          "elapsed_ns": 1954118327,
+          "hashes_per_second": 40939179.012
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 4,
+          "attempts": 80000000,
+          "elapsed_ns": 2673935793,
+          "hashes_per_second": 29918444.642
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 0,
+          "attempts": 160000000,
+          "elapsed_ns": 1961212304,
+          "hashes_per_second": 81582192.644
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 0,
+          "attempts": 160000000,
+          "elapsed_ns": 2639717604,
+          "hashes_per_second": 60612544.22
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 1,
+          "attempts": 160000000,
+          "elapsed_ns": 2606841762,
+          "hashes_per_second": 61376951.349
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 1,
+          "attempts": 160000000,
+          "elapsed_ns": 1956152591,
+          "hashes_per_second": 81793210.17
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 2,
+          "attempts": 160000000,
+          "elapsed_ns": 1954314791,
+          "hashes_per_second": 81870126.93
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 2,
+          "attempts": 160000000,
+          "elapsed_ns": 2612987295,
+          "hashes_per_second": 61232597.765
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 3,
+          "attempts": 160000000,
+          "elapsed_ns": 2610617514,
+          "hashes_per_second": 61288181.49
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 3,
+          "attempts": 160000000,
+          "elapsed_ns": 1955053431,
+          "hashes_per_second": 81839195.524
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 4,
+          "attempts": 160000000,
+          "elapsed_ns": 1959950833,
+          "hashes_per_second": 81634700.884
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 4,
+          "attempts": 160000000,
+          "elapsed_ns": 2615914059,
+          "hashes_per_second": 61164088.877
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 0,
+          "attempts": 320000000,
+          "elapsed_ns": 2062727064,
+          "hashes_per_second": 155134436.148
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 0,
+          "attempts": 320000000,
+          "elapsed_ns": 2738658787,
+          "hashes_per_second": 116845516.323
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 1,
+          "attempts": 320000000,
+          "elapsed_ns": 2829276370,
+          "hashes_per_second": 113103125.376
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 1,
+          "attempts": 320000000,
+          "elapsed_ns": 2067758631,
+          "hashes_per_second": 154756940.778
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 2,
+          "attempts": 320000000,
+          "elapsed_ns": 2096214714,
+          "hashes_per_second": 152656117.65
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 2,
+          "attempts": 320000000,
+          "elapsed_ns": 2764325624,
+          "hashes_per_second": 115760602.594
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 3,
+          "attempts": 320000000,
+          "elapsed_ns": 2795937481,
+          "hashes_per_second": 114451772.321
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 3,
+          "attempts": 320000000,
+          "elapsed_ns": 2062770715,
+          "hashes_per_second": 155131153.294
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 4,
+          "attempts": 320000000,
+          "elapsed_ns": 2069664806,
+          "hashes_per_second": 154614408.61
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 4,
+          "attempts": 320000000,
+          "elapsed_ns": 2779560426,
+          "hashes_per_second": 115126117.427
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 0,
+          "attempts": 640000000,
+          "elapsed_ns": 2554159943,
+          "hashes_per_second": 250571622.092
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 0,
+          "attempts": 640000000,
+          "elapsed_ns": 3325405019,
+          "hashes_per_second": 192457759.684
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 1,
+          "attempts": 640000000,
+          "elapsed_ns": 3331156998,
+          "hashes_per_second": 192125438.814
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 1,
+          "attempts": 640000000,
+          "elapsed_ns": 2540512211,
+          "hashes_per_second": 251917702.749
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 2,
+          "attempts": 640000000,
+          "elapsed_ns": 2544338530,
+          "hashes_per_second": 251538854.777
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 2,
+          "attempts": 640000000,
+          "elapsed_ns": 3350309820,
+          "hashes_per_second": 191027109.248
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 3,
+          "attempts": 640000000,
+          "elapsed_ns": 3329393648,
+          "hashes_per_second": 192227194.398
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 3,
+          "attempts": 640000000,
+          "elapsed_ns": 2514781260,
+          "hashes_per_second": 254495295.547
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 4,
+          "attempts": 640000000,
+          "elapsed_ns": 2510473108,
+          "hashes_per_second": 254932027.736
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 4,
+          "attempts": 640000000,
+          "elapsed_ns": 3339807594,
+          "hashes_per_second": 191627805.491
+        }
+      ]
+    },
+    {
+      "host": "cold-epyc9655-4vcpu",
+      "cpu_model": "Model name:                              AMD EPYC 9655 96-Core Processor",
+      "logical_cpu_slots": [
+        0,
+        1,
+        2,
+        3,
+        0,
+        1,
+        2,
+        3
+      ],
+      "actual_logical_cpus": 4,
+      "eight_threads_oversubscribed": true,
+      "simd_lanes": 16,
+      "iterations_per_worker": 160000000,
+      "warmup_per_worker": 1000000,
+      "repetitions": 5,
+      "oracle": "b4b920f70c0de8df",
+      "source_log_sha256": "3ae5642012544200e002eea7e02135b380daf91dae7dfb0fb2cd39a248cedd61",
+      "summary": [
+        {
+          "threads": 1,
+          "backend": "sha-ni",
+          "median_hps": 50926681.52,
+          "min_hps": 49585048.575,
+          "max_hps": 51785537.046,
+          "mad_hps": 809762.9450000003
+        },
+        {
+          "threads": 1,
+          "backend": "portable-simd",
+          "median_hps": 120055694.827,
+          "min_hps": 116285066.73,
+          "max_hps": 122303150.65,
+          "mad_hps": 2034351.3969999999
+        },
+        {
+          "threads": 2,
+          "backend": "sha-ni",
+          "median_hps": 101140406.408,
+          "min_hps": 96855190.273,
+          "max_hps": 102857739.057,
+          "mad_hps": 1009711.8149999976
+        },
+        {
+          "threads": 2,
+          "backend": "portable-simd",
+          "median_hps": 238510816.218,
+          "min_hps": 235705471.008,
+          "max_hps": 239262773.672,
+          "mad_hps": 751957.4539999962
+        },
+        {
+          "threads": 4,
+          "backend": "sha-ni",
+          "median_hps": 188442291.546,
+          "min_hps": 173777478.251,
+          "max_hps": 189924309.717,
+          "mad_hps": 1482018.1710000038
+        },
+        {
+          "threads": 4,
+          "backend": "portable-simd",
+          "median_hps": 436603097.385,
+          "min_hps": 421238204.744,
+          "max_hps": 463665485.267,
+          "mad_hps": 13979548.21599996
+        },
+        {
+          "threads": 8,
+          "backend": "sha-ni",
+          "median_hps": 188688904.436,
+          "min_hps": 184509831.579,
+          "max_hps": 193084510.572,
+          "mad_hps": 3947635.0860000253
+        },
+        {
+          "threads": 8,
+          "backend": "portable-simd",
+          "median_hps": 449673201.02,
+          "min_hps": 383028309.118,
+          "max_hps": 457434431.241,
+          "mad_hps": 7754299.1620000005
+        }
+      ],
+      "samples": [
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 0,
+          "attempts": 160000000,
+          "elapsed_ns": 3169752614,
+          "hashes_per_second": 50477125.342
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 0,
+          "attempts": 160000000,
+          "elapsed_ns": 1351143423,
+          "hashes_per_second": 118418220.654
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 1,
+          "attempts": 160000000,
+          "elapsed_ns": 1375929038,
+          "hashes_per_second": 116285066.73
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 1,
+          "attempts": 160000000,
+          "elapsed_ns": 3226779132,
+          "hashes_per_second": 49585048.575
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 2,
+          "attempts": 160000000,
+          "elapsed_ns": 3089665747,
+          "hashes_per_second": 51785537.046
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 2,
+          "attempts": 160000000,
+          "elapsed_ns": 1308224679,
+          "hashes_per_second": 122303150.65
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 3,
+          "attempts": 160000000,
+          "elapsed_ns": 1310508145,
+          "hashes_per_second": 122090046.224
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 3,
+          "attempts": 160000000,
+          "elapsed_ns": 3092597523,
+          "hashes_per_second": 51736444.465
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 1,
+          "repeat": 4,
+          "attempts": 160000000,
+          "elapsed_ns": 3141771567,
+          "hashes_per_second": 50926681.52
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 1,
+          "repeat": 4,
+          "attempts": 160000000,
+          "elapsed_ns": 1332714789,
+          "hashes_per_second": 120055694.827
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 0,
+          "attempts": 320000000,
+          "elapsed_ns": 3303901413,
+          "hashes_per_second": 96855190.273
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 0,
+          "attempts": 320000000,
+          "elapsed_ns": 1337441655,
+          "hashes_per_second": 239262773.672
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 1,
+          "attempts": 320000000,
+          "elapsed_ns": 1341658232,
+          "hashes_per_second": 238510816.218
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 1,
+          "attempts": 320000000,
+          "elapsed_ns": 3163918471,
+          "hashes_per_second": 101140406.408
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 2,
+          "attempts": 320000000,
+          "elapsed_ns": 3165333602,
+          "hashes_per_second": 101095189.397
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 2,
+          "attempts": 320000000,
+          "elapsed_ns": 1357626527,
+          "hashes_per_second": 235705471.008
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 3,
+          "attempts": 320000000,
+          "elapsed_ns": 1349999014,
+          "hashes_per_second": 237037210.162
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 3,
+          "attempts": 320000000,
+          "elapsed_ns": 3132644441,
+          "hashes_per_second": 102150118.223
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 2,
+          "repeat": 4,
+          "attempts": 320000000,
+          "elapsed_ns": 3111093078,
+          "hashes_per_second": 102857739.057
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 2,
+          "repeat": 4,
+          "attempts": 320000000,
+          "elapsed_ns": 1337959483,
+          "hashes_per_second": 239170172.241
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 0,
+          "attempts": 640000000,
+          "elapsed_ns": 3682870798,
+          "hashes_per_second": 173777478.251
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 0,
+          "attempts": 640000000,
+          "elapsed_ns": 1519330376,
+          "hashes_per_second": 421238204.744
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 1,
+          "attempts": 640000000,
+          "elapsed_ns": 1514350067,
+          "hashes_per_second": 422623549.169
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 1,
+          "attempts": 640000000,
+          "elapsed_ns": 3571757056,
+          "hashes_per_second": 179183519.474
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 2,
+          "attempts": 640000000,
+          "elapsed_ns": 3395829420,
+          "hashes_per_second": 188466474.856
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 2,
+          "attempts": 640000000,
+          "elapsed_ns": 1439008125,
+          "hashes_per_second": 444750789.715
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 3,
+          "attempts": 640000000,
+          "elapsed_ns": 1465862253,
+          "hashes_per_second": 436603097.385
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 3,
+          "attempts": 640000000,
+          "elapsed_ns": 3369763465,
+          "hashes_per_second": 189924309.717
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 4,
+          "repeat": 4,
+          "attempts": 640000000,
+          "elapsed_ns": 3396265216,
+          "hashes_per_second": 188442291.546
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 4,
+          "repeat": 4,
+          "attempts": 640000000,
+          "elapsed_ns": 1380305458,
+          "hashes_per_second": 463665485.267
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 0,
+          "attempts": 1280000000,
+          "elapsed_ns": 6629221558,
+          "hashes_per_second": 193084510.572
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 0,
+          "attempts": 1280000000,
+          "elapsed_ns": 2896459044,
+          "hashes_per_second": 441918901.858
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 1,
+          "attempts": 1280000000,
+          "elapsed_ns": 3341789548,
+          "hashes_per_second": 383028309.118
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 1,
+          "attempts": 1280000000,
+          "elapsed_ns": 6783652721,
+          "hashes_per_second": 188688904.436
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 2,
+          "attempts": 1280000000,
+          "elapsed_ns": 6644637633,
+          "hashes_per_second": 192636539.522
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 2,
+          "attempts": 1280000000,
+          "elapsed_ns": 2846511638,
+          "hashes_per_second": 449673201.02
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 3,
+          "attempts": 1280000000,
+          "elapsed_ns": 2798215247,
+          "hashes_per_second": 457434431.241
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 3,
+          "attempts": 1280000000,
+          "elapsed_ns": 6853034949,
+          "hashes_per_second": 186778560.087
+        },
+        {
+          "backend": "sha-ni",
+          "threads": 8,
+          "repeat": 4,
+          "attempts": 1280000000,
+          "elapsed_ns": 6937299704,
+          "hashes_per_second": 184509831.579
+        },
+        {
+          "backend": "portable-simd",
+          "threads": 8,
+          "repeat": 4,
+          "attempts": 1280000000,
+          "elapsed_ns": 2831621379,
+          "hashes_per_second": 452037835.811
+        }
+      ]
+    }
+  ]
+}

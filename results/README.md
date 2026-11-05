@@ -1,5 +1,55 @@
 # Curated results
 
+## Rust SHA-NI vs portable-SIMD thread scaling — 2026-11-05
+
+`sha256-shani-vs-simd-thread-scaling-2026-11-05.json` is a curated
+three-host, six host/backend combinations of 120 *individual* measured samples.
+All modes use the **same statically linked x86_64-musl Rust executable**
+(SHA-256 `33640edd4ec43b1d4180fc7301b7a47ea69be65fdb97c9ee6e3548c10b3f492c`),
+compiled once on Acer with sccache, nightly-2026-11-03, from
+`challenge-solvers` git commit `3776d8f`. The independent RustCrypto
+SHA-256 full-digest oracle passed for every worker and backend; no target hits
+occurred, and all attempts and affinity checks succeeded.
+
+**Aggregate median million candidate hashes/s**, five alternating-order
+samples per (host, backend, thread count):
+
+| Host / production backend | 1 thread | 2 threads | 4 threads | 8 threads |
+| --- | ---: | ---: | ---: | ---: |
+| Asus Ryzen 4900HS SHA-NI (4 streams) | **40.72** | **81.79** | **154.76** | **251.92** |
+| Asus Ryzen 4900HS portable SIMD AVX2 ×8 | 30.56 | 61.23 | 115.13 | 192.13 |
+| Acer Ryzen 4700U SHA-NI (4 streams) | **37.77** | **75.20** | **120.97** | **192.66** |
+| Acer Ryzen 4700U portable SIMD AVX2 ×8 | 27.49 | 54.90 | 89.77 | 153.85 |
+| Cold EPYC 9655 VM SHA-NI (4 streams) | 50.93 | 101.14 | 188.44 | 188.69* |
+| Cold EPYC 9655 VM portable SIMD AVX-512 ×16 | **120.06** | **238.51** | **436.60** | **449.67*** |
+
+**(*)** Cold-storage exposes only **four virtual CPUs** (0–3), so its
+eight-thread case is **oversubscribed** (two threads pinned per vCPU),
+not 8 physical cores. Asus selected 8 distinct physical SMT cores
+(logical IDs 0,2,4,6,8,10,12,14); Acer has 8 physical cores without SMT.
+Per-worker fixed work is 80M hashes on Ryzen or 160M on EPYC: by exhausting
+whole prefix groups, the SHA-NI and SIMD implementations process the
+*identical candidate set* per worker despite their different lane widths.
+Both test the same 64-bit target. One million warmup candidates per worker
+preceded each timed trial and were not timed.
+
+**Conclusion:** the current x86 dispatch is right for these actual machines:
+SHA-NI is ~31–34% faster on Asus Zen 2 and 25–37% faster on Acer Zen 2
+than AVX2 portable SIMD; AVX-512 portable SIMD is ~2.32–2.38× faster
+than SHA-NI on the Zen 5 VM. Increasing concurrent workers changes the
+magnitude but **never changes the winner** here. Asus samples were
+especially stable. Acer experienced appreciable concurrent-load variation
+(e.g., eight-thread SIMD 101.24–154.67 MH/s), so medians rather than
+individual peaks are the appropriate comparison.
+
+This is a **production nonce-search** comparison, not standalone
+SHA-256 compression, and makes no extrapolation to unavailable Zen 3/4
+hardware or a full bare-metal 96-core EPYC. Full source, pinned build
+recipe, exact core affinity, independent correctness, raw sample data,
+and SHA-256 provenance:
+[`workloads/challenge-sha256-scaling-v1/README.md`](../workloads/challenge-sha256-scaling-v1/README.md).
+
+
 Tracked result files contain only accepted benchmark runs. Failed bring-up attempts, smoke tests, and invalid measurements stay out of the curated dataset.
 
 ## EPYC SHA-256 target-match control (2026-11-05)
