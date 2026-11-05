@@ -143,3 +143,33 @@ candidate hashes run only the initial prefix group, so all match
 the same lane IDs and decimal inner indices. The C# match mode
 also correctly handles partial vector batches; any unexpected hit
 inside the valid lane range aborts rather than silently counting it.
+
+
+## AVX-512 RyuJIT codegen and control findings (2026-11-05)
+
+The measured **match-control** compares the same fixed 64-bit SHA-256
+equality target as the production Rust solver and checks the exact
+attempted candidate count. On CPU0 of an EPYC 9655, with 16 lanes,
+1M warmup + 7×10M, production Rust SIMD achieved 121.86 MH/s,
+portable C# target-match 59.83 MH/s, and existing C# digest-XOR
+61.57 MH/s. The paired comparison confirms the gap is **not**
+caused by XOR sink reduction. Original backend/results remain intact.
+
+In the genuine RyuJIT `CompressVector` disassembly, portable
+`Vector<uint>` compiles to AVX-512 `zmm` operations, but vector rotates
+lower to multiple shifts/ORs, unlike LLVM's unrolled production Rust
+kernel using `vprold`. RyuJIT's 1,149-byte compression also zeros
+a 1,024-byte stack message ring and calls a memmove before rounds;
+both are absent in the same form from Rust's 15.3 KiB specialized
+unrolled function. Separate scratch-buffer, no-init (requires /unsafe),
+and fully-unrolled C# attempts regressed on Acer. Moving the first six
+rounds into a separate loop matched baseline on EPYC in controlled
+A/B checks (no measurable net gain); keep the original simpler loop.
+Acer CPU4 comparison is diagnostic only due to pronounced frequency
+or concurrent load variability.
+
+Collected disassembly/AB diagnostics live outside the repository under
+`/srv/scratch/benchmarks/museum-of-jit/diagnostics/codegen-20261105/`.
+Curated EPYC raw samples are in
+`results/epyc-9655-zen5-challenge-sha256-match-2026-11-05.json`;
+Acer's raw diagnostic is under `results/diagnostics/`.
