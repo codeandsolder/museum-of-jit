@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-mode="${1:?need portable|scalar|bcl}"
+mode="${1:?need portable|match|scalar|bcl}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 dotnet="${MUSEUM_DOTNET:-dotnet}"
 command -v "$dotnet" >/dev/null || { echo "dotnet not found" >&2; exit 69; }

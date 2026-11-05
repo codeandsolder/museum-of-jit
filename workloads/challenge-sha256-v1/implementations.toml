@@ -4,6 +4,12 @@ runner = "tools/runners/dotnet-challenge-portable.sh"
 runtime = ".NET/RyuJIT portable System.Numerics.Vector"
 source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
 
+[dotnet-challenge-match]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-challenge-match.sh"
+runtime = ".NET/RyuJIT portable Vector SHA-256, 64-bit hit-only parity"
+source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
+
 [dotnet-challenge-scalar]
 mode = "idiomatic"
 runner = "tools/runners/dotnet-challenge-scalar.sh"

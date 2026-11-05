@@ -323,6 +323,53 @@ internal static class Sha256Kernel
         return ((ulong)tail0 << 32) | tail1;
     }
 
+    // Same 64-bit equality target and "no hit" accounting used by the
+    // production Rust solver, with no per-candidate digest XOR/materialization.
+    // This is a distinct benchmark mode: never conflate its sink with RunVector.
+    internal static ulong RunVectorMatch(int count)
+    {
+        int width = Vector<uint>.Count;
+        if (width > CandidatesPerRow || CandidatesPerRow % width != 0)
+            throw new NotSupportedException("Vector<uint>.Count must divide 16");
+
+        Span<Vector<uint>> block = stackalloc Vector<uint>[16];
+        Span<Vector<uint>> state = stackalloc Vector<uint>[8];
+        for (int i = 0; i < 16; i++) block[i] = new Vector<uint>(Template[i]);
+        Span<uint> words = stackalloc uint[width];
+        Span<uint> partialMask = stackalloc uint[width];
+        var targetHi = new Vector<uint>(0xbaddcafeu);
+        var targetLo = new Vector<uint>(0x12345678u);
+        var allBits = new Vector<uint>(uint.MaxValue);
+
+        int done = 0;
+        for (int group = 0; done < count; group += width)
+        {
+            for (int lane = 0; lane < width; lane++)
+                words[lane] = PrefixWord(10 + group + lane);
+            block[10] = new Vector<uint>(words);
+
+            for (int inner = 0; inner < MaxRows && done < count; inner++)
+            {
+                InnerWords(inner, out uint word11, out uint word12);
+                block[11] = new Vector<uint>(word11);
+                block[12] = new Vector<uint>(word12);
+                CompressVector(block, state);
+                int valid = Math.Min(width, count - done);
+                var matches = Vector.Equals(state[0], targetHi) & Vector.Equals(state[1], targetLo);
+                if (Vector.EqualsAny(matches, allBits))
+                {
+                    matches.CopyTo(partialMask);
+                    for (int lane = 0; lane < valid; lane++)
+                        if (partialMask[lane] == uint.MaxValue)
+                            throw new InvalidOperationException("unexpected match in fixed-target benchmark");
+                }
+                done += valid;
+            }
+        }
+
+        return (ulong)done;
+    }
+
     internal static void SelfTest()
     {
         // Every lane and multiple carries through the 7-digit decimal field.
@@ -379,7 +426,8 @@ internal static class Sha256Kernel
         foreach (int count in new[] { 1, 3, 7, 15, 16, 17, 31, 32, 63, 129, 1024 })
         {
             ulong expected = RunBcl(count);
-            if (RunScalar(count) != expected || RunVector(count) != expected)
+            if (RunScalar(count) != expected || RunVector(count) != expected ||
+                RunVectorMatch(count) != (ulong)count)
                 throw new InvalidOperationException($"partial batch mismatch count={count}");
         }
     }

@@ -166,6 +166,7 @@ def implementation_evidence(impl: str, text: str) -> dict:
         }
     dotnet_challenge_modes = {
         "dotnet-challenge-portable": "portable",
+        "dotnet-challenge-match": "match",
         "dotnet-challenge-scalar": "scalar",
         "dotnet-challenge-bcl": "bcl",
     }
@@ -203,6 +204,20 @@ def implementation_evidence(impl: str, text: str) -> dict:
     if executor_count < 1:
         raise ValueError("CPython JIT benchmark installed no tier-2 executors")
     return {"jit_enabled": True, "jit_executors": executor_count}
+
+
+def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> None:
+    # Hit-only solvers must attest to the complete attempted candidate count;
+    # their count sink cannot be compared to the digest-XOR sink.
+    if impl not in ("dotnet-challenge-match", "rust-challenge-simd"):
+        return
+    expected = f"{sample_iterations:016x}"
+    for index, sample in enumerate(parsed["samples"]):
+        if sample["sink"] != expected:
+            raise ValueError(
+                f"{impl} sample {index} did not attest exact attempted count: "
+                f"expected {expected}, got {sample['sink']}"
+            )
 
 
 def run_one(
@@ -277,6 +292,7 @@ def run_one(
                 f"MUSEUM_SAMPLES={env['MUSEUM_SAMPLES']}"
             )
         evidence = implementation_evidence(impl, proc.stdout)
+        validate_challenge_sink(impl, parsed, int(env["MUSEUM_ITERATIONS"]))
     except ValueError as exc:
         result = base | {
             "status": "invalid", "exit_code": proc.returncode, "error": str(exc),

@@ -118,3 +118,28 @@ A fully unrolled C# SHA-256 compression experiment compiled correctly
 and passed the oracle but was 3.1× slower than the ordinary loop on
 Acer CPU4 (6.6 vs 20.5 MH/s). It was rejected rather than adding
 a slower and much larger active implementation.
+
+## Equal-target match-control benchmark
+
+The `dotnet-challenge-match` backend uses the existing portable SIMD
+compression kernel but checks the same 64-bit exact-match target as
+`rust-challenge-simd`: `0xbaddcafe12345678` (high/low digest words).
+Neither emits a per-candidate digest XOR. Both report the exact number
+of attempted candidates as the sink; the harness rejects wrong counts.
+The full-digest SHA-256 BCL oracle, decimal-carry checks, and partial-lane
+tests run before either .NET benchmark mode.
+
+This isolates the effect of replacing digest-XOR reduction with
+match-only control flow, but **does not make their SHA implementations
+instruction-identical**: the C# kernel still calculates all eight
+feedforward digest words while production Rust only needs two for
+64-bit target matching. The original `dotnet-challenge-portable` and
+all curated historical results remain unchanged and directly comparable
+by source revision and fixture hash.
+
+The production solver enumerates a different prefix range after
+exhausting each full inner sequence. Benchmarks up to 10 million
+candidate hashes run only the initial prefix group, so all match
+the same lane IDs and decimal inner indices. The C# match mode
+also correctly handles partial vector batches; any unexpected hit
+inside the valid lane range aborts rather than silently counting it.
