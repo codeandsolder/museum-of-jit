@@ -173,3 +173,69 @@ Collected disassembly/AB diagnostics live outside the repository under
 Curated EPYC raw samples are in
 `results/epyc-9655-zen5-challenge-sha256-match-2026-11-05.json`;
 Acer's raw diagnostic is under `results/diagnostics/`.
+
+
+## Portable unrolled C# experiment: stable AVX-512 performance (2026-11-05)
+
+The new `dotnet-challenge-optimized` (digest-XOR) and
+`dotnet-challenge-match-optimized` (64-bit hit-only) backends use a
+**source-generated**, 16-word, fully unrolled SHA-256 compression function
+expressed entirely in portable `System.Numerics.Vector<uint>` operations.
+No architecture-specific intrinsics, unsafe code, or dynamic code generation
+are required. The canonical compact loop and old backends are unchanged.
+The optimization is selected **only when `Vector<uint>.Count == 16`**:
+on AVX2/other narrower targets the new modes deliberately use the old
+portable implementation. On AVX-512-capable .NET 10, enable
+`DOTNET_MaxVectorTBitWidth=512` to select the sixteen-lane path.
+
+The generated file `Sha256Kernel.Unrolled.g.cs` is **mechanical output**
+from `tools/generate_challenge_sha256_unrolled.py`, a small development/CI
+source generator deriving round logic and both drivers from the canonical
+source. Run `uv run --no-project --python 3
+tools/generate_challenge_sha256_unrolled.py --check` to detect drift.
+This isolates the lengthy expansion without maintaining duplicate business
+logic. The full-digest RustCrypto-independent BCL self-test checks all
+eight words of **both** compression implementations for every lane and
+decimal-carry case, plus partial candidate batches in both new modes.
+
+**Important JIT finding:** a fully unrolled C# method suffers pathological
+Tier-0 performance when .NET 10's default tiered compilation is enabled:
+some samples fell to ~10 MH/s. The narrow
+`[MethodImpl(MethodImplOptions.AggressiveOptimization)]` hint on the
+generated compression function bypasses Tier 0 *for that method only*,
+without disabling tiering or PGO process-wide. It also bypasses
+dynamic-PGO benefits for this one function; do not apply it indiscriminately.
+Full unroll on 8-lane Zen 2 was previously slower due to register pressure,
+hence the explicit width-16 dispatch above.
+
+Final paired Zen 5 CPU0 A/B validation, **default runtime tiering,
+512-bit portable vectors, 1M warmup, 2 × 7 × 10M** independent
+candidates per mode, source built on Acer with .NET 10, executed
+on cold-storage with .NET 10.0.403:
+
+| C# mode | Existing compact loop | Optimized full unroll | Gain |
+| --- | ---: | ---: | ---: |
+| Exact 64-bit target-match | 57.10 MH/s | **62.70 MH/s** | **+9.8%** |
+| Digest-XOR reduction | 60.09 MH/s | **65.75 MH/s** | **+9.4%** |
+
+Every run passed the known SHA-256 fixture; both target-match modes
+produced exactly `0000000000989680` attempted-count sinks, with
+matching digest-XOR sinks between old/new modes. Additional 7×10M
+and 3×7×10M experiments confirmed the unrolled version stabilizes
+around 64–67 MH/s with tiering disabled or a method-level
+optimization hint. The 2026-11-05 negative experiments include:
+fixed `Vector512<uint>` (no meaningful advantage over 512-bit
+`Vector<uint>`), alternative Ch/Maj expressions (~1–2% noise),
+16 explicit message-schedule copies, and 4-/8-round partial
+unrolls (no reproducible improvement). Disabling ReadyToRun
+actually decreased throughput by about 20%.
+
+The complete measured per-sample diagnostics, including rejected
+experiments and JIT policy controls, live in
+`results/diagnostics/csharp-sha256-ryujit-20261105/`. The production Rust
+AVX-512 SHA-256 matcher was previously ~121.86 MH/s on this host:
+the optimized C# matcher now reaches **~51.5%** of Rust, versus
+~46.9% with the compact C# loop in the paired final run.
+These remain *different full-digest calculation mixes*, as documented
+in the original workload comparison. The gain here is an internal
+C#-versus-C# comparison on the same work and runtime.

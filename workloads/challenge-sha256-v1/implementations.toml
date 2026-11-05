@@ -4,6 +4,18 @@ runner = "tools/runners/dotnet-challenge-portable.sh"
 runtime = ".NET/RyuJIT portable System.Numerics.Vector"
 source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
 
+[dotnet-challenge-optimized]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-challenge-optimized.sh"
+runtime = ".NET/RyuJIT portable SIMD fully unrolled and optimized"
+source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
+
+[dotnet-challenge-match-optimized]
+mode = "idiomatic"
+runner = "tools/runners/dotnet-challenge-match-optimized.sh"
+runtime = ".NET/RyuJIT portable SIMD unrolled, 64-bit target parity"
+source = "workloads/challenge-sha256-v1/implementations/dotnet-portable"
+
 [dotnet-challenge-match]
 mode = "idiomatic"
 runner = "tools/runners/dotnet-challenge-match.sh"
