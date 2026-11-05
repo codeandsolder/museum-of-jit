@@ -98,3 +98,23 @@ must implement the pinned source and pass the fixed SHA-256 oracle;
 a successful checksum is necessary but not sufficient to establish
 source provenance. No compilation is performed when supplied with a
 prebuilt binary.
+
+
+## Accepted Zen 5 results
+
+See [curated result notes](../../results/README.md) and the tracked
+`epyc-9655-zen5-challenge-sha256-{256,512}-2026-11-05.json` records.
+
+On EPYC 9655 CPU0 with .NET 10.0.403, 1M warmup and seven × 10M
+candidates: portable C# SIMD reaches 29.81 MH/s with eight lanes,
+58.44 MH/s with sixteen lanes (`DOTNET_MaxVectorTBitWidth=512`);
+the pinned Rust AVX-512 production solver reaches 118.17 MH/s.
+Scalar C# is 6.15 MH/s with the same 512-bit JIT policy.
+The C# modes' per-sample XOR digests match exactly within each
+run. Changing lane width changes the candidate enumeration order
+and hence the sink, not the hash work per candidate.
+
+A fully unrolled C# SHA-256 compression experiment compiled correctly
+and passed the oracle but was 3.1× slower than the ordinary loop on
+Acer CPU4 (6.6 vs 20.5 MH/s). It was rejected rather than adding
+a slower and much larger active implementation.
