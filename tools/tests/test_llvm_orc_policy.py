@@ -116,7 +116,7 @@ class BenchmarkArgumentTests(unittest.TestCase):
                 try:
                     stat = (
                         Path(f"/proc/{child}/stat")
-                        .read_text()
+                        .read_text(encoding="utf-8")
                         .rsplit(")", 1)[1]
                         .split()
                     )

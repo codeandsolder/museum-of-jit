@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -83,10 +84,8 @@ def run_command(
             finally:
                 # Includes interruption, normal exit with leftover children,
                 # and timeout. Never kill another runner or shared cache daemon.
-                try:
+                with contextlib.suppress(ProcessLookupError):
                     os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
                 proc.wait()
             stdout.seek(0)
             stderr.seek(0)
@@ -358,6 +357,21 @@ def validate_challenge_sink(
             )
 
 
+def validate_benchmark_output(
+    impl: str, text: str, plan: BenchmarkPlan, expected_check: str
+) -> tuple[ParsedOutput, dict[str, object]]:
+    validate_dimensions(text, plan)
+    parsed = parse_output(text, expected_check)
+    if len(parsed["samples"]) != plan.samples:
+        raise ValueError(
+            f"sample count {len(parsed['samples'])} does not match "
+            f"requested samples={plan.samples}"
+        )
+    evidence = implementation_evidence(impl, text)
+    validate_challenge_sink(impl, parsed, plan.iterations)
+    return parsed, evidence
+
+
 def run_one(
     impl: str,
     spec: dict[str, str],
@@ -462,15 +476,9 @@ def run_one(
         print(f"{impl:24s} FAILED exit={proc.returncode}", file=sys.stderr)
         return result
     try:
-        validate_dimensions(proc.stdout, plan)
-        parsed = parse_output(proc.stdout, expected_check)
-        if len(parsed["samples"]) != plan.samples:
-            raise ValueError(
-                f"sample count {len(parsed['samples'])} does not match "
-                f"requested samples={plan.samples}"
-            )
-        evidence = implementation_evidence(impl, proc.stdout)
-        validate_challenge_sink(impl, parsed, plan.iterations)
+        parsed, evidence = validate_benchmark_output(
+            impl, proc.stdout, plan, expected_check
+        )
     except ValueError as exc:
         result = base | {
             "status": "invalid",
