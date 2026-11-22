@@ -147,13 +147,12 @@ fn gpu_report(
         })
         .collect();
     let program = format!(
-        "{}\nvar benchResult = null; runCase({}, {}, {}, {}).then(\n\
+        "{}\nvar benchResult = null; runCase({}, {}, {samples}, {}).then(\n\
          v => {{benchResult = JSON.stringify(v);}},\n\
          e => {{benchResult = 'ERROR ' + String(e && e.stack || e);}}); null",
         include_str!("bench.js"),
         serde_json::to_string(&case.shader)?,
         serde_json::to_string(&words)?,
-        samples,
         matches!(algorithm, Algorithm::HashWx)
     );
     host.eval(&program)?;
