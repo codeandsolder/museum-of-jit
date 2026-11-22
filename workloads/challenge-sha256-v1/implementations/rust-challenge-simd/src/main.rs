@@ -107,7 +107,9 @@ fn main() -> Result<(), String> {
         let start = Instant::now();
         let work = run(&message, iterations)?;
         let seconds = start.elapsed().as_secs_f64();
-        let rate = (work as f64) / seconds;
+        let work_for_rate =
+            u32::try_from(work).map_err(|_| "work exceeds the nonce fixture limit")?;
+        let rate = f64::from(work_for_rate) / seconds;
         // Provenance sink is exact attempted count, not digest XOR; the optimized
         // production solver only materializes matching digests.
         println!("RATE {rate:.6} sink={work:016x}");

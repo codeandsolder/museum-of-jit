@@ -1,4 +1,4 @@
-//! Native Cranelift emission of the full canonical fixed HashWX program.
+//! Native Cranelift emission of the full canonical fixed `HashWX` program.
 //! No bytecode interpreter runs inside the measured hash loop.
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::ir::{
@@ -20,31 +20,74 @@ const SCRATCH_BYTES: u32 = 16_392;
 #[derive(Deserialize)]
 struct Corpus {
     format: String,
-    programs: Vec<Program>,
+    programs: [Program; 32],
 }
 #[derive(Deserialize)]
 struct Program {
-    instructions: Vec<Instruction>,
+    instructions: [Instruction; 8],
     unconditional: bool,
 }
 #[derive(Deserialize)]
 struct Instruction {
-    op: u8,
+    op: Opcode,
     src: u8,
     dst: u8,
     imm: u8,
 }
 
+#[derive(Clone, Copy, Deserialize)]
+#[serde(try_from = "u8")]
+enum Opcode {
+    OrMultiply,
+    XorMultiply,
+    AddMultiply,
+    MultiplyRotate,
+    RotateXor,
+    RotateAdd,
+    RotateSub,
+    ArithmeticXor,
+    ArithmeticAdd,
+    ArithmeticSub,
+    LogicalXor,
+    LogicalAdd,
+    LogicalSub,
+}
+
+impl TryFrom<u8> for Opcode {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::OrMultiply),
+            1 => Ok(Self::XorMultiply),
+            2 => Ok(Self::AddMultiply),
+            3 => Ok(Self::MultiplyRotate),
+            4 => Ok(Self::RotateXor),
+            5 => Ok(Self::RotateAdd),
+            6 => Ok(Self::RotateSub),
+            7 => Ok(Self::ArithmeticXor),
+            8 => Ok(Self::ArithmeticAdd),
+            9 => Ok(Self::ArithmeticSub),
+            10 => Ok(Self::LogicalXor),
+            11 => Ok(Self::LogicalAdd),
+            12 => Ok(Self::LogicalSub),
+            _ => Err(format!("unsupported HashWX opcode {value}")),
+        }
+    }
+}
+
 fn validate(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
-    if corpus.format != "museum-of-jit/hashwx-fixed-program/v1" || corpus.programs.len() != 32 {
-        return Err("unexpected corpus version or program count".into());
+    if corpus.format != "museum-of-jit/hashwx-fixed-program/v1" {
+        return Err("unexpected corpus version".into());
+    }
+    // The last program must exhaust the phase-local branch budget so the
+    // first phase populates every scratch byte before the second reads it.
+    if !corpus.programs[31].unconditional {
+        return Err("final program must be unconditional".into());
     }
     for (pidx, program) in corpus.programs.iter().enumerate() {
-        if program.instructions.len() != 8 {
-            return Err(format!("program {pidx}: expected eight instructions").into());
-        }
         for (iidx, ins) in program.instructions.iter().enumerate() {
-            if ins.op > 12 || ins.src > 8 || ins.dst > 7 || ins.imm >= 64 {
+            if ins.src > 8 || ins.dst > 7 || ins.imm >= 64 {
                 return Err(format!("invalid instruction {pidx}:{iidx}").into());
             }
         }
@@ -53,7 +96,8 @@ fn validate(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
 }
 
 fn constant(b: &mut FunctionBuilder<'_>, value: u64) -> Value {
-    b.ins().iconst(types::I64, value as i64)
+    b.ins()
+        .iconst(types::I64, i64::from_ne_bytes(value.to_ne_bytes()))
 }
 fn get(b: &mut FunctionBuilder<'_>, reg: Variable) -> Value {
     b.use_var(reg)
@@ -62,40 +106,44 @@ fn put(b: &mut FunctionBuilder<'_>, reg: Variable, value: Value) {
     b.def_var(reg, value);
 }
 
-fn sip(b: &mut FunctionBuilder<'_>, regs: &[Variable; 9], [a, y, c, d]: [usize; 4]) {
-    let va = get(b, regs[a]);
-    let vy = get(b, regs[y]);
-    let vc = get(b, regs[c]);
-    let vd = get(b, regs[d]);
-    let va = b.ins().iadd(va, vy);
-    let vc = b.ins().iadd(vc, vd);
-    put(b, regs[a], va);
-    put(b, regs[c], vc);
-    let sh13 = constant(b, 13);
-    let sh16 = constant(b, 16);
-    let vy = b.ins().rotl(vy, sh13);
-    let vd = b.ins().rotl(vd, sh16);
-    let vy = b.ins().bxor(vy, va);
-    let vd = b.ins().bxor(vd, vc);
-    put(b, regs[y], vy);
-    put(b, regs[d], vd);
-    let sh32 = constant(b, 32);
-    let va = b.ins().rotl(va, sh32);
-    put(b, regs[a], va);
-    let vc = b.ins().iadd(vc, vy);
-    let va = b.ins().iadd(va, vd);
-    put(b, regs[c], vc);
-    put(b, regs[a], va);
-    let sh17 = constant(b, 17);
-    let sh21 = constant(b, 21);
-    let vy = b.ins().rotl(vy, sh17);
-    let vd = b.ins().rotl(vd, sh21);
-    let vy = b.ins().bxor(vy, vc);
-    let vd = b.ins().bxor(vd, va);
-    put(b, regs[y], vy);
-    put(b, regs[d], vd);
-    let vc = b.ins().rotl(vc, sh32);
-    put(b, regs[c], vc);
+fn sip(
+    builder: &mut FunctionBuilder<'_>,
+    regs: &[Variable; 9],
+    [first, second, third, fourth]: [usize; 4],
+) {
+    let first_value = get(builder, regs[first]);
+    let second_value = get(builder, regs[second]);
+    let third_value = get(builder, regs[third]);
+    let fourth_value = get(builder, regs[fourth]);
+    let first_value = builder.ins().iadd(first_value, second_value);
+    let third_value = builder.ins().iadd(third_value, fourth_value);
+    put(builder, regs[first], first_value);
+    put(builder, regs[third], third_value);
+    let sh13 = constant(builder, 13);
+    let sh16 = constant(builder, 16);
+    let second_value = builder.ins().rotl(second_value, sh13);
+    let fourth_value = builder.ins().rotl(fourth_value, sh16);
+    let second_value = builder.ins().bxor(second_value, first_value);
+    let fourth_value = builder.ins().bxor(fourth_value, third_value);
+    put(builder, regs[second], second_value);
+    put(builder, regs[fourth], fourth_value);
+    let sh32 = constant(builder, 32);
+    let first_value = builder.ins().rotl(first_value, sh32);
+    put(builder, regs[first], first_value);
+    let third_value = builder.ins().iadd(third_value, second_value);
+    let first_value = builder.ins().iadd(first_value, fourth_value);
+    put(builder, regs[third], third_value);
+    put(builder, regs[first], first_value);
+    let sh17 = constant(builder, 17);
+    let sh21 = constant(builder, 21);
+    let second_value = builder.ins().rotl(second_value, sh17);
+    let fourth_value = builder.ins().rotl(fourth_value, sh21);
+    let second_value = builder.ins().bxor(second_value, third_value);
+    let fourth_value = builder.ins().bxor(fourth_value, first_value);
+    put(builder, regs[second], second_value);
+    put(builder, regs[fourth], fourth_value);
+    let third_value = builder.ins().rotl(third_value, sh32);
+    put(builder, regs[third], third_value);
 }
 
 fn snapshot(b: &mut FunctionBuilder<'_>, regs: &[Variable; 9], sp: Variable, base: Value) {
@@ -103,11 +151,17 @@ fn snapshot(b: &mut FunctionBuilder<'_>, regs: &[Variable; 9], sp: Variable, bas
     let next = b.ins().iadd_imm_s(old, -64);
     put(b, sp, next);
     let addr = b.ins().iadd(base, next);
-    for (idx, &reg) in regs[..8].iter().enumerate() {
+    for (&reg, offset) in regs[..8].iter().zip([56, 48, 40, 32, 24, 16, 8, 0]) {
         let v = get(b, reg);
-        b.ins()
-            .store(MemFlagsData::new(), v, addr, 56 - 8 * idx as i32);
+        b.ins().store(MemFlagsData::new(), v, addr, offset);
     }
+}
+
+enum Combine {
+    Multiply,
+    Xor,
+    Add,
+    Sub,
 }
 
 fn instruction(
@@ -117,34 +171,51 @@ fn instruction(
     ins: &Instruction,
     memory: bool,
 ) {
-    let dst = regs[ins.dst as usize];
+    let dst = regs[usize::from(ins.dst)];
     let lhs = get(b, dst);
-    if ins.op == 3 {
-        let r8 = get(b, regs[8]);
-        let product = b.ins().imul(lhs, r8);
-        let n = constant(b, ins.imm as u64);
-        let result = b.ins().rotr(product, n);
-        put(b, dst, result);
-        return;
-    }
-    // Exactly like the canonical Wasm emitter: update dst *before* reading src,
-    // including the aliased-src-and-dst and scratch-address cases.
-    let stage = match ins.op {
-        0 => b.ins().bor_imm_s(lhs, ins.imm as i64),
-        1 => b.ins().bxor_imm_s(lhs, ins.imm as i64),
-        2 => b.ins().iadd_imm_s(lhs, ins.imm as i64),
-        4..=12 => {
-            let shift = constant(b, ins.imm as u64);
-            match ins.op {
-                4..=6 => b.ins().rotr(lhs, shift),
-                7..=9 => b.ins().sshr(lhs, shift),
-                _ => b.ins().ushr(lhs, shift),
-            }
+    let imm = i64::from(ins.imm);
+    let (stage, combine) = match ins.op {
+        Opcode::MultiplyRotate => {
+            let r8 = get(b, regs[8]);
+            let product = b.ins().imul(lhs, r8);
+            let shift = constant(b, u64::from(ins.imm));
+            let result = b.ins().rotr(product, shift);
+            put(b, dst, result);
+            return;
         }
-        _ => unreachable!("validated opcode"),
+        Opcode::OrMultiply => (b.ins().bor_imm_s(lhs, imm), Combine::Multiply),
+        Opcode::XorMultiply => (b.ins().bxor_imm_s(lhs, imm), Combine::Multiply),
+        Opcode::AddMultiply => (b.ins().iadd_imm_s(lhs, imm), Combine::Multiply),
+        Opcode::RotateXor
+        | Opcode::RotateAdd
+        | Opcode::RotateSub
+        | Opcode::ArithmeticXor
+        | Opcode::ArithmeticAdd
+        | Opcode::ArithmeticSub
+        | Opcode::LogicalXor
+        | Opcode::LogicalAdd
+        | Opcode::LogicalSub => {
+            let shift = constant(b, u64::from(ins.imm));
+            let stage = match ins.op {
+                Opcode::RotateXor | Opcode::RotateAdd | Opcode::RotateSub => {
+                    b.ins().rotr(lhs, shift)
+                }
+                Opcode::ArithmeticXor | Opcode::ArithmeticAdd | Opcode::ArithmeticSub => {
+                    b.ins().sshr(lhs, shift)
+                }
+                _ => b.ins().ushr(lhs, shift),
+            };
+            let combine = match ins.op {
+                Opcode::RotateXor | Opcode::ArithmeticXor | Opcode::LogicalXor => Combine::Xor,
+                Opcode::RotateAdd | Opcode::ArithmeticAdd | Opcode::LogicalAdd => Combine::Add,
+                _ => Combine::Sub,
+            };
+            (stage, combine)
+        }
     };
+    // Update dst before reading src, including aliased registers and addresses.
     put(b, dst, stage);
-    let src = get(b, regs[ins.src as usize]);
+    let src = get(b, regs[usize::from(ins.src)]);
     let rhs = if memory {
         let masked = b.ins().band_imm_s(src, 16_383);
         let addr = b.ins().iadd(base, masked);
@@ -152,14 +223,11 @@ fn instruction(
     } else {
         src
     };
-    let result = match ins.op {
-        0..=2 => b.ins().imul(stage, rhs),
-        4..=12 => match (ins.op - 4) % 3 {
-            0 => b.ins().bxor(stage, rhs),
-            1 => b.ins().iadd(stage, rhs),
-            _ => b.ins().isub(stage, rhs),
-        },
-        _ => unreachable!("validated opcode"),
+    let result = match combine {
+        Combine::Multiply => b.ins().imul(stage, rhs),
+        Combine::Xor => b.ins().bxor(stage, rhs),
+        Combine::Add => b.ins().iadd(stage, rhs),
+        Combine::Sub => b.ins().isub(stage, rhs),
     };
     put(b, dst, result);
 }
@@ -188,7 +256,7 @@ fn emit_program(
     // Materializing (budget != 0) && (branch_bit == 0) used to generate two
     // SETcc instructions per conditional program, obscuring branch lowering.
     if !p.unconditional {
-        let branch_register = get(b, regs[p.instructions[0].dst as usize]);
+        let branch_register = get(b, regs[usize::from(p.instructions[0].dst)]);
         let bit = b.ins().band_imm_s(branch_register, 32);
         let bit_set = b.ins().icmp_imm_s(IntCC::NotEqual, bit, 0);
         let check_budget = b.create_block();
@@ -312,6 +380,94 @@ fn define_batch(
     Ok((id, code_len))
 }
 
+fn initialize_registers(b: &mut FunctionBuilder<'_>, regs: &[Variable; 9], salt: Value) -> Value {
+    for (idx, value) in [
+        0x736f_6d65_7073_6575 ^ K0,
+        0x646f_7261_6e64_6f6d ^ K1,
+        0x6c79_6765_6e65_7261 ^ K0,
+        0x7465_6462_7974_6573 ^ K1,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let v = constant(b, value);
+        put(b, regs[idx], v);
+    }
+    let v3 = get(b, regs[3]);
+    let v3 = b.ins().bxor(v3, salt);
+    put(b, regs[3], v3);
+    sip(b, regs, [0, 1, 2, 3]);
+    let v0 = get(b, regs[0]);
+    let v0 = b.ins().bxor(v0, salt);
+    put(b, regs[0], v0);
+    let v2 = get(b, regs[2]);
+    let v2 = b.ins().bxor_imm_s(v2, 0xbb);
+    put(b, regs[2], v2);
+    for _ in 0..3 {
+        sip(b, regs, [0, 1, 2, 3]);
+    }
+    let saved = [
+        get(b, regs[3]),
+        get(b, regs[2]),
+        get(b, regs[1]),
+        get(b, regs[0]),
+    ];
+    for (idx, value) in [K0, K1, K0, K1].into_iter().enumerate() {
+        let r = get(b, regs[idx]);
+        let x = b
+            .ins()
+            .bxor_imm_s(r, i64::from_ne_bytes(value.to_ne_bytes()));
+        put(b, regs[idx], x);
+    }
+    for _ in 0..4 {
+        sip(b, regs, [0, 1, 2, 3]);
+    }
+    let lower = [
+        get(b, regs[3]),
+        get(b, regs[2]),
+        get(b, regs[1]),
+        get(b, regs[0]),
+    ];
+    for (idx, value) in lower.into_iter().enumerate() {
+        put(b, regs[idx + 4], value);
+    }
+    for (idx, value) in saved.into_iter().enumerate() {
+        put(b, regs[idx], value);
+    }
+    let r0 = get(b, regs[0]);
+    let r4 = get(b, regs[4]);
+    let x = b.ins().bxor(r0, r4);
+    let x = b.ins().band_imm_s(x, -8);
+    let r8 = b.ins().bor_imm_s(x, 3);
+    put(b, regs[8], r8);
+    r8
+}
+
+fn emit_hash(b: &mut FunctionBuilder<'_>, corpus: &Corpus, salt: Value) {
+    let regs: [Variable; 9] = std::array::from_fn(|_| b.declare_var(types::I64));
+    let sp = b.declare_var(types::I64);
+    let scratch = b.create_sized_stack_slot(StackSlotData::new(
+        StackSlotKind::ExplicitSlot,
+        SCRATCH_BYTES,
+        3,
+    ));
+    let base = b.ins().stack_addr(types::I64, scratch, 0);
+    let r8 = initialize_registers(b, &regs, salt);
+    b.ins().store(MemFlagsData::new(), r8, base, 16_384);
+    let sp_start = constant(b, 16_384);
+    put(b, sp, sp_start);
+    emit_phase(b, &regs, sp, base, &corpus.programs, false);
+    emit_phase(b, &regs, sp, base, &corpus.programs, true);
+    sip(b, &regs, [0, 1, 2, 3]);
+    sip(b, &regs, [4, 5, 6, 7]);
+    let r3 = get(b, regs[3]);
+    let r7 = get(b, regs[7]);
+    let r8 = get(b, regs[8]);
+    let result = b.ins().bxor(r3, r7);
+    let result = b.ins().bxor(result, r8);
+    b.ins().return_(&[result]);
+}
+
 struct Compiled {
     // Owns the executable regions backing both native function pointers.
     _module: JITModule,
@@ -324,6 +480,7 @@ struct Compiled {
 
 impl Compiled {
     fn build(corpus: &Corpus, batch_mode: bool) -> Result<Self, Box<dyn Error>> {
+        validate(corpus)?;
         // The raw JITBuilder default is opt_level=none; use the optimizing
         // compilation policy for a meaningful native-vs-Wasm codegen comparison.
         let jit_builder =
@@ -343,85 +500,8 @@ impl Compiled {
             b.append_block_params_for_function_params(start);
             b.switch_to_block(start);
             b.seal_block(start);
-            let regs: [Variable; 9] = std::array::from_fn(|_| b.declare_var(types::I64));
-            let sp = b.declare_var(types::I64);
-            let scratch = b.create_sized_stack_slot(StackSlotData::new(
-                StackSlotKind::ExplicitSlot,
-                SCRATCH_BYTES,
-                3,
-            ));
-            let base = b.ins().stack_addr(types::I64, scratch, 0);
             let salt = b.block_params(start)[0];
-            for (idx, value) in [
-                0x736f_6d65_7073_6575 ^ K0,
-                0x646f_7261_6e64_6f6d ^ K1,
-                0x6c79_6765_6e65_7261 ^ K0,
-                0x7465_6462_7974_6573 ^ K1,
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                let v = constant(&mut b, value);
-                put(&mut b, regs[idx], v);
-            }
-            let v3 = get(&mut b, regs[3]);
-            let v3 = b.ins().bxor(v3, salt);
-            put(&mut b, regs[3], v3);
-            sip(&mut b, &regs, [0, 1, 2, 3]);
-            let v0 = get(&mut b, regs[0]);
-            let v0 = b.ins().bxor(v0, salt);
-            put(&mut b, regs[0], v0);
-            let v2 = get(&mut b, regs[2]);
-            let v2 = b.ins().bxor_imm_s(v2, 0xbb);
-            put(&mut b, regs[2], v2);
-            for _ in 0..3 {
-                sip(&mut b, &regs, [0, 1, 2, 3]);
-            }
-            let saved = [
-                get(&mut b, regs[3]),
-                get(&mut b, regs[2]),
-                get(&mut b, regs[1]),
-                get(&mut b, regs[0]),
-            ];
-            for (idx, value) in [K0, K1, K0, K1].into_iter().enumerate() {
-                let r = get(&mut b, regs[idx]);
-                let x = b.ins().bxor_imm_s(r, value as i64);
-                put(&mut b, regs[idx], x);
-            }
-            for _ in 0..4 {
-                sip(&mut b, &regs, [0, 1, 2, 3]);
-            }
-            let lower = [
-                get(&mut b, regs[3]),
-                get(&mut b, regs[2]),
-                get(&mut b, regs[1]),
-                get(&mut b, regs[0]),
-            ];
-            for (idx, value) in lower.into_iter().enumerate() {
-                put(&mut b, regs[idx + 4], value);
-            }
-            for (idx, value) in saved.into_iter().enumerate() {
-                put(&mut b, regs[idx], value);
-            }
-            let r0 = get(&mut b, regs[0]);
-            let r4 = get(&mut b, regs[4]);
-            let x = b.ins().bxor(r0, r4);
-            let x = b.ins().band_imm_s(x, -8);
-            let r8 = b.ins().bor_imm_s(x, 3);
-            put(&mut b, regs[8], r8);
-            b.ins().store(MemFlagsData::new(), r8, base, 16_384);
-            let sp_start = constant(&mut b, 16_384);
-            put(&mut b, sp, sp_start);
-            emit_phase(&mut b, &regs, sp, base, &corpus.programs, false);
-            emit_phase(&mut b, &regs, sp, base, &corpus.programs, true);
-            sip(&mut b, &regs, [0, 1, 2, 3]);
-            sip(&mut b, &regs, [4, 5, 6, 7]);
-            let r3 = get(&mut b, regs[3]);
-            let r7 = get(&mut b, regs[7]);
-            let r8 = get(&mut b, regs[8]);
-            let result = b.ins().bxor(r3, r7);
-            let result = b.ins().bxor(result, r8);
-            b.ins().return_(&[result]);
+            emit_hash(&mut b, corpus, salt);
             b.finalize(frontend_config);
         }
         module.define_function(function, &mut context)?;
@@ -439,10 +519,14 @@ impl Compiled {
         };
         module.finalize_definitions()?;
         let ptr = module.get_finalized_function(function);
+        // SAFETY: the finalized function has the native C ABI signature (u64) -> u64
+        // declared above; the module owns its executable memory.
         let entry =
             unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(u64) -> u64>(ptr) };
         let batch_entry = batch_id.map(|id| {
             let ptr = module.get_finalized_function(id);
+            // SAFETY: define_batch declared the native C ABI (u64, u64) -> u64.
+            // The module owns the finalized code.
             unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn(u64, u64) -> u64>(ptr) }
         });
         Ok(Self {
@@ -480,20 +564,24 @@ impl Compiled {
 
     #[inline]
     fn hash(&self, salt: u64) -> u64 {
+        // SAFETY: build validates register bounds, immediate bounds and the
+        // final unconditional program, so the generated hash initializes its
+        // scratch memory before reading it. The module still owns the code.
         unsafe { (self.entry)(salt) }
     }
     #[inline]
-    fn batch(&self, start: u64, count: u64) -> u64 {
-        let entry = self
-            .batch_entry
-            .expect("batch entry must be compiled in batch mode");
-        unsafe { entry(start, count) }
+    fn batch(&self, start: u64, count: u64) -> Result<u64, Box<dyn Error>> {
+        let entry = self.batch_entry.ok_or("batch mode was not compiled")?;
+        // SAFETY: this finalized native function calls the validated hash in
+        // a bounded loop and has the signature declared in define_batch.
+        // The module owns both code regions.
+        Ok(unsafe { entry(start, count) })
     }
 }
 
-fn count(raw: &str, minimum: u64) -> Result<u64, Box<dyn Error>> {
-    let value = raw.parse::<u64>()?;
-    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=i32::MAX as u64).contains(&value) {
+fn count(raw: &str, minimum: u32) -> Result<u32, Box<dyn Error>> {
+    let value = raw.parse::<u32>()?;
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=2_147_483_647).contains(&value) {
         return Err(format!("invalid benchmark count: {raw}").into());
     }
     Ok(value)
@@ -533,7 +621,7 @@ fn batch_cases(compiled: &Compiled, path: &str) -> Result<(), Box<dyn Error>> {
         }
         let start = u64::from_str_radix(fields[0], 16)?;
         let count = u64::from_str_radix(fields[1], 16)?;
-        let jit = compiled.batch(start, count);
+        let jit = compiled.batch(start, count)?;
         let mut host = 0u64;
         for offset in 0..count {
             host ^= compiled.hash(start.wrapping_add(offset));
@@ -586,7 +674,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .transpose()?;
     let t0 = Instant::now();
     let corpus: Corpus = serde_json::from_str(&std::fs::read_to_string(input)?)?;
-    validate(&corpus)?;
     let compiled = Compiled::build(&corpus, batch_mode)?;
     let build_us = t0.elapsed().as_secs_f64() * 1e6;
     let t0 = Instant::now();
@@ -615,26 +702,29 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("MODE {}", if batch_mode { "jit-batch" } else { "direct" });
     println!("BUILD_US {build_us:.3} FIRST_US {first_us:.3} CHECK {check:016x}");
     if batch_mode {
-        std::hint::black_box(compiled.batch(0, warmup));
+        std::hint::black_box(compiled.batch(0, u64::from(warmup))?);
     } else {
         for n in 0..warmup {
-            std::hint::black_box(compiled.hash(n));
+            std::hint::black_box(compiled.hash(u64::from(n)));
         }
     }
     for _ in 0..samples {
         let t0 = Instant::now();
         let sink = if batch_mode {
-            compiled.batch(0, iterations)
+            compiled.batch(0, u64::from(iterations))?
         } else {
             let mut value = 0u64;
             for n in 0..iterations {
-                value ^= std::hint::black_box(compiled.hash(n));
+                value ^= std::hint::black_box(compiled.hash(u64::from(n)));
             }
             value
         };
         std::hint::black_box(sink);
         let elapsed = t0.elapsed().as_secs_f64();
-        println!("RATE {:.3} sink={sink:016x}", iterations as f64 / elapsed);
+        println!(
+            "RATE {:.3} sink={sink:016x}",
+            f64::from(iterations) / elapsed
+        );
     }
     Ok(())
 }
