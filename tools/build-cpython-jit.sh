@@ -61,7 +61,9 @@ while (( $# )); do
         PLAN_ONLY=1
         continue
     fi
-    (( $# )) && [[ -n "$1" && "$1" != --* ]] || invalid "missing value for $option"
+    if (( $# == 0 )) || [[ -z "$1" || "$1" == --* ]]; then
+        invalid "missing value for $option"
+    fi
     value=$1
     shift
     case "$option" in
