@@ -9,3 +9,5 @@ The first HashWX/HashX exhibit is derived from and compared against these upstre
 Recovered historical experiments under `archive/hashwx-fixed-v1/` were written while developing the HashWX implementation and are retained so benchmark conclusions remain auditable. Their generated instruction stream is normalized as `workloads/hashwx-fixed-v1/program.json`.
 
 See the upstream repositories for their original notices and licenses. The museum repository is distributed under LGPL-3.0-only; individual imported/reference components remain subject to their upstream terms where applicable.
+
+The experimental native GPU exhibit uses `f2i-com/zipp.org` (Zipp 0.0.37), pinned revision `9507aa98bb4dba013eaab4e684b5cbe39e5d593c`, via Cargo.
