@@ -335,12 +335,9 @@ impl<'a> RunContext<'a> {
         row.runtime.version = prepared.version;
         row.runtime.binary_sha256 = prepared.binary_sha256;
         let output = session.invoke(prepared.command, "benchmark")?;
+        let status = output.ensure_success("benchmark");
         row.stdout = output.stdout;
-        ensure!(
-            output.code == 0,
-            "benchmark exited with status {}",
-            output.code
-        );
+        status?;
         row.status = Status::Invalid;
         let (parsed, evidence) = protocol::validate(
             &implementation.backend,

@@ -152,12 +152,10 @@ fn rust_build(
         .arg("--message-format=json-render-diagnostics");
     let output = session.invoke(build, "build")?;
     check_cache_diagnostics(&output.stderr)?;
-    ensure!(
-        output.code == 0,
-        "Cargo build failed with status {}: {}",
-        output.code,
-        output.stdout
-    );
+    if let Err(error) = output.ensure_success("Cargo build") {
+        session.diagnostics.push_str(&output.stdout);
+        return Err(error);
+    }
     let path = unique_cargo_artifact(&output.stdout, binary)?;
     ensure!(
         path.is_file(),
@@ -270,11 +268,11 @@ pub fn build_llvm(session: &mut Session<'_>, cfg: &RuntimeConfig, output: &Path)
         .args(["-pthread", "-ldl", "-lz"]);
     let result = session.invoke(build, "build")?;
     check_cache_diagnostics(&result.stderr)?;
-    ensure!(
-        result.code == 0 && output.is_file(),
-        "LLVM build failed: {}",
-        result.code
-    );
+    if let Err(error) = result.ensure_success("LLVM build") {
+        session.diagnostics.push_str(&result.stdout);
+        return Err(error);
+    }
+    ensure!(output.is_file(), "LLVM build did not produce output");
     Ok(())
 }
 
@@ -417,24 +415,19 @@ fn prepare_rust(
     } else {
         ("1.99.0", "hashwx-zipp-raw")
     };
-    let (path, version) =
-        if let Some(prebuilt) = cfg.rust_challenge_binary.as_deref().filter(|_| challenge) {
-            let version = cfg
-                .rust_challenge_rustc_version
-                .clone()
-                .context("prebuilt Rust challenge binary requires rust_challenge_rustc_version")?;
-            ensure!(
-                !version.trim().is_empty(),
-                "empty prebuilt compiler version"
-            );
-            (executable(session.root(), prebuilt)?, version)
-        } else {
-            let version = rust_version(session, cfg, toolchain)?;
-            (
-                rust_build(session, cfg, source, toolchain, binary)?,
-                version,
-            )
-        };
+    let (path, version) = if let Some(prebuilt) = cfg.rust_challenge.as_ref().filter(|_| challenge)
+    {
+        (
+            executable(session.root(), &prebuilt.binary)?,
+            prebuilt.rustc_version.clone(),
+        )
+    } else {
+        let version = rust_version(session, cfg, toolchain)?;
+        (
+            rust_build(session, cfg, source, toolchain, binary)?,
+            version,
+        )
+    };
     Prepared::new(Command::new(&path), version, Some(&path))
 }
 

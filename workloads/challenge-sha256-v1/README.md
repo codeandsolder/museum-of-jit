@@ -89,8 +89,8 @@ than sixteen u32 lanes despite AVX-512 support.
 
 Where Rust is unavailable on the benchmark host, compile once on the
 development machine using canonical sccache and a compatible target,
-then set `rust_challenge_binary` to the executable and
-`rust_challenge_rustc_version` to the exact rustc version in runtime TOML. The
+then configure a `[rust_challenge]` table in runtime TOML with `binary`
+and the exact `rustc_version`. The
 runner records the executable's SHA-256. The provided executable
 must implement the pinned source and pass the fixed SHA-256 oracle;
 a successful checksum is necessary but not sufficient to establish

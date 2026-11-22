@@ -18,11 +18,15 @@ uv = "uv"
 # Otherwise uv selects wasmtime==50.0.1.
 # rpython_binary = "/path/to/retranslated/hashwx-rpython-jit"
 # cranelift_binary = "/path/to/museum-hashwx-cranelift-direct"
-# rust_challenge_binary = "/path/to/museum-challenge-sha256-reference"
-# rust_challenge_rustc_version = "actual compiler version used for the prebuilt binary"
 # llvm_binary = "/path/to/llvm-orc-hashwx"
 llvm_config = "llvm-config" # must be 21.1.8 for source builds
 # llvm_link_libdir = "/path/to/LLVM21/linker/dependencies"
 # llvm_target_libm_dir = "/path/to/target-compatible/libm"
 # llvm_runtime_libdir = "/path/to/native/LLVM/runtime/dependencies"
 # build_cpus = "0-7" # widen build-only CPU affinity; timed processes inherit caller affinity
+
+
+# Optional prebuilt reference solver; metadata and executable required together.
+# [rust_challenge]
+# binary = "/path/to/museum-challenge-sha256-reference"
+# rustc_version = "actual compiler version used for the prebuilt binary"

@@ -140,14 +140,20 @@ pub struct RuntimeConfig {
     pub wasmtime_python: Option<PathBuf>,
     pub rpython_binary: Option<PathBuf>,
     pub cranelift_binary: Option<PathBuf>,
-    pub rust_challenge_binary: Option<PathBuf>,
-    pub rust_challenge_rustc_version: Option<String>,
+    pub rust_challenge: Option<PrebuiltRust>,
     pub llvm_binary: Option<PathBuf>,
     pub llvm_config: PathBuf,
     pub llvm_link_libdir: Option<PathBuf>,
     pub llvm_target_libm_dir: Option<PathBuf>,
     pub llvm_runtime_libdir: Option<PathBuf>,
     pub build_cpus: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PrebuiltRust {
+    pub binary: PathBuf,
+    pub rustc_version: String,
 }
 
 impl Default for RuntimeConfig {
@@ -167,8 +173,7 @@ impl Default for RuntimeConfig {
             wasmtime_python: None,
             rpython_binary: None,
             cranelift_binary: None,
-            rust_challenge_binary: None,
-            rust_challenge_rustc_version: None,
+            rust_challenge: None,
             llvm_binary: None,
             llvm_config: "llvm-config".into(),
             llvm_link_libdir: None,
@@ -181,14 +186,21 @@ impl Default for RuntimeConfig {
 
 impl RuntimeConfig {
     pub fn load(path: Option<&Path>) -> Result<Self> {
-        path.map_or_else(
+        let config = path.map_or_else(
             || Ok(Self::default()),
             |p| {
                 let text =
                     fs::read_to_string(p).with_context(|| format!("read {}", p.display()))?;
                 toml::from_str(&text).with_context(|| format!("parse {}", p.display()))
             },
-        )
+        )?;
+        if let Some(prebuilt) = &config.rust_challenge {
+            ensure!(
+                !prebuilt.rustc_version.trim().is_empty(),
+                "empty prebuilt Rust compiler version"
+            );
+        }
+        Ok(config)
     }
 }
 
@@ -341,4 +353,73 @@ pub enum Backend {
     Llvm {
         policy: IrPolicy,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn explicit_options_and_catalog_validation() -> Result<()> {
+        for args in [
+            ["run", "--warmup", "+1"],
+            ["run", "--iterations", "0"],
+            ["run", "--samples", "-1"],
+        ] {
+            assert!(Cli::try_parse_from(["museum-bench"].into_iter().chain(args)).is_err());
+        }
+        let cli = Cli::try_parse_from([
+            "museum-bench",
+            "run",
+            "--warmup",
+            "0",
+            "--iterations",
+            "160000001",
+            "--samples",
+            "1",
+        ])?;
+        let Action::Run { plan, .. } = cli.action else {
+            anyhow::bail!("expected run arguments");
+        };
+        assert!(plan.validate(Workload::HashwxFixedV1).is_ok());
+        assert!(plan.validate(Workload::ChallengeSha256V1).is_err());
+        for timeout in [0.0, f64::NAN, f64::INFINITY, -1.0] {
+            assert!(
+                Plan { timeout, ..plan }
+                    .validate(Workload::HashwxFixedV1)
+                    .is_err()
+            );
+        }
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()?;
+        let hashwx = Catalog::load(&root, Workload::HashwxFixedV1)?;
+        let challenge = Catalog::load(&root, Workload::ChallengeSha256V1)?;
+        assert_eq!(
+            hashwx.implementation.len() + challenge.implementation.len(),
+            25
+        );
+        assert!(hashwx.select(&["not-an-implementation".into()]).is_err());
+        assert!(
+            hashwx
+                .select(&["rust-dynasm".into(), "rust-dynasm".into()])
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_config_rejects_unknown_and_incomplete_fields() -> Result<()> {
+        let default: RuntimeConfig = toml::from_str("")?;
+        assert_eq!(default.cargo, Path::new("cargo"));
+        let config: RuntimeConfig = toml::from_str(
+            "[rust_challenge]\nbinary = '/tmp/benchmark'\nrustc_version = 'pinned compiler'",
+        )?;
+        assert!(config.rust_challenge.is_some());
+        assert!(toml::from_str::<RuntimeConfig>("some_unknown_field = true").is_err());
+        assert!(
+            toml::from_str::<RuntimeConfig>("[rust_challenge]\nbinary = '/tmp/benchmark'").is_err()
+        );
+        Ok(())
+    }
 }

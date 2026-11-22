@@ -133,9 +133,19 @@ impl CommandRecord {
 }
 
 pub struct Output {
-    pub code: i32,
+    pub code: Option<i32>,
     pub stdout: String,
     pub stderr: String,
+}
+
+impl Output {
+    pub fn ensure_success(&self, stage: &str) -> Result<()> {
+        match self.code {
+            Some(0) => Ok(()),
+            Some(code) => bail!("{stage} failed with status {code}"),
+            None => bail!("{stage} exceeded deadline or was cancelled"),
+        }
+    }
 }
 
 /// One benchmark owns a scratch directory, an absolute deadline, and all
@@ -181,6 +191,7 @@ impl<'a> Session<'a> {
     pub fn invoke(&mut self, mut command: Command, stage: &'static str) -> Result<Output> {
         if self.cancelled.load(Ordering::Relaxed) || Instant::now() >= self.deadline {
             self.timed_out = true;
+            self.last_exit = None;
             bail!("benchmark deadline or cancellation before {stage}");
         }
         command
@@ -194,8 +205,16 @@ impl<'a> Session<'a> {
             .stdout(stdout.try_clone()?)
             .stderr(stderr.try_clone()?);
         let started = Instant::now();
-        let mut child =
-            GroupChild::spawn(&mut command).with_context(|| format!("launch {:?}", record.argv))?;
+        let mut child = match GroupChild::spawn(&mut command) {
+            Ok(child) => child,
+            Err(error) => {
+                let error = error.context(format!("launch {:?}", record.argv));
+                self.last_exit = None;
+                record.elapsed_seconds = started.elapsed().as_secs_f64();
+                self.records.push(record);
+                return Err(error);
+            }
+        };
         let (status, timed_out) = child.wait(self.deadline, self.cancelled)?;
         let code = status
             .code()
@@ -206,38 +225,30 @@ impl<'a> Session<'a> {
         self.last_exit = record.exit_code;
         self.records.push(record);
         let output = Output {
-            code,
+            code: (!timed_out).then_some(code),
             stdout: read_output(&mut stdout)?,
             stderr: read_output(&mut stderr)?,
         };
         self.diagnostics.push_str(&output.stderr);
-        if timed_out {
-            self.timed_out = true;
-            self.diagnostics.push_str(&output.stdout);
-            bail!("{stage} exceeded deadline or was cancelled");
-        }
+        self.timed_out |= timed_out;
         Ok(output)
     }
 
     pub fn checked(&mut self, command: Command, stage: &'static str) -> Result<String> {
         let output = self.invoke(command, stage)?;
-        if output.code != 0 {
-            self.diagnostics.push_str(&output.stdout);
-            bail!("{stage} failed with status {}", output.code);
-        }
-        if stage == "build" {
+        if stage == "build" || output.code != Some(0) {
             self.diagnostics.push_str(&output.stdout);
         }
+        output.ensure_success(stage)?;
         Ok(output.stdout)
     }
 
     pub fn version(&mut self, command: Command) -> Result<String> {
         let output = self.invoke(command, "version")?;
-        ensure!(
-            output.code == 0,
-            "version probe failed with status {}",
-            output.code
-        );
+        if let Err(error) = output.ensure_success("version probe") {
+            self.diagnostics.push_str(&output.stdout);
+            return Err(error);
+        }
         let version = format!("{}{}", output.stdout, output.stderr);
         ensure!(!version.trim().is_empty(), "empty runtime version");
         Ok(version.trim().to_owned())
@@ -257,9 +268,10 @@ mod tests {
         let scratch = session.scratch().to_owned();
         let mut command = Command::new("sh");
         command.args(["-c", "sleep 60 & printf '%s\n' \"$!\"; wait"]);
-        assert!(session.invoke(command, "benchmark").is_err());
+        let output = session.invoke(command, "benchmark")?;
+        assert!(output.ensure_success("benchmark").is_err());
         assert!(session.timed_out);
-        let pid: i32 = session.diagnostics.trim().parse()?;
+        let pid: i32 = output.stdout.trim().parse()?;
         assert!(!Path::new("/proc").join(pid.to_string()).exists());
         drop(session);
         assert!(!scratch.exists());
