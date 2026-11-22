@@ -25,6 +25,7 @@ jobs:
           - workloads/challenge-sha256-v1/implementations/rust-challenge-simd
           - workloads/hashwx-fixed-v1/implementations/cranelift-direct
           - workloads/hashwx-fixed-v1/implementations/rust-dynasm
+          - workloads/hashwx-seeded-v1/zipp-gpu
     uses: codeandsolder/rust-skills2/.github/workflows/strict-rust.yml@1365fef0f10e5b882e2ad751b6466a272a89d9bc # main
     with:
       working-directory: ${{ matrix.workspace }}
@@ -43,6 +44,7 @@ jobs:
         cargo test --locked --workspace --all-features --manifest-path workloads/challenge-sha256-v1/implementations/rust-challenge-simd/Cargo.toml
         cargo test --locked --workspace --all-features --manifest-path workloads/hashwx-fixed-v1/implementations/cranelift-direct/Cargo.toml
         cargo test --locked --workspace --all-features --manifest-path workloads/hashwx-fixed-v1/implementations/rust-dynasm/Cargo.toml
+        cargo test --locked --workspace --all-features --manifest-path workloads/hashwx-seeded-v1/zipp-gpu/Cargo.toml
 
   tool-contracts:
     name: Benchmark tool contracts

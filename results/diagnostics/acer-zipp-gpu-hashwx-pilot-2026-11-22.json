@@ -1,0 +1,17 @@
+{
+  "adapter": "AMD Radeon Graphics (RADV RENOIR)",
+  "algorithm": "hashwx",
+  "compileMs": 52.21132899999999,
+  "hardware": "AMD Radeon Graphics (RADV RENOIR) (vulkan, radv Mesa 26.3.1-arch3.4)",
+  "hashes_per_sample": 4096,
+  "times": [
+    82.260695,
+    77.12983400000002,
+    42.46067399999998,
+    36.51440699999995,
+    36.408555999999976,
+    36.127114000000006,
+    35.05484200000001
+  ],
+  "verified": 4096
+}
