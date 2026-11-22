@@ -366,7 +366,7 @@ mod tests {
             ["run", "--iterations", "0"],
             ["run", "--samples", "-1"],
         ] {
-            assert!(Cli::try_parse_from(["museum-bench"].into_iter().chain(args)).is_err());
+            assert!(Cli::try_parse_from(std::iter::once("museum-bench").chain(args)).is_err());
         }
         let cli = Cli::try_parse_from([
             "museum-bench",

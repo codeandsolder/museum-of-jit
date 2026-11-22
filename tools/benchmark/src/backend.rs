@@ -643,7 +643,9 @@ fn prepare_python(
     if matches!(engine, PythonEngine::Cpython) {
         cmd.env("PYTHON_JIT", "1");
     }
-    cmd.arg(source.join("bench.py")).args(["--engine", mode]);
+    cmd.arg("-u")
+        .arg(source.join("bench.py"))
+        .args(["--engine", mode]);
     Ok(Prepared::new(cmd, version, None))
 }
 
