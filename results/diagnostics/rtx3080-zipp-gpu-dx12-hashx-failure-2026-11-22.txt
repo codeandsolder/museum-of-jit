@@ -1,0 +1,6 @@
+Executable source: 32984c8
+Windows 10 build 19045.6456, NVIDIA GeForce RTX 3080, driver 591.86
+Command: museum-zipp-gpu.exe hashx 64 1 dx12
+hash mismatch at salt 702238cd6ece77ca: GPU 410c20c6af6f490e, CPU 729c093565b76429
+The Vulkan run with the same inputs and executable passed. The native CPU
+JIT and portable CPU reference agreed. Root cause not yet isolated.
