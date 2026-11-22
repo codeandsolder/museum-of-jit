@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>codeandsolder/ci-workflows:renovate-fleet"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/vendor/**",
+    "archive/**",
+    "results/**"
+  ],
+  "packageRules": [
+    {
+      "description": "Review changes to benchmark runtime dependencies rather than changing a measured backend automatically",
+      "matchManagers": [
+        "cargo",
+        "pep621"
+      ],
+      "matchFileNames": [
+        "workloads/**",
+        "pyproject.toml"
+      ],
+      "automerge": false
+    }
+  ]
+}
