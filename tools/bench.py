@@ -3,6 +3,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -12,29 +13,43 @@ import sys
 import time
 import tomllib
 import uuid
+from typing import NamedTuple
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKLOAD = "hashwx-fixed-v1"
 EXPECTED_CHECK = "fd5d450b767035c5"
 
-BENCH_DEFAULTS = {
-    "MUSEUM_WARMUP": (30000, 0),
-    "MUSEUM_ITERATIONS": (300000, 1),
-    "MUSEUM_SAMPLES": (7, 1),
-}
+# The wire protocol is three decimal integers in positional order. Limit
+# them to the common signed 32-bit range of all benchmark runtimes.
+MAX_COUNT = (1 << 31) - 1
+CHALLENGE_MAX_COUNT = 160_000_000
 
 
-def normalize_benchmark_env(env: dict[str, str]) -> None:
-    for name, (default, minimum) in BENCH_DEFAULTS.items():
-        raw = env.get(name, str(default))
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
-        if value < minimum:
-            raise SystemExit(f"{name} must be >= {minimum}, got {value}")
-        env[name] = str(value)
+class BenchmarkPlan(NamedTuple):
+    warmup: int
+    iterations: int
+    samples: int
+    timeout: float
+
+    def dimensions(self) -> list[str]:
+        return [str(self.warmup), str(self.iterations), str(self.samples)]
+
+
+def parse_count(raw: str, minimum: int = 1) -> int:
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise argparse.ArgumentTypeError("expected a decimal integer")
+    value = int(raw)
+    if not minimum <= value <= MAX_COUNT:
+        raise argparse.ArgumentTypeError(f"expected {minimum}..{MAX_COUNT}")
+    return value
+
+
+def parse_timeout(raw: str) -> float:
+    value = float(raw)
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError("timeout must be finite and positive")
+    return value
 
 
 def command_output(argv: list[str], env=None) -> str:
@@ -224,7 +239,7 @@ def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> 
 
 def run_one(
     impl: str, spec: dict, env: dict[str, str], host: dict,
-    corpus_sha: str, workload_id: str = DEFAULT_WORKLOAD,
+    corpus_sha: str, plan: BenchmarkPlan, workload_id: str = DEFAULT_WORKLOAD,
     expected_check: str = EXPECTED_CHECK,
 ) -> dict:
     runner = ROOT / spec["runner"]
@@ -234,6 +249,7 @@ def run_one(
         revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout.strip()
     except subprocess.CalledProcessError:
         revision = None
+    argv = [str(runner), *plan.dimensions()]
     base = {
         "schema_version": 1,
         "run_id": str(uuid.uuid4()),
@@ -243,7 +259,7 @@ def run_one(
         "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
         "runtime": {
             "name": spec["runtime"], "version": runtime_version(impl, env),
-            "command": [str(runner.relative_to(ROOT))],
+            "command": [str(runner.relative_to(ROOT)), *plan.dimensions()],
             "jit_configuration": {
                 key: env[key] for key in (
                     "DOTNET_MaxVectorTBitWidth", "DOTNET_PreferredVectorBitWidth",
@@ -253,15 +269,15 @@ def run_one(
                 ) if key in env
             },
         },
-        "warmup_iterations": int(env["MUSEUM_WARMUP"]),
-        "sample_iterations": int(env["MUSEUM_ITERATIONS"]),
-        "sample_count": int(env["MUSEUM_SAMPLES"]),
+        "warmup_iterations": plan.warmup,
+        "sample_iterations": plan.iterations,
+        "sample_count": plan.samples,
         "samples": [],
     }
-    timeout = float(env.get("MUSEUM_RUN_TIMEOUT", "120"))
+    timeout = plan.timeout
     started = time.perf_counter()
     try:
-        proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, capture_output=True, check=False, timeout=timeout)
+        proc = subprocess.run(argv, cwd=ROOT, env=env, text=True, capture_output=True, check=False, timeout=timeout)
     except subprocess.TimeoutExpired as exc:
         elapsed = time.perf_counter() - started
         stdout = exc.stdout or ""
@@ -288,13 +304,13 @@ def run_one(
         return result
     try:
         parsed = parse_output(proc.stdout, expected_check)
-        if len(parsed["samples"]) != int(env["MUSEUM_SAMPLES"]):
+        if len(parsed["samples"]) != plan.samples:
             raise ValueError(
                 f"sample count {len(parsed['samples'])} does not match "
-                f"MUSEUM_SAMPLES={env['MUSEUM_SAMPLES']}"
+                f"requested samples={plan.samples}"
             )
         evidence = implementation_evidence(impl, proc.stdout)
-        validate_challenge_sink(impl, parsed, int(env["MUSEUM_ITERATIONS"]))
+        validate_challenge_sink(impl, parsed, plan.iterations)
     except ValueError as exc:
         result = base | {
             "status": "invalid", "exit_code": proc.returncode, "error": str(exc),
@@ -321,6 +337,10 @@ def main() -> None:
     parser.add_argument("--workload", default=DEFAULT_WORKLOAD)
     parser.add_argument("--impl", action="append", default=[])
     parser.add_argument("--output")
+    parser.add_argument("--warmup", type=lambda raw: parse_count(raw, 0), default=30_000)
+    parser.add_argument("--iterations", type=parse_count, default=300_000)
+    parser.add_argument("--samples", type=parse_count, default=7)
+    parser.add_argument("--timeout", type=parse_timeout, default=120.0, help="runner deadline in seconds")
     args = parser.parse_args()
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.workload):
         raise SystemExit(f"invalid workload name: {args.workload!r}")
@@ -339,7 +359,9 @@ def main() -> None:
     if unknown:
         raise SystemExit(f"unknown implementation(s): {', '.join(unknown)}")
     env = os.environ.copy()
-    normalize_benchmark_env(env)
+    plan = BenchmarkPlan(args.warmup, args.iterations, args.samples, args.timeout)
+    if args.workload == "challenge-sha256-v1" and max(plan.warmup, plan.iterations, plan.samples) > CHALLENGE_MAX_COUNT:
+        parser.error(f"challenge counts must not exceed {CHALLENGE_MAX_COUNT}")
     fixture = workload / "fixture.json"
     if fixture.is_file():
         expected_check = json.loads(fixture.read_text())["expected_check"]
@@ -349,7 +371,7 @@ def main() -> None:
         corpus_file = workload / "program.json"
     corpus_sha = hashlib.sha256(corpus_file.read_bytes()).hexdigest()
     host = host_info()
-    results = [run_one(name, specs[name], env, host, corpus_sha, args.workload, expected_check) for name in names]
+    results = [run_one(name, specs[name], env, host, corpus_sha, plan, args.workload, expected_check) for name in names]
     rendered = json.dumps(results, indent=2) + "\n"
     if args.output:
         out = Path(args.output)

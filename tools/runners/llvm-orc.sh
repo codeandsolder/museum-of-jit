@@ -8,9 +8,9 @@ if [[ -n "${MUSEUM_LLVM_ORC_LIBDIR:-}" ]];then
 fi
 if [[ -n "${MUSEUM_LLVM_ORC_BIN:-}" ]];then
   [[ -x "$MUSEUM_LLVM_ORC_BIN" ]] || { echo "LLVM ORC executable unavailable: $MUSEUM_LLVM_ORC_BIN" >&2; exit 69; }
-  exec "$MUSEUM_LLVM_ORC_BIN"
+  exec "$MUSEUM_LLVM_ORC_BIN" "$@"
 fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 "$ROOT/tools/build-llvm-orc.sh" "$tmp/llvm-orc-hashwx"
-"$tmp/llvm-orc-hashwx"
+"$tmp/llvm-orc-hashwx" "$@"

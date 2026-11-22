@@ -6,4 +6,4 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 javac_args=()
 if [[ -n "${MUSEUM_JAVAC_RELEASE:-}" ]]; then javac_args+=(--release "$MUSEUM_JAVAC_RELEASE"); fi
 "$javac" "${javac_args[@]}" -d "$tmp" "$ROOT/workloads/hashwx-fixed-v1/implementations/java-split/HashWxSplit.java"
-"$java" -cp "$tmp" HashWxSplit
+"$java" -cp "$tmp" HashWxSplit "$@"

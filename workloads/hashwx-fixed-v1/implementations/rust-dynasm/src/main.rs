@@ -71,5 +71,38 @@ impl Jit{fn compile()->Self{let mut ops=dynasmrt::x64::Assembler::new().unwrap()
 fn source(ops:&mut dynasmrt::x64::Assembler,src:u8){let s=xr(src);dynasm!(ops ; mov eax,Rd(s) ; and eax,16383);}
 fn emit_op(ops:&mut dynasmrt::x64::Assembler,x:Ins,mem:bool){let d=xr(x.dst);let s=xr(x.src);let im=x.imm as i8;match x.op{0=>{dynasm!(ops; or Rq(d),x.imm as i32);if mem{source(ops,x.src);dynasm!(ops; imul Rq(d),QWORD [rsp+rax])}else{dynasm!(ops; imul Rq(d),Rq(s))}},1=>{dynasm!(ops; xor Rq(d),x.imm as i32);if mem{source(ops,x.src);dynasm!(ops; imul Rq(d),QWORD [rsp+rax])}else{dynasm!(ops; imul Rq(d),Rq(s))}},2=>{dynasm!(ops; add Rq(d),x.imm as i32);if mem{source(ops,x.src);dynasm!(ops; imul Rq(d),QWORD [rsp+rax])}else{dynasm!(ops; imul Rq(d),Rq(s))}},3=>dynasm!(ops; imul Rq(d),rbx; ror Rq(d),im),4..=6=>{dynasm!(ops; ror Rq(d),im);if mem{source(ops,x.src);match x.op{4=>dynasm!(ops; xor Rq(d),QWORD [rsp+rax]),5=>dynasm!(ops; add Rq(d),QWORD [rsp+rax]),_=>dynasm!(ops; sub Rq(d),QWORD [rsp+rax])}}else{match x.op{4=>dynasm!(ops; xor Rq(d),Rq(s)),5=>dynasm!(ops; add Rq(d),Rq(s)),_=>dynasm!(ops; sub Rq(d),Rq(s))}}},7..=9=>{dynasm!(ops; sar Rq(d),im);if mem{source(ops,x.src);match x.op{7=>dynasm!(ops; xor Rq(d),QWORD [rsp+rax]),8=>dynasm!(ops; add Rq(d),QWORD [rsp+rax]),_=>dynasm!(ops; sub Rq(d),QWORD [rsp+rax])}}else{match x.op{7=>dynasm!(ops; xor Rq(d),Rq(s)),8=>dynasm!(ops; add Rq(d),Rq(s)),_=>dynasm!(ops; sub Rq(d),Rq(s))}}},10..=12=>{dynasm!(ops; shr Rq(d),im);if mem{source(ops,x.src);match x.op{10=>dynasm!(ops; xor Rq(d),QWORD [rsp+rax]),11=>dynasm!(ops; add Rq(d),QWORD [rsp+rax]),_=>dynasm!(ops; sub Rq(d),QWORD [rsp+rax])}}else{match x.op{10=>dynasm!(ops; xor Rq(d),Rq(s)),11=>dynasm!(ops; add Rq(d),Rq(s)),_=>dynasm!(ops; sub Rq(d),Rq(s))}}},_=>unreachable!()}}
 fn emit_phase(ops:&mut dynasmrt::x64::Assembler,mem:bool){let rep=ops.new_dynamic_label();dynasm!(ops; mov esi,4 ; =>rep ; mov edx,32);for p in P{let start=ops.new_dynamic_label();let done=ops.new_dynamic_label();dynasm!(ops; =>start);if !mem{dynasm!(ops; push r8 ; push r9 ; push r10 ; push r11 ; push r12 ; push r13 ; push r14 ; push r15);}for x in p.ins{emit_op(ops,x,mem)}let bf=xr(p.ins[0].dst);dynasm!(ops; test edx,edx ; jz =>done);if !p.uncond{dynasm!(ops; test Rd(bf),32 ; jnz =>done);}dynasm!(ops; dec edx ; jmp =>start ; =>done);}dynasm!(ops; dec esi ; jnz =>rep);}
-fn bench_count(name:&str,default:u64,allow_zero:bool)->u64{match std::env::var(name){Ok(raw)=>{let n=raw.parse::<u64>().unwrap_or_else(|_|panic!("{name} must be a non-negative integer, got {raw:?}"));assert!(allow_zero||n>0,"{name} must be > 0");n},Err(std::env::VarError::NotPresent)=>default,Err(err)=>panic!("cannot read {name}: {err}")}}
-fn main(){let warmup=bench_count("MUSEUM_WARMUP",30000,true);let n=bench_count("MUSEUM_ITERATIONS",300000,false);let samples=bench_count("MUSEUM_SAMPLES",7,false);let t=Instant::now();let j=Jit::compile();let build=t.elapsed();let c=unsafe{j.hash(123456)};println!("BUILD_US {:.3} CODE {} CHECK {:016x}",build.as_secs_f64()*1e6,j.buf.len(),c);for i in 0..warmup{std::hint::black_box(unsafe{j.hash(i)});}for _ in 0..samples{let mut sink=0u64;let t=Instant::now();for i in 0..n{sink^=unsafe{j.hash(i)}}let sec=t.elapsed().as_secs_f64();println!("RATE {:.3} sink={:016x}",n as f64/sec,sink);}}
+fn bench_count(raw: &str, minimum: u64) -> Result<u64, String> {
+    let value = raw.parse::<u64>().map_err(|_| format!("invalid decimal count: {raw}"))?;
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=i32::MAX as u64).contains(&value) {
+        return Err(format!("benchmark count out of range: {raw}"));
+    }
+    Ok(value)
+}
+
+fn main() -> Result<(), String> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let [warmup, iterations, samples] = args.as_slice() else {
+        return Err("usage: museum-hashwx-dynasm WARMUP ITERATIONS SAMPLES".into());
+    };
+    let warmup = bench_count(warmup, 0)?;
+    let iterations = bench_count(iterations, 1)?;
+    let samples = bench_count(samples, 1)?;
+    let t = Instant::now();
+    let j = Jit::compile();
+    let build = t.elapsed();
+    let c = unsafe { j.hash(123456) };
+    println!("BUILD_US {:.3} CODE {} CHECK {:016x}", build.as_secs_f64() * 1e6, j.buf.len(), c);
+    for i in 0..warmup {
+        std::hint::black_box(unsafe { j.hash(i) });
+    }
+    for _ in 0..samples {
+        let mut sink = 0u64;
+        let t = Instant::now();
+        for i in 0..iterations {
+            sink ^= unsafe { j.hash(i) };
+        }
+        let sec = t.elapsed().as_secs_f64();
+        println!("RATE {:.3} sink={:016x}", iterations as f64 / sec, sink);
+    }
+    Ok(())
+}

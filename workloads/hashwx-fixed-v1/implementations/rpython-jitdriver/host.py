@@ -7,26 +7,26 @@ import subprocess
 import sys
 
 
-def count(name: str, default: int, allow_zero: bool = False) -> int:
-    raw = os.environ.get(name, str(default))
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise SystemExit(f"{name} has invalid count: {raw}") from exc
-    if value < 0 if allow_zero else value <= 0:
-        raise SystemExit(f"{name} has invalid count: {raw}")
+def count(raw: str, minimum: int = 1) -> int:
+    if not raw or not raw.isascii() or not raw.isdecimal():
+        raise SystemExit(f"invalid decimal count: {raw!r}")
+    value = int(raw)
+    if not minimum <= value <= 2**31 - 1:
+        raise SystemExit(f"count out of range: {value}")
     return value
 
 
 def main() -> None:
+    if len(sys.argv) != 4:
+        raise SystemExit("usage: host.py WARMUP ITERATIONS SAMPLES")
     binary = os.environ.get("MUSEUM_RPYTHON_HASHWX")
     if not binary:
         raise SystemExit(
             "MUSEUM_RPYTHON_HASHWX must point to the translated RPython executable"
         )
-    warmup = count("MUSEUM_WARMUP", 30000, True)
-    iterations = count("MUSEUM_ITERATIONS", 300000)
-    samples = count("MUSEUM_SAMPLES", 7)
+    warmup = count(sys.argv[1], 0)
+    iterations = count(sys.argv[2])
+    samples = count(sys.argv[3])
     proc = subprocess.run(
         [binary, str(warmup), str(iterations), str(samples)],
         text=True,

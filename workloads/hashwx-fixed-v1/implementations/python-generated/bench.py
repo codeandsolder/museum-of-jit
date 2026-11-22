@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import os
 import platform
 import sys
 import time
@@ -176,7 +175,22 @@ def main() -> None:
     ap.add_argument("--engine", choices=("auto", "cpython", "pypy"), default="auto")
     ap.add_argument("--dump-source")
     ap.add_argument("--trace-executors", action="store_true", help="record installed CPython JIT executors outside timed samples")
+    ap.add_argument("warmup")
+    ap.add_argument("iterations")
+    ap.add_argument("samples")
     args = ap.parse_args()
+
+    def count(raw: str, minimum: int) -> int:
+        if not raw or not raw.isascii() or not raw.isdecimal():
+            ap.error(f"invalid decimal count: {raw!r}")
+        value = int(raw)
+        if not minimum <= value <= 2**31 - 1:
+            ap.error(f"count out of range: {value}")
+        return value
+
+    warmup = count(args.warmup, 0)
+    iterations = count(args.iterations, 1)
+    samples = count(args.samples, 1)
     engine = args.engine
     if engine == "auto":
         engine = "pypy" if platform.python_implementation() == "PyPy" else "cpython"
@@ -209,19 +223,6 @@ def main() -> None:
     first_us = (time.perf_counter_ns() - t0) / 1000.0
     if check != EXPECTED_CHECK:
         raise SystemExit(f"wrong result: {check:016x} != {EXPECTED_CHECK:016x}")
-    def count(name: str, default: int, minimum: int) -> int:
-        raw = os.environ.get(name, str(default))
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
-        if value < minimum:
-            raise SystemExit(f"{name} must be >= {minimum}, got {value}")
-        return value
-
-    warmup = count("MUSEUM_WARMUP", 30000, 0)
-    iterations = count("MUSEUM_ITERATIONS", 300000, 1)
-    samples = count("MUSEUM_SAMPLES", 7, 1)
     for n in range(warmup):
         hash_one(n, mem)
     jit = getattr(sys, "_jit", None)
