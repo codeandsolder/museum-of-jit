@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Strict identity checks for the canonical LLVM O0–O3 JIT adapters.
+"""Strict identity checks for the canonical LLVM O0-O3 JIT adapters.
 
 Run: uv run --no-project --python 3.13 python -m unittest discover -s tools/tests
 This guards the benchmark's evidence layer, not HashWX algorithm correctness.
@@ -52,9 +51,11 @@ class PolicyAttestationTests(unittest.TestCase):
                     output + f"IR_OPT {policy}\n",
                 ]
                 for malformed in incorrect:
-                    with self.subTest(malformed=malformed):
-                        with self.assertRaises(ValueError):
-                            bench.implementation_evidence(impl, malformed)
+                    with (
+                        self.subTest(malformed=malformed),
+                        self.assertRaises(ValueError),
+                    ):
+                        bench.implementation_evidence(impl, malformed)
 
 
 class BenchmarkArgumentTests(unittest.TestCase):
@@ -68,12 +69,14 @@ class BenchmarkArgumentTests(unittest.TestCase):
             "1.0",
             "1e2",
             " 1",
-            "１２",
+            "\uff11\uff12",
             str(bench.MAX_COUNT + 1),
         ):
-            with self.subTest(value=value):
-                with self.assertRaises(argparse.ArgumentTypeError):
-                    bench.parse_count(value)
+            with (
+                self.subTest(value=value),
+                self.assertRaises(argparse.ArgumentTypeError),
+            ):
+                bench.parse_count(value)
         for value in ("0", "-1", "nan", "inf", "-inf"):
             with self.assertRaises(argparse.ArgumentTypeError):
                 bench.parse_timeout(value)

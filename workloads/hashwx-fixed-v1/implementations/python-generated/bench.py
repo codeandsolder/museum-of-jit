@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 import argparse
+import importlib
 import json
 import platform
 import sys
 import time
 from pathlib import Path
+from types import FunctionType
+from typing import TypedDict
 
 MASK = (1 << 64) - 1
 SIGN = 1 << 63
@@ -69,16 +72,21 @@ def emit_load(lines: list[str], src: int, engine: str, indent: str) -> None:
 
 
 def emit_op(
-    lines: list[str], ins: dict, memory: bool, engine: str, indent: str
+    lines: list[str], ins: dict[str, int], memory: bool, engine: str, indent: str
 ) -> None:
     op, src, dst, imm = (ins[k] for k in ("op", "src", "dst", "imm"))
-    if op != 3:
-        if memory:
-            emit_load(lines, src, engine, indent)
-            s = "s"
-        else:
-            s = f"r{src}"
+    # Opcode 3 consumes r8 instead of a normal source operand.
     d = f"r{dst}"
+    if op == 3:
+        lines.append(
+            f"{indent}{d}={rotr_expr(mul_expr(d, 'r8', engine), imm, engine)}; bf={d}"
+        )
+        return
+    if memory:
+        emit_load(lines, src, engine, indent)
+        s = "s"
+    else:
+        s = f"r{src}"
     if op == 0:
         lines.append(f"{indent}{d}={mul_expr(f'({d}|{imm})', s, engine)}")
     elif op == 1:
@@ -86,10 +94,6 @@ def emit_op(
     elif op == 2:
         lines.append(
             f"{indent}{d}={mul_expr(add_expr(d, str(imm), engine), s, engine)}"
-        )
-    elif op == 3:
-        lines.append(
-            f"{indent}{d}={rotr_expr(mul_expr(d, 'r8', engine), imm, engine)}; bf={d}"
         )
     elif op == 4:
         lines.append(f"{indent}{d}={rotr_expr(d, imm, engine)}^{s}")
@@ -121,12 +125,12 @@ def emit_op(
         raise ValueError(op)
 
 
-def count_cpython_executors(hash_one) -> int | None:
+def count_cpython_executors(hash_one: FunctionType) -> int | None:
     try:
-        import _opcode
+        opcode = importlib.import_module("_opcode")
     except ImportError:
         return None
-    get_executor = getattr(_opcode, "get_executor", None)
+    get_executor = getattr(opcode, "get_executor", None)
     if get_executor is None:
         return None
     executor_ids = set()
@@ -140,7 +144,12 @@ def count_cpython_executors(hash_one) -> int | None:
     return len(executor_ids)
 
 
-def generate(programs: list[dict], engine: str) -> str:
+class Program(TypedDict):
+    instructions: list[dict[str, int]]
+    unconditional: bool
+
+
+def generate(programs: list[Program], engine: str) -> str:
     lines = ["def hash_one(salt,mem):"]
     i = "    "
     lines += [
@@ -215,9 +224,10 @@ def main() -> None:
         engine = "pypy" if platform.python_implementation() == "PyPy" else "cpython"
     if args.trace_executors and engine != "cpython":
         ap.error("--trace-executors only supports the CPython implementation")
+    ns: dict[str, object]
     if engine == "pypy":
         try:
-            from __pypy__ import intop
+            intop = importlib.import_module("__pypy__").intop
         except ImportError as exc:
             raise SystemExit("PyPy intop implementation requires PyPy") from exc
         ns = {
@@ -241,6 +251,8 @@ def main() -> None:
     if args.dump_source:
         Path(args.dump_source).write_text(source, encoding="utf-8")
     hash_one = ns["hash_one"]
+    if not isinstance(hash_one, FunctionType):
+        raise TypeError("generated hash_one must be a Python function")
     mem = [0] * 2050
     t0 = time.perf_counter_ns()
     check = hash_one(123456, mem) & MASK

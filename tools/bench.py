@@ -14,7 +14,7 @@ import time
 import tomllib
 import uuid
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, TypedDict
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKLOAD = "hashwx-fixed-v1"
@@ -52,7 +52,7 @@ def parse_timeout(raw: str) -> float:
     return value
 
 
-def command_output(argv: list[str], env=None) -> str:
+def command_output(argv: list[str], env: dict[str, str] | None = None) -> str:
     try:
         p = subprocess.run(
             argv,
@@ -129,12 +129,15 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
     return "unknown"
 
 
-def host_info() -> dict:
+def host_info() -> dict[str, object]:
     cpu_model = "unknown"
     family = model_id = None
     flags: list[str] = []
     try:
         text = Path("/proc/cpuinfo").read_text(encoding="utf-8")
+    except OSError:
+        pass
+    else:
         block = text.split("\n\n", 1)[0]
         fields = {}
         for line in block.splitlines():
@@ -145,8 +148,6 @@ def host_info() -> dict:
         family = fields.get("cpu family")
         model_id = fields.get("model")
         flags = fields.get("flags", "").split()
-    except OSError:
-        pass
     try:
         osr = platform.freedesktop_os_release()
         os_name = osr.get("PRETTY_NAME") or osr.get("NAME") or platform.system()
@@ -169,7 +170,20 @@ def host_info() -> dict:
     }
 
 
-def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
+class Sample(TypedDict):
+    hashes_per_second: float
+    sink: str
+
+
+class ParsedOutput(TypedDict):
+    check: str
+    build_us: float | None
+    first_call_us: float | None
+    code_bytes: int | None
+    samples: list[Sample]
+
+
+def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> ParsedOutput:
     checks = re.findall(r"\bCHECK\s+([0-9a-fA-F]{16})\b", text)
     rates = [
         (float(rate), sink.lower())
@@ -184,11 +198,11 @@ def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
     if not rates:
         raise ValueError("benchmark produced no RATE lines")
 
-    def number(name: str):
+    def number(name: str) -> float | None:
         m = re.search(rf"\b{name}\s+([0-9]+(?:\.[0-9]+)?)", text)
         return float(m.group(1)) if m else None
 
-    def integer(name: str):
+    def integer(name: str) -> int | None:
         m = re.search(rf"\b{name}\s+(\d+)", text)
         return int(m.group(1)) if m else None
 
@@ -201,7 +215,7 @@ def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
     }
 
 
-def implementation_evidence(impl: str, text: str) -> dict:
+def implementation_evidence(impl: str, text: str) -> dict[str, object]:
     if impl == "rust-challenge-simd":
         match = re.findall(
             r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text
@@ -275,7 +289,9 @@ def implementation_evidence(impl: str, text: str) -> dict:
     return {"jit_enabled": True, "jit_executors": executor_count}
 
 
-def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> None:
+def validate_challenge_sink(
+    impl: str, parsed: ParsedOutput, sample_iterations: int
+) -> None:
     # Hit-only solvers must attest to the complete attempted candidate count;
     # their count sink cannot be compared to the digest-XOR sink.
     if impl not in (
@@ -295,14 +311,14 @@ def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> 
 
 def run_one(
     impl: str,
-    spec: dict,
+    spec: dict[str, str],
     env: dict[str, str],
-    host: dict,
+    host: dict[str, object],
     corpus_sha: str,
     plan: BenchmarkPlan,
     workload_id: str = DEFAULT_WORKLOAD,
     expected_check: str = EXPECTED_CHECK,
-) -> dict:
+) -> dict[str, object]:
     runner = ROOT / spec["runner"]
     if not runner.is_file():
         raise FileNotFoundError(runner)
@@ -318,7 +334,25 @@ def run_one(
     except subprocess.CalledProcessError:
         revision = None
     argv = [str(runner), *plan.dimensions()]
-    base = {
+    runtime: dict[str, object] = {
+        "name": spec["runtime"],
+        "version": runtime_version(impl, env),
+        "command": [str(runner.relative_to(ROOT)), *plan.dimensions()],
+        "jit_configuration": {
+            key: env[key]
+            for key in (
+                "DOTNET_MaxVectorTBitWidth",
+                "DOTNET_PreferredVectorBitWidth",
+                "DOTNET_EnableAVX2",
+                "DOTNET_EnableAVX512F",
+                "DOTNET_EnableHWIntrinsic",
+                "COMPlus_TieredPGO",
+                "COMPlus_TieredCompilation",
+            )
+            if key in env
+        },
+    }
+    base: dict[str, object] = {
         "schema_version": 1,
         "run_id": str(uuid.uuid4()),
         "timestamp_utc": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
@@ -330,24 +364,7 @@ def run_one(
             "source": spec["source"],
             "revision": revision,
         },
-        "runtime": {
-            "name": spec["runtime"],
-            "version": runtime_version(impl, env),
-            "command": [str(runner.relative_to(ROOT)), *plan.dimensions()],
-            "jit_configuration": {
-                key: env[key]
-                for key in (
-                    "DOTNET_MaxVectorTBitWidth",
-                    "DOTNET_PreferredVectorBitWidth",
-                    "DOTNET_EnableAVX2",
-                    "DOTNET_EnableAVX512F",
-                    "DOTNET_EnableHWIntrinsic",
-                    "COMPlus_TieredPGO",
-                    "COMPlus_TieredCompilation",
-                )
-                if key in env
-            },
-        },
+        "runtime": runtime,
         "warmup_iterations": plan.warmup,
         "sample_iterations": plan.iterations,
         "sample_count": plan.samples,
@@ -440,8 +457,8 @@ def run_one(
         "stderr": proc.stderr,
         "elapsed_seconds": elapsed,
     }
-    result["runtime"].update(evidence)
-    rates = [x["hashes_per_second"] for x in result["samples"]]
+    runtime.update(evidence)
+    rates = [x["hashes_per_second"] for x in parsed["samples"]]
     print(
         f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}",
         file=sys.stderr,

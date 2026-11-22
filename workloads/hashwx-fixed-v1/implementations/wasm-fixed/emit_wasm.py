@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import TypedDict
 
 ROOT = Path(__file__).resolve().parents[2]
 PROGRAM = ROOT / "program.json"
@@ -246,7 +247,12 @@ def snapshot(c: Code) -> None:
         c.i64_store(align=3, offset=offset)
 
 
-def emit_program(c: Code, program: dict, memory: bool) -> None:
+class Program(TypedDict):
+    instructions: list[dict[str, int]]
+    unconditional: bool
+
+
+def emit_program(c: Code, program: Program, memory: bool) -> None:
     c.block()
     c.loop()
     if not memory:
@@ -274,7 +280,7 @@ def emit_program(c: Code, program: dict, memory: bool) -> None:
     c.end()
 
 
-def phase(c: Code, programs: list[dict], memory: bool) -> None:
+def phase(c: Code, programs: list[Program], memory: bool) -> None:
     c.i32_const(4)
     c.local_set(REP)
     c.loop()
@@ -290,7 +296,7 @@ def phase(c: Code, programs: list[dict], memory: bool) -> None:
     c.end()
 
 
-def hash_body(programs: list[dict]) -> bytes:
+def hash_body(programs: list[Program]) -> bytes:
     c = Code()
     for register, value in (
         (R0, 0x736F6D6570736575 ^ K0),
@@ -394,7 +400,7 @@ def function_body(locals_: tuple[tuple[int, int], ...], instructions: bytes) -> 
     return uleb(len(payload)) + payload
 
 
-def emit_module(programs: list[dict]) -> bytes:
+def emit_module(programs: list[Program]) -> bytes:
     types = vec(
         [
             bytes((0x60,)) + vec([bytes((I64,))]) + vec([bytes((I64,))]),

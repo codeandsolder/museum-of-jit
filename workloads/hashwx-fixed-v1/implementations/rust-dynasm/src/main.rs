@@ -1,1769 +1,470 @@
 use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
 use std::time::Instant;
+
 #[derive(Clone, Copy)]
-struct Ins {
-    op: u8,
+enum Opcode {
+    OrMultiply,
+    XorMultiply,
+    AddMultiply,
+    MultiplyRotate,
+    RotateXor,
+    RotateAdd,
+    RotateSub,
+    ArithmeticXor,
+    ArithmeticAdd,
+    ArithmeticSub,
+    LogicalXor,
+    LogicalAdd,
+    LogicalSub,
+}
+
+#[derive(Clone, Copy)]
+struct Instruction {
+    op: Opcode,
     src: u8,
     dst: u8,
-    imm: u8,
+    imm: i8,
 }
-#[derive(Clone, Copy)]
+
+impl Instruction {
+    const fn new(op: Opcode, src: u8, dst: u8, imm: i8) -> Self {
+        Self { op, src, dst, imm }
+    }
+}
+
 struct Program {
-    ins: [Ins; 8],
-    uncond: bool,
+    instructions: [Instruction; 8],
+    unconditional: bool,
 }
-const P: [Program; 32] = [
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 7,
-                imm: 40,
-            },
-            Ins {
-                op: 12,
-                src: 4,
-                dst: 6,
-                imm: 2,
-            },
-            Ins {
-                op: 6,
-                src: 6,
-                dst: 5,
-                imm: 54,
-            },
-            Ins {
-                op: 11,
-                src: 5,
-                dst: 3,
-                imm: 2,
-            },
-            Ins {
-                op: 1,
-                src: 3,
-                dst: 2,
-                imm: 33,
-            },
-            Ins {
-                op: 1,
-                src: 7,
-                dst: 0,
-                imm: 9,
-            },
-            Ins {
-                op: 0,
-                src: 2,
-                dst: 1,
-                imm: 9,
-            },
-            Ins {
-                op: 5,
-                src: 1,
-                dst: 4,
-                imm: 60,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 4,
-                imm: 20,
-            },
-            Ins {
-                op: 12,
-                src: 3,
-                dst: 5,
-                imm: 2,
-            },
-            Ins {
-                op: 11,
-                src: 5,
-                dst: 3,
-                imm: 3,
-            },
-            Ins {
-                op: 1,
-                src: 2,
-                dst: 7,
-                imm: 9,
-            },
-            Ins {
-                op: 1,
-                src: 7,
-                dst: 0,
-                imm: 1,
-            },
-            Ins {
-                op: 4,
-                src: 4,
-                dst: 2,
-                imm: 45,
-            },
-            Ins {
-                op: 1,
-                src: 6,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 6,
-                src: 1,
-                dst: 6,
-                imm: 51,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 0,
-                imm: 10,
-            },
-            Ins {
-                op: 8,
-                src: 7,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 4,
-                dst: 6,
-                imm: 33,
-            },
-            Ins {
-                op: 10,
-                src: 3,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 1,
-                imm: 33,
-            },
-            Ins {
-                op: 1,
-                src: 6,
-                dst: 4,
-                imm: 9,
-            },
-            Ins {
-                op: 4,
-                src: 1,
-                dst: 3,
-                imm: 24,
-            },
-            Ins {
-                op: 9,
-                src: 5,
-                dst: 7,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 5,
-                imm: 24,
-            },
-            Ins {
-                op: 8,
-                src: 0,
-                dst: 1,
-                imm: 3,
-            },
-            Ins {
-                op: 10,
-                src: 7,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 11,
-                src: 4,
-                dst: 3,
-                imm: 3,
-            },
-            Ins {
-                op: 4,
-                src: 5,
-                dst: 2,
-                imm: 37,
-            },
-            Ins {
-                op: 1,
-                src: 3,
-                dst: 4,
-                imm: 33,
-            },
-            Ins {
-                op: 2,
-                src: 2,
-                dst: 7,
-                imm: 9,
-            },
-            Ins {
-                op: 2,
-                src: 1,
-                dst: 0,
-                imm: 1,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 1,
-                imm: 49,
-            },
-            Ins {
-                op: 10,
-                src: 1,
-                dst: 0,
-                imm: 2,
-            },
-            Ins {
-                op: 10,
-                src: 6,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 5,
-                src: 7,
-                dst: 5,
-                imm: 10,
-            },
-            Ins {
-                op: 9,
-                src: 5,
-                dst: 7,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 3,
-                dst: 6,
-                imm: 9,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 4,
-                dst: 2,
-                imm: 9,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 3,
-                imm: 63,
-            },
-            Ins {
-                op: 1,
-                src: 0,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 9,
-                src: 4,
-                dst: 1,
-                imm: 3,
-            },
-            Ins {
-                op: 11,
-                src: 1,
-                dst: 4,
-                imm: 2,
-            },
-            Ins {
-                op: 12,
-                src: 3,
-                dst: 2,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 6,
-                dst: 7,
-                imm: 9,
-            },
-            Ins {
-                op: 1,
-                src: 7,
-                dst: 6,
-                imm: 33,
-            },
-            Ins {
-                op: 10,
-                src: 2,
-                dst: 0,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 4,
-                imm: 59,
-            },
-            Ins {
-                op: 0,
-                src: 7,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 10,
-                src: 3,
-                dst: 6,
-                imm: 2,
-            },
-            Ins {
-                op: 2,
-                src: 6,
-                dst: 0,
-                imm: 9,
-            },
-            Ins {
-                op: 4,
-                src: 0,
-                dst: 2,
-                imm: 11,
-            },
-            Ins {
-                op: 9,
-                src: 2,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 7,
-                imm: 9,
-            },
-            Ins {
-                op: 6,
-                src: 5,
-                dst: 1,
-                imm: 5,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 0,
-                imm: 57,
-            },
-            Ins {
-                op: 8,
-                src: 7,
-                dst: 4,
-                imm: 3,
-            },
-            Ins {
-                op: 12,
-                src: 4,
-                dst: 2,
-                imm: 2,
-            },
-            Ins {
-                op: 2,
-                src: 1,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 11,
-                src: 5,
-                dst: 3,
-                imm: 2,
-            },
-            Ins {
-                op: 4,
-                src: 6,
-                dst: 5,
-                imm: 6,
-            },
-            Ins {
-                op: 0,
-                src: 3,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 0,
-                dst: 1,
-                imm: 1,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 6,
-                imm: 35,
-            },
-            Ins {
-                op: 5,
-                src: 1,
-                dst: 2,
-                imm: 18,
-            },
-            Ins {
-                op: 2,
-                src: 6,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 2,
-                src: 5,
-                dst: 3,
-                imm: 33,
-            },
-            Ins {
-                op: 8,
-                src: 4,
-                dst: 0,
-                imm: 3,
-            },
-            Ins {
-                op: 12,
-                src: 3,
-                dst: 1,
-                imm: 3,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 5,
-                imm: 9,
-            },
-            Ins {
-                op: 7,
-                src: 2,
-                dst: 4,
-                imm: 3,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 4,
-                imm: 34,
-            },
-            Ins {
-                op: 5,
-                src: 3,
-                dst: 1,
-                imm: 16,
-            },
-            Ins {
-                op: 7,
-                src: 7,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 7,
-                imm: 33,
-            },
-            Ins {
-                op: 1,
-                src: 0,
-                dst: 2,
-                imm: 33,
-            },
-            Ins {
-                op: 5,
-                src: 2,
-                dst: 0,
-                imm: 32,
-            },
-            Ins {
-                op: 8,
-                src: 6,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 4,
-                dst: 5,
-                imm: 9,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 10,
-                src: 6,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 3,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 7,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 4,
-                dst: 5,
-                imm: 33,
-            },
-            Ins {
-                op: 12,
-                src: 5,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 4,
-                src: 1,
-                dst: 0,
-                imm: 9,
-            },
-            Ins {
-                op: 7,
-                src: 2,
-                dst: 6,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 3,
-                imm: 17,
-            },
-            Ins {
-                op: 5,
-                src: 3,
-                dst: 0,
-                imm: 35,
-            },
-            Ins {
-                op: 10,
-                src: 1,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 7,
-                dst: 4,
-                imm: 33,
-            },
-            Ins {
-                op: 6,
-                src: 4,
-                dst: 1,
-                imm: 7,
-            },
-            Ins {
-                op: 0,
-                src: 6,
-                dst: 2,
-                imm: 9,
-            },
-            Ins {
-                op: 1,
-                src: 5,
-                dst: 7,
-                imm: 33,
-            },
-            Ins {
-                op: 4,
-                src: 0,
-                dst: 6,
-                imm: 55,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 0,
-                imm: 21,
-            },
-            Ins {
-                op: 7,
-                src: 6,
-                dst: 5,
-                imm: 3,
-            },
-            Ins {
-                op: 11,
-                src: 5,
-                dst: 2,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 2,
-                dst: 7,
-                imm: 9,
-            },
-            Ins {
-                op: 7,
-                src: 7,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 3,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 7,
-                src: 1,
-                dst: 4,
-                imm: 1,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 5,
-                imm: 41,
-            },
-            Ins {
-                op: 5,
-                src: 3,
-                dst: 6,
-                imm: 55,
-            },
-            Ins {
-                op: 10,
-                src: 6,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 2,
-                dst: 4,
-                imm: 9,
-            },
-            Ins {
-                op: 6,
-                src: 0,
-                dst: 1,
-                imm: 36,
-            },
-            Ins {
-                op: 10,
-                src: 4,
-                dst: 2,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 5,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 0,
-                imm: 33,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 6,
-                imm: 19,
-            },
-            Ins {
-                op: 5,
-                src: 6,
-                dst: 3,
-                imm: 61,
-            },
-            Ins {
-                op: 2,
-                src: 2,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 6,
-                src: 4,
-                dst: 7,
-                imm: 54,
-            },
-            Ins {
-                op: 10,
-                src: 5,
-                dst: 2,
-                imm: 2,
-            },
-            Ins {
-                op: 2,
-                src: 7,
-                dst: 4,
-                imm: 33,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 5,
-                src: 3,
-                dst: 0,
-                imm: 62,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 1,
-                imm: 50,
-            },
-            Ins {
-                op: 5,
-                src: 6,
-                dst: 4,
-                imm: 35,
-            },
-            Ins {
-                op: 0,
-                src: 5,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 3,
-                imm: 1,
-            },
-            Ins {
-                op: 8,
-                src: 3,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 9,
-                src: 2,
-                dst: 5,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 7,
-                dst: 0,
-                imm: 33,
-            },
-            Ins {
-                op: 8,
-                src: 0,
-                dst: 7,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 0,
-                imm: 31,
-            },
-            Ins {
-                op: 1,
-                src: 6,
-                dst: 5,
-                imm: 33,
-            },
-            Ins {
-                op: 9,
-                src: 1,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 3,
-                imm: 9,
-            },
-            Ins {
-                op: 5,
-                src: 2,
-                dst: 6,
-                imm: 36,
-            },
-            Ins {
-                op: 4,
-                src: 5,
-                dst: 4,
-                imm: 37,
-            },
-            Ins {
-                op: 0,
-                src: 3,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 11,
-                src: 7,
-                dst: 2,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 3,
-                imm: 58,
-            },
-            Ins {
-                op: 12,
-                src: 6,
-                dst: 7,
-                imm: 3,
-            },
-            Ins {
-                op: 1,
-                src: 7,
-                dst: 6,
-                imm: 33,
-            },
-            Ins {
-                op: 11,
-                src: 2,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 10,
-                src: 0,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 5,
-                dst: 0,
-                imm: 1,
-            },
-            Ins {
-                op: 7,
-                src: 4,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 3,
-                dst: 1,
-                imm: 33,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 5,
-                imm: 34,
-            },
-            Ins {
-                op: 9,
-                src: 6,
-                dst: 7,
-                imm: 2,
-            },
-            Ins {
-                op: 6,
-                src: 7,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 11,
-                src: 4,
-                dst: 0,
-                imm: 2,
-            },
-            Ins {
-                op: 1,
-                src: 0,
-                dst: 2,
-                imm: 9,
-            },
-            Ins {
-                op: 10,
-                src: 5,
-                dst: 1,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 2,
-                dst: 3,
-                imm: 33,
-            },
-            Ins {
-                op: 1,
-                src: 3,
-                dst: 6,
-                imm: 33,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 2,
-                imm: 11,
-            },
-            Ins {
-                op: 4,
-                src: 7,
-                dst: 6,
-                imm: 55,
-            },
-            Ins {
-                op: 7,
-                src: 3,
-                dst: 0,
-                imm: 3,
-            },
-            Ins {
-                op: 10,
-                src: 0,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 2,
-                src: 2,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 7,
-                src: 4,
-                dst: 3,
-                imm: 3,
-            },
-            Ins {
-                op: 1,
-                src: 5,
-                dst: 1,
-                imm: 9,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 5,
-                imm: 33,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 0,
-                imm: 24,
-            },
-            Ins {
-                op: 11,
-                src: 4,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 2,
-                src: 3,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 7,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 11,
-                src: 2,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 1,
-                dst: 3,
-                imm: 9,
-            },
-            Ins {
-                op: 4,
-                src: 6,
-                dst: 5,
-                imm: 42,
-            },
-            Ins {
-                op: 7,
-                src: 0,
-                dst: 7,
-                imm: 3,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 1,
-                imm: 20,
-            },
-            Ins {
-                op: 1,
-                src: 2,
-                dst: 7,
-                imm: 9,
-            },
-            Ins {
-                op: 6,
-                src: 6,
-                dst: 5,
-                imm: 44,
-            },
-            Ins {
-                op: 7,
-                src: 5,
-                dst: 2,
-                imm: 3,
-            },
-            Ins {
-                op: 7,
-                src: 1,
-                dst: 4,
-                imm: 2,
-            },
-            Ins {
-                op: 9,
-                src: 3,
-                dst: 0,
-                imm: 3,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 3,
-                imm: 33,
-            },
-            Ins {
-                op: 2,
-                src: 4,
-                dst: 6,
-                imm: 9,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 7,
-                imm: 22,
-            },
-            Ins {
-                op: 8,
-                src: 0,
-                dst: 5,
-                imm: 2,
-            },
-            Ins {
-                op: 11,
-                src: 4,
-                dst: 6,
-                imm: 2,
-            },
-            Ins {
-                op: 1,
-                src: 6,
-                dst: 2,
-                imm: 33,
-            },
-            Ins {
-                op: 0,
-                src: 1,
-                dst: 0,
-                imm: 9,
-            },
-            Ins {
-                op: 4,
-                src: 7,
-                dst: 3,
-                imm: 26,
-            },
-            Ins {
-                op: 5,
-                src: 3,
-                dst: 4,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 5,
-                dst: 1,
-                imm: 33,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 7,
-                imm: 59,
-            },
-            Ins {
-                op: 8,
-                src: 1,
-                dst: 0,
-                imm: 2,
-            },
-            Ins {
-                op: 12,
-                src: 2,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 0,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 3,
-                dst: 2,
-                imm: 9,
-            },
-            Ins {
-                op: 2,
-                src: 5,
-                dst: 3,
-                imm: 33,
-            },
-            Ins {
-                op: 7,
-                src: 7,
-                dst: 6,
-                imm: 2,
-            },
-            Ins {
-                op: 11,
-                src: 6,
-                dst: 4,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 7,
-                imm: 21,
-            },
-            Ins {
-                op: 7,
-                src: 3,
-                dst: 6,
-                imm: 3,
-            },
-            Ins {
-                op: 1,
-                src: 6,
-                dst: 1,
-                imm: 33,
-            },
-            Ins {
-                op: 2,
-                src: 1,
-                dst: 5,
-                imm: 9,
-            },
-            Ins {
-                op: 11,
-                src: 7,
-                dst: 0,
-                imm: 3,
-            },
-            Ins {
-                op: 6,
-                src: 5,
-                dst: 4,
-                imm: 31,
-            },
-            Ins {
-                op: 1,
-                src: 4,
-                dst: 2,
-                imm: 9,
-            },
-            Ins {
-                op: 10,
-                src: 2,
-                dst: 3,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 4,
-                imm: 33,
-            },
-            Ins {
-                op: 11,
-                src: 7,
-                dst: 3,
-                imm: 2,
-            },
-            Ins {
-                op: 11,
-                src: 3,
-                dst: 0,
-                imm: 3,
-            },
-            Ins {
-                op: 1,
-                src: 5,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 9,
-                src: 4,
-                dst: 6,
-                imm: 3,
-            },
-            Ins {
-                op: 0,
-                src: 2,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 2,
-                imm: 9,
-            },
-            Ins {
-                op: 11,
-                src: 6,
-                dst: 5,
-                imm: 2,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 3,
-                imm: 4,
-            },
-            Ins {
-                op: 11,
-                src: 5,
-                dst: 4,
-                imm: 2,
-            },
-            Ins {
-                op: 11,
-                src: 4,
-                dst: 5,
-                imm: 3,
-            },
-            Ins {
-                op: 1,
-                src: 3,
-                dst: 7,
-                imm: 1,
-            },
-            Ins {
-                op: 1,
-                src: 1,
-                dst: 2,
-                imm: 9,
-            },
-            Ins {
-                op: 0,
-                src: 2,
-                dst: 1,
-                imm: 9,
-            },
-            Ins {
-                op: 11,
-                src: 6,
-                dst: 0,
-                imm: 2,
-            },
-            Ins {
-                op: 4,
-                src: 0,
-                dst: 6,
-                imm: 22,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 4,
-                imm: 3,
-            },
-            Ins {
-                op: 12,
-                src: 1,
-                dst: 6,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 4,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 5,
-                dst: 0,
-                imm: 33,
-            },
-            Ins {
-                op: 6,
-                src: 0,
-                dst: 3,
-                imm: 19,
-            },
-            Ins {
-                op: 12,
-                src: 2,
-                dst: 7,
-                imm: 3,
-            },
-            Ins {
-                op: 9,
-                src: 6,
-                dst: 5,
-                imm: 1,
-            },
-            Ins {
-                op: 0,
-                src: 7,
-                dst: 2,
-                imm: 9,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 6,
-                imm: 3,
-            },
-            Ins {
-                op: 0,
-                src: 3,
-                dst: 0,
-                imm: 9,
-            },
-            Ins {
-                op: 2,
-                src: 7,
-                dst: 5,
-                imm: 33,
-            },
-            Ins {
-                op: 0,
-                src: 2,
-                dst: 3,
-                imm: 9,
-            },
-            Ins {
-                op: 12,
-                src: 0,
-                dst: 2,
-                imm: 3,
-            },
-            Ins {
-                op: 11,
-                src: 5,
-                dst: 1,
-                imm: 3,
-            },
-            Ins {
-                op: 9,
-                src: 6,
-                dst: 4,
-                imm: 2,
-            },
-            Ins {
-                op: 9,
-                src: 4,
-                dst: 7,
-                imm: 3,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 0,
-                imm: 29,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 1,
-                imm: 9,
-            },
-            Ins {
-                op: 1,
-                src: 5,
-                dst: 4,
-                imm: 9,
-            },
-            Ins {
-                op: 4,
-                src: 4,
-                dst: 5,
-                imm: 47,
-            },
-            Ins {
-                op: 5,
-                src: 2,
-                dst: 3,
-                imm: 13,
-            },
-            Ins {
-                op: 6,
-                src: 3,
-                dst: 6,
-                imm: 51,
-            },
-            Ins {
-                op: 1,
-                src: 7,
-                dst: 2,
-                imm: 33,
-            },
-            Ins {
-                op: 4,
-                src: 1,
-                dst: 7,
-                imm: 31,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 6,
-                imm: 52,
-            },
-            Ins {
-                op: 4,
-                src: 7,
-                dst: 3,
-                imm: 39,
-            },
-            Ins {
-                op: 6,
-                src: 3,
-                dst: 4,
-                imm: 56,
-            },
-            Ins {
-                op: 9,
-                src: 4,
-                dst: 5,
-                imm: 3,
-            },
-            Ins {
-                op: 0,
-                src: 5,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 12,
-                src: 6,
-                dst: 0,
-                imm: 3,
-            },
-            Ins {
-                op: 2,
-                src: 2,
-                dst: 1,
-                imm: 33,
-            },
-            Ins {
-                op: 0,
-                src: 1,
-                dst: 7,
-                imm: 1,
-            },
-        ],
-        uncond: false,
-    },
-    Program {
-        ins: [
-            Ins {
-                op: 3,
-                src: 8,
-                dst: 7,
-                imm: 5,
-            },
-            Ins {
-                op: 10,
-                src: 1,
-                dst: 6,
-                imm: 2,
-            },
-            Ins {
-                op: 0,
-                src: 5,
-                dst: 4,
-                imm: 9,
-            },
-            Ins {
-                op: 0,
-                src: 0,
-                dst: 2,
-                imm: 1,
-            },
-            Ins {
-                op: 7,
-                src: 2,
-                dst: 5,
-                imm: 3,
-            },
-            Ins {
-                op: 4,
-                src: 4,
-                dst: 0,
-                imm: 62,
-            },
-            Ins {
-                op: 2,
-                src: 6,
-                dst: 1,
-                imm: 1,
-            },
-            Ins {
-                op: 9,
-                src: 7,
-                dst: 3,
-                imm: 2,
-            },
-        ],
-        uncond: true,
-    },
-];
-const K0: u64 = 1663540288323457296;
-const K1: u64 = 2242261671028070680;
-#[inline(always)]
-fn sip(v0: &mut u64, v1: &mut u64, v2: &mut u64, v3: &mut u64) {
-    *v0 = v0.wrapping_add(*v1);
-    *v2 = v2.wrapping_add(*v3);
-    *v1 = v1.rotate_left(13);
-    *v3 = v3.rotate_left(16);
-    *v1 ^= *v0;
-    *v3 ^= *v2;
-    *v0 = v0.rotate_left(32);
-    *v2 = v2.wrapping_add(*v1);
-    *v0 = v0.wrapping_add(*v3);
-    *v1 = v1.rotate_left(17);
-    *v3 = v3.rotate_left(21);
-    *v1 ^= *v2;
-    *v3 ^= *v0;
-    *v2 = v2.rotate_left(32);
-}
-#[inline(always)]
-fn init(salt: u64) -> [u64; 9] {
-    let (mut v0, mut v1, mut v2, mut v3) = (
-        0x736f6d6570736575 ^ K0,
-        0x646f72616e646f6d ^ K1,
-        0x6c7967656e657261 ^ K0,
-        0x7465646279746573 ^ K1,
-    );
-    v3 ^= salt;
-    sip(&mut v0, &mut v1, &mut v2, &mut v3);
-    v0 ^= salt;
-    v2 ^= 0xbb;
-    for _ in 0..3 {
-        sip(&mut v0, &mut v1, &mut v2, &mut v3)
-    }
-    let (r0, r1, r2, r3) = (v3, v2, v1, v0);
-    v0 ^= K0;
-    v1 ^= K1;
-    v2 ^= K0;
-    v3 ^= K1;
-    for _ in 0..4 {
-        sip(&mut v0, &mut v1, &mut v2, &mut v3)
-    }
-    let (r4, r5, r6, r7) = (v3, v2, v1, v0);
-    let r8 = ((r0 ^ r4) & !7) | 3;
-    [r0, r1, r2, r3, r4, r5, r6, r7, r8]
-}
-#[inline(always)]
-fn finish(r: &[u64; 9]) -> u64 {
-    let (mut a, mut b, mut c, mut d) = (r[0], r[1], r[2], r[3]);
-    sip(&mut a, &mut b, &mut c, &mut d);
-    let (mut e, mut f, mut g, mut h) = (r[4], r[5], r[6], r[7]);
-    sip(&mut e, &mut f, &mut g, &mut h);
-    d ^ h ^ r[8]
-}
+
+// Exact fixed-program fixture, kept in the native emitter so parsing is not
+// part of the timed assembly step. Its 256 instructions were checked against program.json.
+const PROGRAMS: [Program; 32] = {
+    use Opcode::*;
+    [
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 7, 40),
+                Instruction::new(LogicalSub, 4, 6, 2),
+                Instruction::new(RotateSub, 6, 5, 54),
+                Instruction::new(LogicalAdd, 5, 3, 2),
+                Instruction::new(XorMultiply, 3, 2, 33),
+                Instruction::new(XorMultiply, 7, 0, 9),
+                Instruction::new(OrMultiply, 2, 1, 9),
+                Instruction::new(RotateAdd, 1, 4, 60),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 4, 20),
+                Instruction::new(LogicalSub, 3, 5, 2),
+                Instruction::new(LogicalAdd, 5, 3, 3),
+                Instruction::new(XorMultiply, 2, 7, 9),
+                Instruction::new(XorMultiply, 7, 0, 1),
+                Instruction::new(RotateXor, 4, 2, 45),
+                Instruction::new(XorMultiply, 6, 1, 1),
+                Instruction::new(RotateSub, 1, 6, 51),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 0, 10),
+                Instruction::new(ArithmeticAdd, 7, 2, 1),
+                Instruction::new(XorMultiply, 4, 6, 33),
+                Instruction::new(LogicalXor, 3, 5, 1),
+                Instruction::new(OrMultiply, 0, 1, 33),
+                Instruction::new(XorMultiply, 6, 4, 9),
+                Instruction::new(RotateXor, 1, 3, 24),
+                Instruction::new(ArithmeticSub, 5, 7, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 5, 24),
+                Instruction::new(ArithmeticAdd, 0, 1, 3),
+                Instruction::new(LogicalXor, 7, 6, 1),
+                Instruction::new(LogicalAdd, 4, 3, 3),
+                Instruction::new(RotateXor, 5, 2, 37),
+                Instruction::new(XorMultiply, 3, 4, 33),
+                Instruction::new(AddMultiply, 2, 7, 9),
+                Instruction::new(AddMultiply, 1, 0, 1),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 1, 49),
+                Instruction::new(LogicalXor, 1, 0, 2),
+                Instruction::new(LogicalXor, 6, 4, 1),
+                Instruction::new(RotateAdd, 7, 5, 10),
+                Instruction::new(ArithmeticSub, 5, 7, 2),
+                Instruction::new(OrMultiply, 3, 6, 9),
+                Instruction::new(OrMultiply, 0, 3, 1),
+                Instruction::new(OrMultiply, 4, 2, 9),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 3, 63),
+                Instruction::new(XorMultiply, 0, 5, 1),
+                Instruction::new(ArithmeticSub, 4, 1, 3),
+                Instruction::new(LogicalAdd, 1, 4, 2),
+                Instruction::new(LogicalSub, 3, 2, 2),
+                Instruction::new(OrMultiply, 6, 7, 9),
+                Instruction::new(XorMultiply, 7, 6, 33),
+                Instruction::new(LogicalXor, 2, 0, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 4, 59),
+                Instruction::new(OrMultiply, 7, 3, 1),
+                Instruction::new(LogicalXor, 3, 6, 2),
+                Instruction::new(AddMultiply, 6, 0, 9),
+                Instruction::new(RotateXor, 0, 2, 11),
+                Instruction::new(ArithmeticSub, 2, 5, 1),
+                Instruction::new(XorMultiply, 1, 7, 9),
+                Instruction::new(RotateSub, 5, 1, 5),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 0, 57),
+                Instruction::new(ArithmeticAdd, 7, 4, 3),
+                Instruction::new(LogicalSub, 4, 2, 2),
+                Instruction::new(AddMultiply, 1, 6, 1),
+                Instruction::new(LogicalAdd, 5, 3, 2),
+                Instruction::new(RotateXor, 6, 5, 6),
+                Instruction::new(OrMultiply, 3, 7, 1),
+                Instruction::new(XorMultiply, 0, 1, 1),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 6, 35),
+                Instruction::new(RotateAdd, 1, 2, 18),
+                Instruction::new(AddMultiply, 6, 7, 1),
+                Instruction::new(AddMultiply, 5, 3, 33),
+                Instruction::new(ArithmeticAdd, 4, 0, 3),
+                Instruction::new(LogicalSub, 3, 1, 3),
+                Instruction::new(OrMultiply, 0, 5, 9),
+                Instruction::new(ArithmeticXor, 2, 4, 3),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 4, 34),
+                Instruction::new(RotateAdd, 3, 1, 16),
+                Instruction::new(ArithmeticXor, 7, 6, 1),
+                Instruction::new(XorMultiply, 1, 7, 33),
+                Instruction::new(XorMultiply, 0, 2, 33),
+                Instruction::new(RotateAdd, 2, 0, 32),
+                Instruction::new(ArithmeticAdd, 6, 3, 1),
+                Instruction::new(XorMultiply, 4, 5, 9),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 1, 1),
+                Instruction::new(LogicalXor, 6, 7, 1),
+                Instruction::new(XorMultiply, 3, 2, 1),
+                Instruction::new(OrMultiply, 7, 3, 1),
+                Instruction::new(XorMultiply, 4, 5, 33),
+                Instruction::new(LogicalSub, 5, 4, 1),
+                Instruction::new(RotateXor, 1, 0, 9),
+                Instruction::new(ArithmeticXor, 2, 6, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 3, 17),
+                Instruction::new(RotateAdd, 3, 0, 35),
+                Instruction::new(LogicalXor, 1, 5, 1),
+                Instruction::new(OrMultiply, 7, 4, 33),
+                Instruction::new(RotateSub, 4, 1, 7),
+                Instruction::new(OrMultiply, 6, 2, 9),
+                Instruction::new(XorMultiply, 5, 7, 33),
+                Instruction::new(RotateXor, 0, 6, 55),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 0, 21),
+                Instruction::new(ArithmeticXor, 6, 5, 3),
+                Instruction::new(LogicalAdd, 5, 2, 2),
+                Instruction::new(OrMultiply, 2, 7, 9),
+                Instruction::new(ArithmeticXor, 7, 3, 1),
+                Instruction::new(OrMultiply, 3, 1, 1),
+                Instruction::new(OrMultiply, 0, 6, 1),
+                Instruction::new(ArithmeticXor, 1, 4, 1),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 5, 41),
+                Instruction::new(RotateAdd, 3, 6, 55),
+                Instruction::new(LogicalXor, 6, 7, 1),
+                Instruction::new(XorMultiply, 2, 4, 9),
+                Instruction::new(RotateSub, 0, 1, 36),
+                Instruction::new(LogicalXor, 4, 2, 2),
+                Instruction::new(OrMultiply, 5, 3, 1),
+                Instruction::new(XorMultiply, 1, 0, 33),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 6, 19),
+                Instruction::new(RotateAdd, 6, 3, 61),
+                Instruction::new(AddMultiply, 2, 5, 1),
+                Instruction::new(RotateSub, 4, 7, 54),
+                Instruction::new(LogicalXor, 5, 2, 2),
+                Instruction::new(AddMultiply, 7, 4, 33),
+                Instruction::new(OrMultiply, 0, 1, 1),
+                Instruction::new(RotateAdd, 3, 0, 62),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 1, 50),
+                Instruction::new(RotateAdd, 6, 4, 35),
+                Instruction::new(OrMultiply, 5, 2, 1),
+                Instruction::new(XorMultiply, 1, 3, 1),
+                Instruction::new(ArithmeticAdd, 3, 6, 1),
+                Instruction::new(ArithmeticSub, 2, 5, 2),
+                Instruction::new(OrMultiply, 7, 0, 33),
+                Instruction::new(ArithmeticAdd, 0, 7, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 0, 31),
+                Instruction::new(XorMultiply, 6, 5, 33),
+                Instruction::new(ArithmeticSub, 1, 7, 1),
+                Instruction::new(OrMultiply, 0, 3, 9),
+                Instruction::new(RotateAdd, 2, 6, 36),
+                Instruction::new(RotateXor, 5, 4, 37),
+                Instruction::new(OrMultiply, 3, 1, 1),
+                Instruction::new(LogicalAdd, 7, 2, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 3, 58),
+                Instruction::new(LogicalSub, 6, 7, 3),
+                Instruction::new(XorMultiply, 7, 6, 33),
+                Instruction::new(LogicalAdd, 2, 5, 1),
+                Instruction::new(LogicalXor, 0, 4, 1),
+                Instruction::new(OrMultiply, 5, 0, 1),
+                Instruction::new(ArithmeticXor, 4, 2, 1),
+                Instruction::new(XorMultiply, 3, 1, 33),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 5, 34),
+                Instruction::new(ArithmeticSub, 6, 7, 2),
+                Instruction::new(RotateSub, 7, 4, 1),
+                Instruction::new(LogicalAdd, 4, 0, 2),
+                Instruction::new(XorMultiply, 0, 2, 9),
+                Instruction::new(LogicalXor, 5, 1, 2),
+                Instruction::new(OrMultiply, 2, 3, 33),
+                Instruction::new(XorMultiply, 3, 6, 33),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 2, 11),
+                Instruction::new(RotateXor, 7, 6, 55),
+                Instruction::new(ArithmeticXor, 3, 0, 3),
+                Instruction::new(LogicalXor, 0, 7, 1),
+                Instruction::new(AddMultiply, 2, 4, 1),
+                Instruction::new(ArithmeticXor, 4, 3, 3),
+                Instruction::new(XorMultiply, 5, 1, 9),
+                Instruction::new(XorMultiply, 1, 5, 33),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 0, 24),
+                Instruction::new(LogicalAdd, 4, 2, 1),
+                Instruction::new(AddMultiply, 3, 6, 1),
+                Instruction::new(OrMultiply, 7, 1, 1),
+                Instruction::new(LogicalAdd, 2, 4, 1),
+                Instruction::new(OrMultiply, 1, 3, 9),
+                Instruction::new(RotateXor, 6, 5, 42),
+                Instruction::new(ArithmeticXor, 0, 7, 3),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 1, 20),
+                Instruction::new(XorMultiply, 2, 7, 9),
+                Instruction::new(RotateSub, 6, 5, 44),
+                Instruction::new(ArithmeticXor, 5, 2, 3),
+                Instruction::new(ArithmeticXor, 1, 4, 2),
+                Instruction::new(ArithmeticSub, 3, 0, 3),
+                Instruction::new(OrMultiply, 0, 3, 33),
+                Instruction::new(AddMultiply, 4, 6, 9),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 7, 22),
+                Instruction::new(ArithmeticAdd, 0, 5, 2),
+                Instruction::new(LogicalAdd, 4, 6, 2),
+                Instruction::new(XorMultiply, 6, 2, 33),
+                Instruction::new(OrMultiply, 1, 0, 9),
+                Instruction::new(RotateXor, 7, 3, 26),
+                Instruction::new(RotateAdd, 3, 4, 1),
+                Instruction::new(XorMultiply, 5, 1, 33),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 7, 59),
+                Instruction::new(ArithmeticAdd, 1, 0, 2),
+                Instruction::new(LogicalSub, 2, 5, 1),
+                Instruction::new(XorMultiply, 0, 1, 1),
+                Instruction::new(OrMultiply, 3, 2, 9),
+                Instruction::new(AddMultiply, 5, 3, 33),
+                Instruction::new(ArithmeticXor, 7, 6, 2),
+                Instruction::new(LogicalAdd, 6, 4, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 7, 21),
+                Instruction::new(ArithmeticXor, 3, 6, 3),
+                Instruction::new(XorMultiply, 6, 1, 33),
+                Instruction::new(AddMultiply, 1, 5, 9),
+                Instruction::new(LogicalAdd, 7, 0, 3),
+                Instruction::new(RotateSub, 5, 4, 31),
+                Instruction::new(XorMultiply, 4, 2, 9),
+                Instruction::new(LogicalXor, 2, 3, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 4, 33),
+                Instruction::new(LogicalAdd, 7, 3, 2),
+                Instruction::new(LogicalAdd, 3, 0, 3),
+                Instruction::new(XorMultiply, 5, 1, 1),
+                Instruction::new(ArithmeticSub, 4, 6, 3),
+                Instruction::new(OrMultiply, 2, 7, 1),
+                Instruction::new(XorMultiply, 1, 2, 9),
+                Instruction::new(LogicalAdd, 6, 5, 2),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 3, 4),
+                Instruction::new(LogicalAdd, 5, 4, 2),
+                Instruction::new(LogicalAdd, 4, 5, 3),
+                Instruction::new(XorMultiply, 3, 7, 1),
+                Instruction::new(XorMultiply, 1, 2, 9),
+                Instruction::new(OrMultiply, 2, 1, 9),
+                Instruction::new(LogicalAdd, 6, 0, 2),
+                Instruction::new(RotateXor, 0, 6, 22),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 4, 3),
+                Instruction::new(LogicalSub, 1, 6, 1),
+                Instruction::new(OrMultiply, 4, 1, 1),
+                Instruction::new(OrMultiply, 5, 0, 33),
+                Instruction::new(RotateSub, 0, 3, 19),
+                Instruction::new(LogicalSub, 2, 7, 3),
+                Instruction::new(ArithmeticSub, 6, 5, 1),
+                Instruction::new(OrMultiply, 7, 2, 9),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 6, 3),
+                Instruction::new(OrMultiply, 3, 0, 9),
+                Instruction::new(AddMultiply, 7, 5, 33),
+                Instruction::new(OrMultiply, 2, 3, 9),
+                Instruction::new(LogicalSub, 0, 2, 3),
+                Instruction::new(LogicalAdd, 5, 1, 3),
+                Instruction::new(ArithmeticSub, 6, 4, 2),
+                Instruction::new(ArithmeticSub, 4, 7, 3),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 0, 29),
+                Instruction::new(OrMultiply, 0, 1, 9),
+                Instruction::new(XorMultiply, 5, 4, 9),
+                Instruction::new(RotateXor, 4, 5, 47),
+                Instruction::new(RotateAdd, 2, 3, 13),
+                Instruction::new(RotateSub, 3, 6, 51),
+                Instruction::new(XorMultiply, 7, 2, 33),
+                Instruction::new(RotateXor, 1, 7, 31),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 6, 52),
+                Instruction::new(RotateXor, 7, 3, 39),
+                Instruction::new(RotateSub, 3, 4, 56),
+                Instruction::new(ArithmeticSub, 4, 5, 3),
+                Instruction::new(OrMultiply, 5, 2, 1),
+                Instruction::new(LogicalSub, 6, 0, 3),
+                Instruction::new(AddMultiply, 2, 1, 33),
+                Instruction::new(OrMultiply, 1, 7, 1),
+            ],
+            unconditional: false,
+        },
+        Program {
+            instructions: [
+                Instruction::new(MultiplyRotate, 8, 7, 5),
+                Instruction::new(LogicalXor, 1, 6, 2),
+                Instruction::new(OrMultiply, 5, 4, 9),
+                Instruction::new(OrMultiply, 0, 2, 1),
+                Instruction::new(ArithmeticXor, 2, 5, 3),
+                Instruction::new(RotateXor, 4, 0, 62),
+                Instruction::new(AddMultiply, 6, 1, 1),
+                Instruction::new(ArithmeticSub, 7, 3, 2),
+            ],
+            unconditional: true,
+        },
+    ]
+};
+
+const K0: u64 = 0x1716_1514_1312_1110;
+const K1: u64 = 0x1f1e_1d1c_1b1a_1918;
+const EXPECTED: u64 = 0xfd5d_450b_7670_35c5;
+
 fn emit_sip(ops: &mut dynasmrt::x64::Assembler, a: u8, b: u8, c: u8, d: u8) {
     dynasm!(ops;
      add Rq(a),Rq(b); add Rq(c),Rq(d); rol Rq(b),13; rol Rq(d),16; xor Rq(b),Rq(a); xor Rq(d),Rq(c); rol Rq(a),32;
@@ -1772,27 +473,27 @@ fn emit_sip(ops: &mut dynasmrt::x64::Assembler, a: u8, b: u8, c: u8, d: u8) {
 }
 struct Jit {
     buf: dynasmrt::ExecutableBuffer,
-    entry: *const u8,
+    entry: unsafe extern "sysv64" fn(u64) -> u64,
 }
 impl Jit {
-    fn compile() -> Self {
-        let mut ops = dynasmrt::x64::Assembler::new().unwrap();
+    fn compile() -> Result<Self, String> {
+        let mut ops = dynasmrt::x64::Assembler::new().map_err(|err| err.to_string())?;
         dynasm!(ops ; .arch x64 ; push rbx ; push r12 ; push r13 ; push r14 ; push r15
-  ; mov r8,QWORD (0x736f6d6570736575u64^K0) as i64
-  ; mov r9,QWORD (0x646f72616e646f6du64^K1) as i64
-  ; mov r10,QWORD (0x6c7967656e657261u64^K0) as i64
-  ; mov r11,QWORD (0x7465646279746573u64^K1) as i64
+  ; mov r8,QWORD i64::from_ne_bytes((0x736f_6d65_7073_6575_u64^K0).to_ne_bytes())
+  ; mov r9,QWORD i64::from_ne_bytes((0x646f_7261_6e64_6f6d_u64^K1).to_ne_bytes())
+  ; mov r10,QWORD i64::from_ne_bytes((0x6c79_6765_6e65_7261_u64^K0).to_ne_bytes())
+  ; mov r11,QWORD i64::from_ne_bytes((0x7465_6462_7974_6573_u64^K1).to_ne_bytes())
   ; xor r11,rdi);
         emit_sip(&mut ops, 8, 9, 10, 11);
         dynasm!(ops; xor r8,rdi; xor r10,0xbb);
         for _ in 0..3 {
-            emit_sip(&mut ops, 8, 9, 10, 11)
+            emit_sip(&mut ops, 8, 9, 10, 11);
         }
         dynasm!(ops; mov r12,r11; mov r13,r10; mov r14,r9; mov r15,r8
-  ; mov rax,QWORD K0 as i64; xor r8,rax; xor r10,rax
-  ; mov rax,QWORD K1 as i64; xor r9,rax; xor r11,rax);
+  ; mov rax,QWORD i64::from_ne_bytes(K0.to_ne_bytes()); xor r8,rax; xor r10,rax
+  ; mov rax,QWORD i64::from_ne_bytes(K1.to_ne_bytes()); xor r9,rax; xor r11,rax);
         for _ in 0..4 {
-            emit_sip(&mut ops, 8, 9, 10, 11)
+            emit_sip(&mut ops, 8, 9, 10, 11);
         }
         dynasm!(ops; mov rax,r11; mov rcx,r10; mov rdx,r9; mov rsi,r8
   ; mov r8,r12; mov r9,r13; mov r10,r14; mov r11,r15
@@ -1804,138 +505,149 @@ impl Jit {
         emit_sip(&mut ops, 8, 9, 10, 11);
         emit_sip(&mut ops, 12, 13, 14, 15);
         dynasm!(ops; mov rax,r11; xor rax,r15; xor rax,rbx; pop r15; pop r14; pop r13; pop r12; pop rbx; ret);
-        let buf = ops.finalize().unwrap();
-        let entry = buf.ptr(dynasmrt::AssemblyOffset(0));
-        Self { buf, entry }
+        let buf = ops
+            .finalize()
+            .map_err(|_| "could not finalize native emitter")?;
+        // SAFETY: the emitter above creates one x86-64 System V function at
+        // offset zero, taking and returning one u64. The owning executable
+        // buffer remains alive for every invocation.
+        let entry = unsafe {
+            std::mem::transmute::<*const u8, unsafe extern "sysv64" fn(u64) -> u64>(
+                buf.ptr(dynasmrt::AssemblyOffset(0)),
+            )
+        };
+        Ok(Self { buf, entry })
     }
-    #[inline(always)]
-    unsafe fn hash(&self, n: u64) -> u64 {
-        let f: unsafe extern "sysv64" fn(u64) -> u64 = unsafe { std::mem::transmute(self.entry) };
-        unsafe { f(n) }
+
+    #[inline]
+    fn hash(&self, salt: u64) -> u64 {
+        // SAFETY: entry is emitted and finalized by compile(), and its owner
+        // remains live. The fixed program uses registers 0..8 and bounded
+        // shift counts; the final unconditional program consumes the remaining
+        // branch budget, so each phase has exactly 256 stack snapshots or reads
+        // from the populated 16 KiB scratch and the adjacent eight-byte word.
+        // The prologue/epilogue preserve callee-saved registers and restore RSP.
+        unsafe { (self.entry)(salt) }
     }
 }
-#[inline]
-fn xr(r: u8) -> u8 {
-    if r < 8 { 8 + r } else { 3 }
+
+const fn xr(register: u8) -> u8 {
+    if register < 8 { 8 + register } else { 3 }
 }
+
 fn source(ops: &mut dynasmrt::x64::Assembler, src: u8) {
     let s = xr(src);
     dynasm!(ops ; mov eax,Rd(s) ; and eax,16383);
 }
-fn emit_op(ops: &mut dynasmrt::x64::Assembler, x: Ins, mem: bool) {
-    let d = xr(x.dst);
-    let s = xr(x.src);
-    let im = x.imm as i8;
-    match x.op {
-        0 => {
-            dynasm!(ops; or Rq(d),x.imm as i32);
-            if mem {
-                source(ops, x.src);
-                dynasm!(ops; imul Rq(d),QWORD [rsp+rax])
-            } else {
-                dynasm!(ops; imul Rq(d),Rq(s))
-            }
+enum Combine {
+    Multiply,
+    Xor,
+    Add,
+    Sub,
+}
+
+fn emit_op(ops: &mut dynasmrt::x64::Assembler, ins: Instruction, memory: bool) {
+    let dst = xr(ins.dst);
+    let src = xr(ins.src);
+    let imm = ins.imm;
+    let combine = match ins.op {
+        Opcode::OrMultiply => {
+            dynasm!(ops; or Rq(dst), i32::from(imm));
+            Combine::Multiply
         }
-        1 => {
-            dynasm!(ops; xor Rq(d),x.imm as i32);
-            if mem {
-                source(ops, x.src);
-                dynasm!(ops; imul Rq(d),QWORD [rsp+rax])
-            } else {
-                dynasm!(ops; imul Rq(d),Rq(s))
-            }
+        Opcode::XorMultiply => {
+            dynasm!(ops; xor Rq(dst), i32::from(imm));
+            Combine::Multiply
         }
-        2 => {
-            dynasm!(ops; add Rq(d),x.imm as i32);
-            if mem {
-                source(ops, x.src);
-                dynasm!(ops; imul Rq(d),QWORD [rsp+rax])
-            } else {
-                dynasm!(ops; imul Rq(d),Rq(s))
-            }
+        Opcode::AddMultiply => {
+            dynasm!(ops; add Rq(dst), i32::from(imm));
+            Combine::Multiply
         }
-        3 => dynasm!(ops; imul Rq(d),rbx; ror Rq(d),im),
-        4..=6 => {
-            dynasm!(ops; ror Rq(d),im);
-            if mem {
-                source(ops, x.src);
-                match x.op {
-                    4 => dynasm!(ops; xor Rq(d),QWORD [rsp+rax]),
-                    5 => dynasm!(ops; add Rq(d),QWORD [rsp+rax]),
-                    _ => dynasm!(ops; sub Rq(d),QWORD [rsp+rax]),
-                }
-            } else {
-                match x.op {
-                    4 => dynasm!(ops; xor Rq(d),Rq(s)),
-                    5 => dynasm!(ops; add Rq(d),Rq(s)),
-                    _ => dynasm!(ops; sub Rq(d),Rq(s)),
-                }
-            }
+        Opcode::MultiplyRotate => {
+            dynasm!(ops; imul Rq(dst),rbx; ror Rq(dst),imm);
+            return;
         }
-        7..=9 => {
-            dynasm!(ops; sar Rq(d),im);
-            if mem {
-                source(ops, x.src);
-                match x.op {
-                    7 => dynasm!(ops; xor Rq(d),QWORD [rsp+rax]),
-                    8 => dynasm!(ops; add Rq(d),QWORD [rsp+rax]),
-                    _ => dynasm!(ops; sub Rq(d),QWORD [rsp+rax]),
-                }
-            } else {
-                match x.op {
-                    7 => dynasm!(ops; xor Rq(d),Rq(s)),
-                    8 => dynasm!(ops; add Rq(d),Rq(s)),
-                    _ => dynasm!(ops; sub Rq(d),Rq(s)),
-                }
-            }
+        Opcode::RotateXor => {
+            dynasm!(ops; ror Rq(dst),imm);
+            Combine::Xor
         }
-        10..=12 => {
-            dynasm!(ops; shr Rq(d),im);
-            if mem {
-                source(ops, x.src);
-                match x.op {
-                    10 => dynasm!(ops; xor Rq(d),QWORD [rsp+rax]),
-                    11 => dynasm!(ops; add Rq(d),QWORD [rsp+rax]),
-                    _ => dynasm!(ops; sub Rq(d),QWORD [rsp+rax]),
-                }
-            } else {
-                match x.op {
-                    10 => dynasm!(ops; xor Rq(d),Rq(s)),
-                    11 => dynasm!(ops; add Rq(d),Rq(s)),
-                    _ => dynasm!(ops; sub Rq(d),Rq(s)),
-                }
-            }
+        Opcode::RotateAdd => {
+            dynasm!(ops; ror Rq(dst),imm);
+            Combine::Add
         }
-        _ => unreachable!(),
+        Opcode::RotateSub => {
+            dynasm!(ops; ror Rq(dst),imm);
+            Combine::Sub
+        }
+        Opcode::ArithmeticXor => {
+            dynasm!(ops; sar Rq(dst),imm);
+            Combine::Xor
+        }
+        Opcode::ArithmeticAdd => {
+            dynasm!(ops; sar Rq(dst),imm);
+            Combine::Add
+        }
+        Opcode::ArithmeticSub => {
+            dynasm!(ops; sar Rq(dst),imm);
+            Combine::Sub
+        }
+        Opcode::LogicalXor => {
+            dynasm!(ops; shr Rq(dst),imm);
+            Combine::Xor
+        }
+        Opcode::LogicalAdd => {
+            dynasm!(ops; shr Rq(dst),imm);
+            Combine::Add
+        }
+        Opcode::LogicalSub => {
+            dynasm!(ops; shr Rq(dst),imm);
+            Combine::Sub
+        }
+    };
+    if memory {
+        source(ops, ins.src);
+        match combine {
+            Combine::Multiply => dynasm!(ops; imul Rq(dst),QWORD [rsp+rax]),
+            Combine::Xor => dynasm!(ops; xor Rq(dst),QWORD [rsp+rax]),
+            Combine::Add => dynasm!(ops; add Rq(dst),QWORD [rsp+rax]),
+            Combine::Sub => dynasm!(ops; sub Rq(dst),QWORD [rsp+rax]),
+        }
+    } else {
+        match combine {
+            Combine::Multiply => dynasm!(ops; imul Rq(dst),Rq(src)),
+            Combine::Xor => dynasm!(ops; xor Rq(dst),Rq(src)),
+            Combine::Add => dynasm!(ops; add Rq(dst),Rq(src)),
+            Combine::Sub => dynasm!(ops; sub Rq(dst),Rq(src)),
+        }
     }
 }
 fn emit_phase(ops: &mut dynasmrt::x64::Assembler, mem: bool) {
     let rep = ops.new_dynamic_label();
     dynasm!(ops; mov esi,4 ; =>rep ; mov edx,32);
-    for p in P {
+    for p in &PROGRAMS {
         let start = ops.new_dynamic_label();
         let done = ops.new_dynamic_label();
         dynasm!(ops; =>start);
         if !mem {
             dynasm!(ops; push r8 ; push r9 ; push r10 ; push r11 ; push r12 ; push r13 ; push r14 ; push r15);
         }
-        for x in p.ins {
-            emit_op(ops, x, mem)
+        for x in p.instructions {
+            emit_op(ops, x, mem);
         }
-        let bf = xr(p.ins[0].dst);
+        let bf = xr(p.instructions[0].dst);
         dynasm!(ops; test edx,edx ; jz =>done);
-        if !p.uncond {
+        if !p.unconditional {
             dynasm!(ops; test Rd(bf),32 ; jnz =>done);
         }
         dynasm!(ops; dec edx ; jmp =>start ; =>done);
     }
     dynasm!(ops; dec esi ; jnz =>rep);
 }
-fn bench_count(raw: &str, minimum: u64) -> Result<u64, String> {
+fn bench_count(raw: &str, minimum: u32) -> Result<u32, String> {
     let value = raw
-        .parse::<u64>()
+        .parse::<u32>()
         .map_err(|_| format!("invalid decimal count: {raw}"))?;
-    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=i32::MAX as u64).contains(&value) {
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=2_147_483_647).contains(&value) {
         return Err(format!("benchmark count out of range: {raw}"));
     }
     Ok(value)
@@ -1950,26 +662,28 @@ fn main() -> Result<(), String> {
     let iterations = bench_count(iterations, 1)?;
     let samples = bench_count(samples, 1)?;
     let t = Instant::now();
-    let j = Jit::compile();
+    let j = Jit::compile()?;
     let build = t.elapsed();
-    let c = unsafe { j.hash(123456) };
+    let check = j.hash(123_456);
+    if check != EXPECTED {
+        return Err(format!("incorrect hash: {check:016x} != {EXPECTED:016x}"));
+    }
     println!(
-        "BUILD_US {:.3} CODE {} CHECK {:016x}",
+        "BUILD_US {:.3} CODE {} CHECK {check:016x}",
         build.as_secs_f64() * 1e6,
-        j.buf.len(),
-        c
+        j.buf.len()
     );
     for i in 0..warmup {
-        std::hint::black_box(unsafe { j.hash(i) });
+        std::hint::black_box(j.hash(u64::from(i)));
     }
     for _ in 0..samples {
         let mut sink = 0u64;
         let t = Instant::now();
         for i in 0..iterations {
-            sink ^= unsafe { j.hash(i) };
+            sink ^= j.hash(u64::from(i));
         }
         let sec = t.elapsed().as_secs_f64();
-        println!("RATE {:.3} sink={:016x}", iterations as f64 / sec, sink);
+        println!("RATE {:.3} sink={sink:016x}", f64::from(iterations) / sec);
     }
     Ok(())
 }

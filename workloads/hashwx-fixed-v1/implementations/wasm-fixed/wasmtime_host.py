@@ -42,6 +42,8 @@ def main() -> None:
     exports = instance.exports(store)
     hash_one = exports["hash"]
     bench = exports["bench"]
+    if not isinstance(hash_one, wasmtime.Func) or not isinstance(bench, wasmtime.Func):
+        raise TypeError("hash and bench exports must be Wasm functions")
 
     t0 = time.perf_counter_ns()
     check = int(hash_one(store, 123456)) & MASK
