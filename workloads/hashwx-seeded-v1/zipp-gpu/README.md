@@ -46,3 +46,26 @@ Reports include native single-thread CPU JIT compilation and per-batch
 times on identical inputs. Every timed GPU readback is checked against
 the already independently verified warmup result outside the timed interval.
 CPU timings include output materialization but not reference comparison.
+
+## RTX 3080 diagnostic (2026-11-22)
+
+Windows 10 build 19045.6456, NVIDIA 591.86, AMD Ryzen 7 3700X.
+Native Windows Vulkan, run through WSL interoperability, executable built
+from 32984c8. The GPU and matched single-thread CPU JIT were exercised
+sequentially; this was not an isolated release-gate benchmark.
+
+| Algorithm | Batch | GPU median | CPU median | GPU throughput | CPU throughput |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| HashX | 65536 | 0.8508 ms | 5.1197 ms | 77.03 MH/s | 12.80 MH/s |
+| HashWX | 4096 | 3.4409 ms | 10.1681 ms | 1.19 MH/s | 0.403 MH/s |
+
+All 557,056 outputs (warmups plus seven samples per workload) matched.
+Observed first/repeat pipeline compilation times were 891/16.0 ms for
+HashX and 6253/44.8 ms for HashWX; driver caching was not controlled.
+Raw observations are in `results/diagnostics/rtx3080-zipp-gpu-*`.
+
+DX12 HashX produced an incorrect output on the same input corpus; DX12
+HashWX did not finish its 64-input smoke test within 150 seconds.
+Do not use DX12 results as validated performance data.
+These fixed-seed, single-thread CPU comparisons do not establish
+production suitability or an advantage versus all CPU cores.
