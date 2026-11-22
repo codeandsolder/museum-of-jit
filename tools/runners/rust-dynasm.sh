@@ -2,6 +2,8 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+# Contain tool-created temporary files as well as the explicit target/output tree.
+export TMPDIR="$tmp"
 # Never guess a host's sccache transport. Acer/Asus carry their canonical
 # rustc-wrapper in Cargo config; benchmark-only hosts must export RUSTC_WRAPPER
 # plus their canonical client endpoint before invoking this runner.

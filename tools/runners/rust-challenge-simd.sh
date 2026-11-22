@@ -8,6 +8,8 @@ if [[ -n "${MUSEUM_CHALLENGE_RUST_BIN:-}" ]]; then
 fi
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+# Contain tool-created temporary files as well as the explicit target/output tree.
+export TMPDIR="$tmp"
 if [[ -n "${RUSTC_WRAPPER:-}" ]]; then
   test -x "$RUSTC_WRAPPER" || { echo "RUSTC_WRAPPER is not executable" >&2; exit 70; }
 elif [[ -f "$HOME/.cargo/config.toml" ]] && rg -q '^rustc-wrapper\s*=.*sccache' "$HOME/.cargo/config.toml"; then

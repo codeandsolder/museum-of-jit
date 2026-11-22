@@ -25,6 +25,8 @@ fi
 export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+# Contain tool-created temporary files as well as the explicit target/output tree.
+export TMPDIR="$tmp"
 cargo +1.99.0 run --locked --release --quiet \
   --manifest-path "$ROOT/workloads/hashwx-fixed-v1/implementations/cranelift-direct/Cargo.toml" \
   --target-dir "$tmp/target" -- "${args[@]}"
