@@ -1,0 +1,28 @@
+# Explicit host-local configuration for museum-bench.
+# Copy to a project-specific directory outside the checkout and supply --config.
+# Omitted settings use the documented defaults. Executable names use PATH;
+# all other paths are absolute or relative to the repository root.
+
+cargo = "cargo"
+rustc = "rustc"
+sccache_client = "/usr/local/libexec/sccache-client"
+dotnet = "dotnet"
+java = "java"
+javac = "javac"
+# javac_release = 21
+cpython = "python3"
+pypy = "pypy3"
+node = "node"
+uv = "uv"
+# wasmtime_python = "/path/to/pinned/wasmtime/venv/bin/python"
+# Otherwise uv selects wasmtime==50.0.1.
+# rpython_binary = "/path/to/retranslated/hashwx-rpython-jit"
+# cranelift_binary = "/path/to/museum-hashwx-cranelift-direct"
+# rust_challenge_binary = "/path/to/museum-challenge-sha256-reference"
+# rust_challenge_rustc_version = "actual compiler version used for the prebuilt binary"
+# llvm_binary = "/path/to/llvm-orc-hashwx"
+llvm_config = "llvm-config" # must be 21.1.8 for source builds
+# llvm_link_libdir = "/path/to/LLVM21/linker/dependencies"
+# llvm_target_libm_dir = "/path/to/target-compatible/libm"
+# llvm_runtime_libdir = "/path/to/native/LLVM/runtime/dependencies"
+# build_cpus = "0-7" # widen build-only CPU affinity; timed processes inherit caller affinity

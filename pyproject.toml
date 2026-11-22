@@ -1,7 +1,7 @@
 [project]
 name = "museum-of-jit-tools"
 version = "0.1.0"
-description = "Benchmark orchestration for Museum of JIT"
+description = "Python exhibits and code-generation tools for Museum of JIT"
 requires-python = ">=3.11"
 
 [project.optional-dependencies]

@@ -20,6 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         workspace:
+          - tools/benchmark
           - workloads/challenge-sha256-scaling-v1/rust
           - workloads/challenge-sha256-v1/implementations/rust-challenge-simd
           - workloads/hashwx-fixed-v1/implementations/cranelift-direct

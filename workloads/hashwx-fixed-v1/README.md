@@ -2,7 +2,7 @@
 
 This is the exact 32-program × 8-instruction stream recovered from the original Rust/dynasm, C# and Java experiments. `program.json` is generated from the recovered Rust source and is the canonical corpus representation for new adapters.
 
-All normalized adapters use:
+All normalized adapters default to:
 
 - correctness probe: `hash(123456)`
 - warmup: 30,000 hashes
@@ -15,7 +15,7 @@ The V8 and Wasmtime adapters share one generated WebAssembly module. It exports 
 
 The workload is useful for compiler/JIT comparisons because the generated program is fixed, so every backend sees the same control flow and operations. It is not a replacement for the seeded/corpus HashWX benchmark, which tests compile latency and generation variance separately.
 
-The `rpython-jitdriver` adapter is a distinct meta-JIT exhibit rather than a faster spelling of generated Python. A tiny RPython interpreter consumes the same fixed instruction stream with bytecode position as JIT-green state, allowing PyPy's tracing meta-JIT to residualize the workload. Its translated executable is built separately from the exact pinned PyPy/RPython source and supplied through `MUSEUM_RPYTHON_HASHWX`.
+The `rpython-jitdriver` adapter is a distinct meta-JIT exhibit rather than a faster spelling of generated Python. A tiny RPython interpreter consumes the same fixed instruction stream with bytecode position as JIT-green state, allowing PyPy's tracing meta-JIT to residualize the workload. Its translated executable is built separately from the exact pinned PyPy/RPython source and supplied through `rpython_binary` in the selected runtime TOML.
 
 Build the translated RPython executable outside the repository tree with the pinned, checksum-verified PyPy 8.0.1 toolchain:
 
@@ -23,13 +23,13 @@ Build the translated RPython executable outside the repository tree with the pin
 tools/build-rpython-jitdriver.sh /path/to/runtime-root /path/to/build-dir
 ```
 
-The translation is forced to one make job, compiles generated C through the host's existing `sccache` client with server auto-start disabled, and rejects an artifact if the translation log reports local sccache fallback. The resulting `hashwx-rpython-jit` is supplied to the benchmark runner as `MUSEUM_RPYTHON_HASHWX`.
+The translation is forced to one make job, compiles generated C through the host's existing `sccache` client with server auto-start disabled, and rejects an artifact if the translation log reports local sccache fallback. The translated executable itself attests the parsed dimensions; older translated executables must be rebuilt. The resulting `hashwx-rpython-jit` is supplied to the benchmark runner as `rpython_binary` in runtime TOML.
 
 ### Native Cranelift IR JIT
 
 The `cranelift-direct` adapter parses the canonical `program.json` and emits the complete fixed program as native Cranelift IR, without a bytecode interpreter or WebAssembly frontend. This is a distinct backend from the `wasmtime-wasm` adapter, which compiles the same algorithm after lowering it to the 14,166-byte shared WebAssembly module. Its `hash(u64) -> u64` JIT function runs inside a Rust host measurement loop, whereas Wasmtime's `bench` loop runs inside Wasm. Compare their rates with that boundary difference in mind.
 
-The pinned implementation uses Cranelift **0.137.1** with explicit `opt_level=speed` (bare `JITBuilder` defaults to `none`), Rust **1.99**, and the host's existing sccache service. The runner accepts an already compiled binary through `MUSEUM_CRANELIFT_BIN`; otherwise it performs an isolated out-of-tree Cargo build with `--locked --release`, requires a configured sccache wrapper and explicitly disables sccache server auto-start. The JIT holds its executable-memory module alive while calling its native pointer; `BUILD_US` measures parse + IR generation + JIT compilation + finalization separately from `FIRST_US` and timed sample loops. No native code size is reported without a trustworthy source.
+The pinned implementation uses Cranelift **0.137.1** with explicit `opt_level=speed` (bare `JITBuilder` defaults to `none`), Rust **1.99**, and the host's existing sccache service. The runner accepts an already compiled binary through `cranelift_binary` in runtime TOML; otherwise it performs an isolated out-of-tree Cargo build with `--locked --release`, requires a configured sccache wrapper and explicitly disables sccache server auto-start. The JIT holds its executable-memory module alive while calling its native pointer; `BUILD_US` measures parse + IR generation + JIT compilation + finalization separately from `FIRST_US` and timed sample loops. No native code size is reported without a trustworthy source.
 
 Validate every hash for 100,000 deterministic salts (including boundary values) against the independently generated V8/Wasm oracle before accepting benchmark results:
 
@@ -38,21 +38,21 @@ uv run --no-project --python 3.13 python tools/validate-cranelift-direct.py \
     --binary /path/to/museum-hashwx-cranelift-direct --count 100000
 ```
 
-The validator uses a temporary directory, does not compile Rust or start any sccache service, compares every 16-digit output exactly, and reports a SHA-256 digest. The compiled binary's diagnostic `--hash-salts SALTS.hex` mode invokes the same native function as the timed benchmark and prints one hash per provided 16-digit salt. These are optional correctness probes, never substituted for the canonical 30k-warmup/7×300k CPU-pinned benchmark.
+The validator uses a temporary directory, does not compile Rust or start any sccache service, compares every 16-digit output exactly, and reports a SHA-256 digest. The compiled binary's diagnostic `--corpus PROGRAM.json --hash-salts SALTS.hex` mode invokes the same native function as the timed benchmark and prints one hash per provided 16-digit salt. These are optional correctness probes, never substituted for the canonical 30k-warmup/7×300k CPU-pinned benchmark.
 
 ### Native Cranelift branch-optimized control flow
 
 The native JIT generator now keeps the branch-bit early exit and repetition-budget exit as **two sequential conditional branches**, rather than materializing two Boolean values and computing a Boolean-AND before a single branch. This matches the fixed Wasm program's control-flow semantics for **all** validated inputs, while allowing Cranelift to emit direct conditional jumps instead of 124 extra `setcc` instructions. The emitted native HashWX function shrinks from 20,488 to 19,944 bytes. CPU0 EPYC 9655 interleaved baseline-versus-optimized runs demonstrate ~10% higher native batch throughput, bringing it to **statistical parity with Wasmtime**. Source, checksummed 100,000-salt and 627-batch differential validation, compiled-code evidence and all canonical/control runs are documented in `results/README.md` and `results/diagnostics/README.md`.
 
-For native codegen investigations, an explicit `--dump-code OUTPUT_DIR` mode exports the finalized native JIT hash and batch machine-code buffers (with a real code-size manifest); it is not invoked during timed benchmarking. Use `tools/analysis/export-wasmtime-elf.py` with the exact pinned Wasmtime Python runtime on the **target CPU** to obtain its serialized ELF with actual compiled function symbols for comparison. Keep both outputs in the project-specific build/diagnostic directory, never in the repository.
+For native codegen investigations, an explicit `--corpus PROGRAM.json --dump-code OUTPUT_DIR` mode exports the finalized native JIT hash and batch machine-code buffers (with a real code-size manifest); it is not invoked during timed benchmarking. Use `tools/analysis/export-wasmtime-elf.py` with the exact pinned Wasmtime Python runtime on the **target CPU** to obtain its serialized ELF with actual compiled function symbols for comparison. Keep both outputs in the project-specific build/diagnostic directory, never in the repository.
 
 ### Cranelift native in-JIT batch comparison
 
 The separate `cranelift-batch` adapter emits a second native Cranelift function `bench(start: u64, count: u64) -> u64`, with a counted loop *inside JIT code* which invokes the **same** fully generated fixed-program `hash(u64) -> u64` JIT function. The accumulator, incremented salt, and remaining count are all Cranelift IR variables, and the salt addition wraps at 64 bits. This matches the Wasm `bench(start,count)` export's loop semantics while removing Rust-to-JIT entry overhead per hash. The normal `cranelift-direct` adapter still invokes hash once per salt from the Rust benchmark loop, and does not compile the extra batch function.
 
-Both modes are provided by the same pinned Cranelift 0.137.1 source and Cargo.lock. The distinct `tools/runners/cranelift-batch.sh` passes `--batch` and delegates to the same sccache-required runner; a precompiled binary from `MUSEUM_CRANELIFT_BIN` is supported. Batch-mode output must report `MODE jit-batch`, enforced by the harness, so the new adapter cannot silently benchmark the direct host-loop path.
+Both modes are provided by the same pinned Cranelift 0.137.1 source and Cargo.lock. The catalog selects native batch mode with `--batch`; the same managed-cache build path or explicitly configured `cranelift_binary` serves both implementations. Batch-mode output must report `MODE jit-batch`, enforced by the harness, so the new adapter cannot silently benchmark the direct host-loop path.
 
-The batch adapter's diagnostic `--batch-cases CASES.hex` accepts one 16-hex-digit `start count` pair per line, runs each case in the native JIT, independently checks the same range using the native hash function from a host loop, then emits the 16-digit sink. To also compare against **independently compiled Wasm** across zero-length, boundary, overflowing-salt, random, and full 300k ranges:
+The batch adapter's diagnostic `--corpus PROGRAM.json --batch-cases CASES.hex` accepts one 16-hex-digit `start count` pair per line, runs each case in the native JIT, independently checks the same range using the native hash function from a host loop, then emits the 16-digit sink. To also compare against **independently compiled Wasm** across zero-length, boundary, overflowing-salt, random, and full 300k ranges:
 
 ```sh
 uv run --no-project --python 3.13 python tools/validate-cranelift-batch.py \

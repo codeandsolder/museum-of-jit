@@ -648,11 +648,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
         return Ok(());
     }
-    let dump_path = match args.as_slice() {
+    let [flag, input, args @ ..] = args.as_slice() else {
+        return Err(
+            "expected --corpus PROGRAM.json followed by a benchmark or diagnostic mode".into(),
+        );
+    };
+    if flag != "--corpus" {
+        return Err("expected --corpus PROGRAM.json".into());
+    }
+    let dump_path = match args {
         [mode, path] if mode == "--dump-code" => Some(std::path::Path::new(path)),
         _ => None,
     };
-    let (batch_mode, oracle_input, batch_input, dimensions) = match args.as_slice() {
+    let (batch_mode, oracle_input, batch_input, dimensions) = match args {
         [warmup, iterations, samples] => (false, None, None, Some([warmup, iterations, samples])),
         [mode, warmup, iterations, samples] if mode == "--batch" => {
             (true, None, None, Some([warmup, iterations, samples]))
@@ -662,11 +670,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         [mode, path] if mode == "--batch-cases" => (true, None, Some(path.as_str()), None),
         _ => {
             return Err("usage: museum-hashwx-cranelift-direct \
-            [[--batch] WARMUP ITERATIONS SAMPLES | --version | --hash-salts SALTS.hex | --batch-cases CASES.hex | --dump-code OUTPUT_DIR]"
+            --corpus PROGRAM.json [[--batch] WARMUP ITERATIONS SAMPLES | --version | --hash-salts SALTS.hex | --batch-cases CASES.hex | --dump-code OUTPUT_DIR]"
                 .into());
         }
     };
-    let input = std::env::var("MUSEUM_PROGRAM_JSON")?;
     let dimensions = dimensions
         .map(|[warmup, iterations, samples]| {
             Ok::<_, Box<dyn Error>>((count(warmup, 0)?, count(iterations, 1)?, count(samples, 1)?))

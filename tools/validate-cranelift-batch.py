@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import itertools
-import os
 import random
 import subprocess
 import sys
@@ -95,9 +94,8 @@ def main() -> None:
         )
         with actual.open("wb") as output:
             subprocess.run(
-                [str(binary), "--batch-cases", str(cases)],
+                [str(binary), "--corpus", str(CORPUS), "--batch-cases", str(cases)],
                 check=True,
-                env=dict(os.environ, MUSEUM_PROGRAM_JSON=str(CORPUS)),
                 stdout=output,
             )
         digest = compare_outputs(expected, actual, count)
