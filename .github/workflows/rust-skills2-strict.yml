@@ -25,14 +25,24 @@ jobs:
           - workloads/challenge-sha256-v1/implementations/rust-challenge-simd
           - workloads/hashwx-fixed-v1/implementations/cranelift-direct
           - workloads/hashwx-fixed-v1/implementations/rust-dynasm
-    uses: codeandsolder/rust-skills2/.github/workflows/strict-rust.yml@208054fbf37368876010035be88315953a1cf9f9 # main
+    uses: codeandsolder/rust-skills2/.github/workflows/strict-rust.yml@1365fef0f10e5b882e2ad751b6466a272a89d9bc # main
     with:
-      rust-toolchain: nightly-2026-11-22
       working-directory: ${{ matrix.workspace }}
       cargo-args: "--locked --workspace --all-targets --all-features"
       # Python is an intentional benchmark language (CPython, PyPy, RPython
       # and Wasmtime bindings). The shared Ruff and ty checks remain enabled.
       ban-python-outside-ci: false
+
+  rust-tests:
+    name: Maintained Rust workspace tests
+    uses: codeandsolder/ci-workflows/.github/workflows/rust-sccache.yml@ce8f8a2849c8cc0ce221e4cb283a4bef0de4a01a # main
+    with:
+      command: |
+        cargo test --locked --workspace --all-features --manifest-path tools/benchmark/Cargo.toml
+        cargo test --locked --workspace --all-features --manifest-path workloads/challenge-sha256-scaling-v1/rust/Cargo.toml
+        cargo test --locked --workspace --all-features --manifest-path workloads/challenge-sha256-v1/implementations/rust-challenge-simd/Cargo.toml
+        cargo test --locked --workspace --all-features --manifest-path workloads/hashwx-fixed-v1/implementations/cranelift-direct/Cargo.toml
+        cargo test --locked --workspace --all-features --manifest-path workloads/hashwx-fixed-v1/implementations/rust-dynasm/Cargo.toml
 
   tool-contracts:
     name: Benchmark tool contracts
