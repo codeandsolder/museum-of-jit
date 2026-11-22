@@ -65,6 +65,15 @@ relative to the repository root. Source builds require the configured managed
 sccache client and disable automatic daemon startup. Benchmark runtime
 versions remain pinned as documented in `tools/runtime-lock.toml`.
 
+The root `rust-toolchain.toml` selects the common dated nightly for
+maintained Rust workspaces and their CI. Renovate updates it weekly after
+the shared compiler-age gate and tests. This is a maintenance compiler,
+not a change to the historical experiment runtime set: explicit compiler
+selections in the benchmark launcher, the curated runtime lock, archive
+sources/toolchains, and previously recorded results remain independent.
+Reproducing an archived result requires its recorded compiler and runtime,
+not the current development default. Renovate excludes the entire archive.
+
 Set benchmark dimensions with `--warmup`, `--iterations`, `--samples`
 (defaults 30000, 300000, 7), and the whole-run deadline with `--timeout`
 (seconds, default 120). Counts use the common signed 32-bit range; the
