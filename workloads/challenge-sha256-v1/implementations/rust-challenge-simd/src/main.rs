@@ -76,6 +76,7 @@ fn main() -> Result<(), String> {
     let warmup = parse_count(warmup, 0)?;
     let iterations = parse_count(iterations, 1)?;
     let samples = parse_count(samples, 1)?;
+    println!("BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}");
     let prefix = prefix();
     let message = SingleBlockMessage::new(&prefix, 0)
         .ok_or("challenge-solvers rejected 42-byte fixed prefix")?;

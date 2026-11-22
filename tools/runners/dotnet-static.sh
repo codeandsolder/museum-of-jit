@@ -5,4 +5,4 @@ dotnet="${MUSEUM_DOTNET:-dotnet}"; command -v "$dotnet" >/dev/null || { echo "do
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 cp -a "$ROOT/workloads/hashwx-fixed-v1/implementations/dotnet-static/." "$tmp/"
 export DOTNET_CLI_HOME="$tmp/home" DOTNET_NOLOGO=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-"$dotnet" run --project "$tmp/HashwxCs.csproj" -c Release --nologo -- "$@"
+"$dotnet" run --disable-build-servers --project "$tmp/HashwxCs.csproj" -c Release --nologo -- "$@"

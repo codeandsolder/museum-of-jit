@@ -24,6 +24,7 @@ if (process.argv.length !== 6) throw new Error("usage: node v8.mjs module.wasm W
 const warmup = count(process.argv[3], 0);
 const iterations = count(process.argv[4]);
 const samples = count(process.argv[5]);
+console.log(`BENCHMARK_DIMENSIONS v1 ${warmup} ${iterations} ${samples}`);
 const bytes = fs.readFileSync(path);
 
 let t0 = process.hrtime.bigint();

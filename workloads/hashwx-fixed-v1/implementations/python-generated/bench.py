@@ -219,6 +219,7 @@ def main() -> None:
     warmup = count(args.warmup, 0)
     iterations = count(args.iterations, 1)
     samples = count(args.samples, 1)
+    print(f"BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}")
     engine = args.engine
     if engine == "auto":
         engine = "pypy" if platform.python_implementation() == "PyPy" else "cpython"

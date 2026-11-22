@@ -693,6 +693,7 @@ fn main() -> Result<(), String> {
     let warmup = bench_count(warmup, 0)?;
     let iterations = bench_count(iterations, 1)?;
     let samples = bench_count(samples, 1)?;
+    println!("BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}");
     let t = Instant::now();
     let j = Jit::compile()?;
     let build = t.elapsed();

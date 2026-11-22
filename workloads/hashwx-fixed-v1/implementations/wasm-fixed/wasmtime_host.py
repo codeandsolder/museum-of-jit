@@ -29,6 +29,7 @@ def main() -> None:
     warmup = count(sys.argv[2], 0)
     iterations = count(sys.argv[3])
     samples = count(sys.argv[4])
+    print(f"BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}")
     module_bytes = Path(sys.argv[1]).read_bytes()
 
     t0 = time.perf_counter_ns()
