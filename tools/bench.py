@@ -37,13 +37,22 @@ def normalize_benchmark_env(env: dict[str, str]) -> None:
         env[name] = str(value)
 
 
-def command_output(argv: list[str], env=None) -> str:
+def command_output(argv: list[str], env: dict[str, str] | None = None) -> str:
     try:
-        p = subprocess.run(argv, cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20, check=False)
+        p = subprocess.run(
+            argv,
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            timeout=20,
+            check=False,
+        )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return "unavailable"
     text = p.stdout.strip()
-    return text if text else f"exit={p.returncode}"
+    return text or f"exit={p.returncode}"
 
 
 def runtime_version(impl: str, env: dict[str, str]) -> str:
@@ -51,7 +60,9 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output(["rustc", "+1.99.0", "--version"], env)
     if impl == "rust-challenge-simd":
         if env.get("MUSEUM_CHALLENGE_RUST_BIN"):
-            return env.get("MUSEUM_CHALLENGE_RUSTC_VERSION", "rustc nightly-2026-11-03 (prebuilt)")
+            return env.get(
+                "MUSEUM_CHALLENGE_RUSTC_VERSION", "rustc nightly-2026-11-03 (prebuilt)"
+            )
         return command_output(["rustc", "+nightly-2026-11-03", "--version"], env)
     if impl.startswith("dotnet-"):
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
@@ -61,26 +72,40 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         binary = env.get("MUSEUM_LLVM_ORC_BIN")
         policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
         run_env = dict(env, MUSEUM_LLVM_IR_OPT=policy)
-        return command_output([binary, "--version"], run_env) if binary else f"LLVM ORC 21.1.8 / {policy} IR (build in runner)"
+        return (
+            command_output([binary, "--version"], run_env)
+            if binary
+            else f"LLVM ORC 21.1.8 / {policy} IR (build in runner)"
+        )
     if impl in ("cranelift-direct", "cranelift-batch"):
         binary = env.get("MUSEUM_CRANELIFT_BIN")
-        return command_output([binary, "--version"], env) if binary else "Cranelift 0.137.1 (build in runner)"
+        return (
+            command_output([binary, "--version"], env)
+            if binary
+            else "Cranelift 0.137.1 (build in runner)"
+        )
     if impl == "cpython-jit":
         return command_output([env.get("MUSEUM_CPYTHON", "python3"), "--version"], env)
     if impl == "pypy-intop":
         return command_output([env.get("MUSEUM_PYPY", "pypy3"), "--version"], env)
     if impl == "v8-wasm":
-        return command_output([
-            env.get("MUSEUM_NODE", "node"),
-            "-p",
-            "process.version + ' / V8 ' + process.versions.v8",
-        ], env)
+        return command_output(
+            [
+                env.get("MUSEUM_NODE", "node"),
+                "-p",
+                "process.version + ' / V8 ' + process.versions.v8",
+            ],
+            env,
+        )
     if impl == "wasmtime-wasm":
-        return command_output([
-            env.get("MUSEUM_WASMTIME_PY", "python3"),
-            "-c",
-            "import importlib.metadata; print('wasmtime ' + importlib.metadata.version('wasmtime'))",
-        ], env)
+        return command_output(
+            [
+                env.get("MUSEUM_WASMTIME_PY", "python3"),
+                "-c",
+                "import importlib.metadata; print('wasmtime ' + importlib.metadata.version('wasmtime'))",
+            ],
+            env,
+        )
     if impl == "rpython-jitdriver":
         binary = env.get("MUSEUM_RPYTHON_HASHWX")
         if not binary:
@@ -94,7 +119,10 @@ def host_info() -> dict:
     family = model_id = None
     flags: list[str] = []
     try:
-        text = Path("/proc/cpuinfo").read_text()
+        text = Path("/proc/cpuinfo").read_text(encoding="utf-8")
+    except OSError:
+        pass
+    else:
         block = text.split("\n\n", 1)[0]
         fields = {}
         for line in block.splitlines():
@@ -105,8 +133,6 @@ def host_info() -> dict:
         family = fields.get("cpu family")
         model_id = fields.get("model")
         flags = fields.get("flags", "").split()
-    except OSError:
-        pass
     try:
         osr = platform.freedesktop_os_release()
         os_name = osr.get("PRETTY_NAME") or osr.get("NAME") or platform.system()
@@ -131,19 +157,27 @@ def host_info() -> dict:
 
 def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
     checks = re.findall(r"\bCHECK\s+([0-9a-fA-F]{16})\b", text)
-    rates = [(float(rate), sink.lower()) for rate, sink in re.findall(r"\bRATE\s+([0-9]+(?:\.[0-9]+)?)\s+sink=([0-9a-fA-F]{16})", text)]
+    rates = [
+        (float(rate), sink.lower())
+        for rate, sink in re.findall(
+            r"\bRATE\s+([0-9]+(?:\.[0-9]+)?)\s+sink=([0-9a-fA-F]{16})", text
+        )
+    ]
     if not checks:
         raise ValueError("benchmark produced no CHECK line")
     if checks[-1].lower() != expected_check:
         raise ValueError(f"wrong CHECK {checks[-1]}, expected {expected_check}")
     if not rates:
         raise ValueError("benchmark produced no RATE lines")
-    def number(name: str):
+
+    def number(name: str) -> float | None:
         m = re.search(rf"\b{name}\s+([0-9]+(?:\.[0-9]+)?)", text)
         return float(m.group(1)) if m else None
-    def integer(name: str):
+
+    def integer(name: str) -> int | None:
         m = re.search(rf"\b{name}\s+(\d+)", text)
         return int(m.group(1)) if m else None
+
     return {
         "check": checks[-1].lower(),
         "build_us": number("BUILD_US"),
@@ -155,7 +189,9 @@ def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
 
 def implementation_evidence(impl: str, text: str) -> dict:
     if impl == "rust-challenge-simd":
-        match = re.findall(r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text)
+        match = re.findall(
+            r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text
+        )
         hashes = re.findall(r"(?m)^BINARY_SHA256 ([0-9a-f]{64})$", text)
         if len(match) != 1 or len(hashes) != 1:
             raise ValueError("missing Rust SIMD or binary provenance attestation")
@@ -176,19 +212,36 @@ def implementation_evidence(impl: str, text: str) -> dict:
         match = re.findall(r"(?m)^ENGINE dotnet MODE (\S+) VECTOR_LANES (\d+)$", text)
         expected_mode = dotnet_challenge_modes[impl]
         if len(match) != 1 or match[0][0] != expected_mode:
-            raise ValueError(f"missing or wrong .NET challenge backend attestation for {impl}")
+            raise ValueError(
+                f"missing or wrong .NET challenge backend attestation for {impl}"
+            )
         return {"simd_lanes": int(match[0][1]), "backend": expected_mode}
     if impl == "llvm-orc" or impl in ("llvm-orc-o0", "llvm-orc-o1", "llvm-orc-o3"):
-        expected_policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
+        expected_policy = (
+            "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
+        )
         mode = re.findall(r"(?m)^MODE (\S+)$", text)
         engine = re.findall(r"(?m)^ENGINE (\S+) VERSION (\S+)$", text)
         policy = re.findall(r"(?m)^IR_OPT (\S+)$", text)
-        if mode != ["jit-batch"] or len(engine) != 1 or engine[0][0] != "llvm-orc" or policy != [expected_policy]:
-            raise ValueError(f"LLVM ORC adapter must attest to mode=jit-batch and IR_OPT={expected_policy}")
-        return {"jit_batch_internal": True, "llvm_ir_optimization": expected_policy, "llvm_codegen": "Aggressive"}
+        if (
+            mode != ["jit-batch"]
+            or len(engine) != 1
+            or engine[0][0] != "llvm-orc"
+            or policy != [expected_policy]
+        ):
+            raise ValueError(
+                f"LLVM ORC adapter must attest to mode=jit-batch and IR_OPT={expected_policy}"
+            )
+        return {
+            "jit_batch_internal": True,
+            "llvm_ir_optimization": expected_policy,
+            "llvm_codegen": "Aggressive",
+        }
     if impl == "cranelift-batch":
         if not re.search(r"\bMODE\s+jit-batch\b", text):
-            raise ValueError("Cranelift batch adapter did not execute the JIT-local batch loop")
+            raise ValueError(
+                "Cranelift batch adapter did not execute the JIT-local batch loop"
+            )
         return {"jit_batch_internal": True}
     if impl != "cpython-jit":
         return {}
@@ -211,7 +264,11 @@ def implementation_evidence(impl: str, text: str) -> dict:
 def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> None:
     # Hit-only solvers must attest to the complete attempted candidate count;
     # their count sink cannot be compared to the digest-XOR sink.
-    if impl not in ("dotnet-challenge-match", "dotnet-challenge-match-optimized", "rust-challenge-simd"):
+    if impl not in (
+        "dotnet-challenge-match",
+        "dotnet-challenge-match-optimized",
+        "rust-challenge-simd",
+    ):
         return
     expected = f"{sample_iterations:016x}"
     for index, sample in enumerate(parsed["samples"]):
@@ -223,15 +280,26 @@ def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> 
 
 
 def run_one(
-    impl: str, spec: dict, env: dict[str, str], host: dict,
-    corpus_sha: str, workload_id: str = DEFAULT_WORKLOAD,
+    impl: str,
+    spec: dict,
+    env: dict[str, str],
+    host: dict,
+    corpus_sha: str,
+    workload_id: str = DEFAULT_WORKLOAD,
     expected_check: str = EXPECTED_CHECK,
 ) -> dict:
     runner = ROOT / spec["runner"]
     if not runner.is_file():
         raise FileNotFoundError(runner)
     try:
-        revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout.strip()
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        ).stdout.strip()
     except subprocess.CalledProcessError:
         revision = None
     base = {
@@ -240,17 +308,28 @@ def run_one(
         "timestamp_utc": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
         "host": host,
         "workload": {"id": workload_id, "corpus_sha256": corpus_sha},
-        "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
+        "implementation": {
+            "id": impl,
+            "mode": spec["mode"],
+            "source": spec["source"],
+            "revision": revision,
+        },
         "runtime": {
-            "name": spec["runtime"], "version": runtime_version(impl, env),
+            "name": spec["runtime"],
+            "version": runtime_version(impl, env),
             "command": [str(runner.relative_to(ROOT))],
             "jit_configuration": {
-                key: env[key] for key in (
-                    "DOTNET_MaxVectorTBitWidth", "DOTNET_PreferredVectorBitWidth",
-                    "DOTNET_EnableAVX2", "DOTNET_EnableAVX512F",
-                    "DOTNET_EnableHWIntrinsic", "COMPlus_TieredPGO",
+                key: env[key]
+                for key in (
+                    "DOTNET_MaxVectorTBitWidth",
+                    "DOTNET_PreferredVectorBitWidth",
+                    "DOTNET_EnableAVX2",
+                    "DOTNET_EnableAVX512F",
+                    "DOTNET_EnableHWIntrinsic",
+                    "COMPlus_TieredPGO",
                     "COMPlus_TieredCompilation",
-                ) if key in env
+                )
+                if key in env
             },
         },
         "warmup_iterations": int(env["MUSEUM_WARMUP"]),
@@ -261,7 +340,15 @@ def run_one(
     timeout = float(env.get("MUSEUM_RUN_TIMEOUT", "120"))
     started = time.perf_counter()
     try:
-        proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, capture_output=True, check=False, timeout=timeout)
+        proc = subprocess.run(
+            [str(runner)],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
+        )
     except subprocess.TimeoutExpired as exc:
         elapsed = time.perf_counter() - started
         stdout = exc.stdout or ""
@@ -271,18 +358,32 @@ def run_one(
         if isinstance(stderr, bytes):
             stderr = stderr.decode(errors="replace")
         result = base | {
-            "status": "timeout", "exit_code": None, "error": f"runner exceeded {timeout:g} seconds",
-            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
-            "stdout": stdout, "stderr": stderr, "elapsed_seconds": elapsed,
+            "status": "timeout",
+            "exit_code": None,
+            "error": f"runner exceeded {timeout:g} seconds",
+            "build_us": None,
+            "first_call_us": None,
+            "code_bytes": None,
+            "check": None,
+            "stdout": stdout,
+            "stderr": stderr,
+            "elapsed_seconds": elapsed,
         }
         print(f"{impl:24s} TIMEOUT after {elapsed:.1f}s", file=sys.stderr)
         return result
     elapsed = time.perf_counter() - started
     if proc.returncode != 0:
         result = base | {
-            "status": "failed", "exit_code": proc.returncode, "error": f"runner exited with status {proc.returncode}",
-            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
-            "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+            "status": "failed",
+            "exit_code": proc.returncode,
+            "error": f"runner exited with status {proc.returncode}",
+            "build_us": None,
+            "first_call_us": None,
+            "code_bytes": None,
+            "check": None,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "elapsed_seconds": elapsed,
         }
         print(f"{impl:24s} FAILED exit={proc.returncode}", file=sys.stderr)
         return result
@@ -297,21 +398,38 @@ def run_one(
         validate_challenge_sink(impl, parsed, int(env["MUSEUM_ITERATIONS"]))
     except ValueError as exc:
         result = base | {
-            "status": "invalid", "exit_code": proc.returncode, "error": str(exc),
-            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
-            "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+            "status": "invalid",
+            "exit_code": proc.returncode,
+            "error": str(exc),
+            "build_us": None,
+            "first_call_us": None,
+            "code_bytes": None,
+            "check": None,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "elapsed_seconds": elapsed,
         }
         print(f"{impl:24s} INVALID {exc}", file=sys.stderr)
         return result
     result = base | {
-        "status": "success", "exit_code": proc.returncode, "error": None,
-        "build_us": parsed["build_us"], "first_call_us": parsed["first_call_us"],
-        "code_bytes": parsed["code_bytes"], "check": parsed["check"], "samples": parsed["samples"],
-        "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+        "status": "success",
+        "exit_code": proc.returncode,
+        "error": None,
+        "build_us": parsed["build_us"],
+        "first_call_us": parsed["first_call_us"],
+        "code_bytes": parsed["code_bytes"],
+        "check": parsed["check"],
+        "samples": parsed["samples"],
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "elapsed_seconds": elapsed,
     }
     result["runtime"].update(evidence)
     rates = [x["hashes_per_second"] for x in result["samples"]]
-    print(f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}", file=sys.stderr)
+    print(
+        f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}",
+        file=sys.stderr,
+    )
     return result
 
 
@@ -349,7 +467,10 @@ def main() -> None:
         corpus_file = workload / "program.json"
     corpus_sha = hashlib.sha256(corpus_file.read_bytes()).hexdigest()
     host = host_info()
-    results = [run_one(name, specs[name], env, host, corpus_sha, args.workload, expected_check) for name in names]
+    results = [
+        run_one(name, specs[name], env, host, corpus_sha, args.workload, expected_check)
+        for name in names
+    ]
     rendered = json.dumps(results, indent=2) + "\n"
     if args.output:
         out = Path(args.output)

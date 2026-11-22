@@ -1,7 +1,10 @@
 """Guard fixture and separate-workload benchmark parsing."""
+
 import hashlib
 import importlib.util
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -13,18 +16,23 @@ SPEC.loader.exec_module(bench)
 
 
 class ChallengeSha256WorkloadTest(unittest.TestCase):
-    def test_fixture_matches_independent_sha256(self):
-        fixture = json.loads((ROOT / "workloads/challenge-sha256-v1/fixture.json").read_text())
+    def test_fixture_matches_independent_sha256(self) -> None:
+        fixture = json.loads(
+            (ROOT / "workloads/challenge-sha256-v1/fixture.json").read_text()
+        )
         prefix = fixture["prefix_ascii"].encode()
         self.assertEqual(len(prefix), 42)
-        self.assertEqual(fixture["expected_check"], hashlib.sha256(prefix + b"100000000").hexdigest()[:16])
+        self.assertEqual(
+            fixture["expected_check"],
+            hashlib.sha256(prefix + b"100000000").hexdigest()[:16],
+        )
         for case in fixture["oracle_cases"]:
             self.assertEqual(
                 hashlib.sha256(prefix + str(case["nonce"]).encode()).hexdigest(),
                 case["sha256"],
             )
 
-    def test_rust_provenance_requires_exact_binary_sha(self):
+    def test_rust_provenance_requires_exact_binary_sha(self) -> None:
         sha = "a" * 64
         example = (
             "BINARY_SHA256 " + sha + "\n"
@@ -40,7 +48,7 @@ class ChallengeSha256WorkloadTest(unittest.TestCase):
                 "rust-challenge-simd", example.replace("BINARY_SHA256 " + sha, "")
             )
 
-    def test_match_backend_and_exact_work_count(self):
+    def test_match_backend_and_exact_work_count(self) -> None:
         output = (
             "ENGINE dotnet MODE match VECTOR_LANES 16\\n"
             "CHECK b4b920f70c0de8df\\n"
@@ -58,7 +66,7 @@ class ChallengeSha256WorkloadTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             bench.implementation_evidence("dotnet-challenge-portable", output)
 
-    def test_optimized_mode_attestation_and_work_count(self):
+    def test_optimized_mode_attestation_and_work_count(self) -> None:
         for name, mode in (
             ("dotnet-challenge-optimized", "optimized"),
             ("dotnet-challenge-match-optimized", "match-optimized"),
@@ -78,15 +86,20 @@ class ChallengeSha256WorkloadTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     bench.validate_challenge_sink(name, parsed, 1025)
 
-    def test_unrolled_source_in_sync(self):
-        import subprocess
-        import sys
+    def test_unrolled_source_in_sync(self) -> None:
+
         subprocess.run(
-            [sys.executable, str(ROOT / "tools/generate_challenge_sha256_unrolled.py"), "--check"],
-            check=True, capture_output=True, text=True
+            [
+                sys.executable,
+                str(ROOT / "tools/generate_challenge_sha256_unrolled.py"),
+                "--check",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
         )
 
-    def test_parser_cannot_pass_wrong_workload_or_probe(self):
+    def test_parser_cannot_pass_wrong_workload_or_probe(self) -> None:
         output = "ENGINE dotnet MODE portable VECTOR_LANES 8\nCHECK b4b920f70c0de8df\nRATE 123.45 sink=0123456789abcdef\n"
         parsed = bench.parse_output(output, "b4b920f70c0de8df")
         self.assertEqual(parsed["samples"][0]["sink"], "0123456789abcdef")

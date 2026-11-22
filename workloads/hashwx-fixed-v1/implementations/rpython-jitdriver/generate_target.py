@@ -323,7 +323,7 @@ def main() -> None:
     rendered = TARGET_TEMPLATE
     for marker, literal in image_literals(document).items():
         rendered = rendered.replace(marker, literal)
-    Path(args.output).write_text(rendered)
+    Path(args.output).write_text(rendered, encoding="utf-8")
 
 
 if __name__ == "__main__":

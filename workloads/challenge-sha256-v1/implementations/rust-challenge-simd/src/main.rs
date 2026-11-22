@@ -6,8 +6,7 @@ use std::time::Instant;
 
 fn prefix() -> [u8; 42] {
     let mut buf = [b'x'; 42];
-    buf[.."challenge-disasterer|sha256|".len()]
-        .copy_from_slice(b"challenge-disasterer|sha256|");
+    buf[.."challenge-disasterer|sha256|".len()].copy_from_slice(b"challenge-disasterer|sha256|");
     buf
 }
 
@@ -19,16 +18,15 @@ where
     solver.set_limit(limit);
     // Full 64-bit equality test. A hit is exceedingly unlikely; fail rather than
     // silently misreport attempted work if one occurs.
-    let solution = solver.solve_nonce_only::<SOLVE_TYPE_MASK>(
-        0xbadd_cafe_1234_5678,
-        u64::MAX,
-    );
+    let solution = solver.solve_nonce_only::<SOLVE_TYPE_MASK>(0xbadd_cafe_1234_5678, u64::MAX);
     if solution.is_some() {
         return Err("unexpected target collision during benchmark".into());
     }
     let attempts = solver.attempted_nonces();
     if attempts != limit {
-        return Err(format!("attempt accounting mismatch: {attempts} != {limit}"));
+        return Err(format!(
+            "attempt accounting mismatch: {attempts} != {limit}"
+        ));
     }
     Ok(attempts)
 }
@@ -81,16 +79,22 @@ fn main() -> Result<(), String> {
     let expected = "b4b920f70c0de8df";
     let oracle = check(&message)?;
     if oracle != expected {
-        return Err(format!("reference changed: expected {expected}, got {oracle}"));
+        return Err(format!(
+            "reference changed: expected {expected}, got {oracle}"
+        ));
     }
 
     let warmup = parse_env("MUSEUM_WARMUP", 30_000, 0)?;
     let iterations = parse_env("MUSEUM_ITERATIONS", 300_000, 1)?;
     let samples = parse_env("MUSEUM_SAMPLES", 7, 1)?;
     #[cfg(target_arch = "x86_64")]
-    let lane_count = if std::arch::is_x86_feature_detected!("avx512f") { 16 }
-        else if std::arch::is_x86_feature_detected!("avx2") { 8 }
-        else { 1 };
+    let lane_count = if std::arch::is_x86_feature_detected!("avx512f") {
+        16
+    } else if std::arch::is_x86_feature_detected!("avx2") {
+        8
+    } else {
+        1
+    };
     #[cfg(not(target_arch = "x86_64"))]
     let lane_count = 1;
     println!("ENGINE rust-challenge MODE simd VECTOR_LANES {lane_count}");

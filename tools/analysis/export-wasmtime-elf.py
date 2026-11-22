@@ -6,6 +6,7 @@ Python runtime. Unlike disassembling Wasm bytecode, Module.serialize() returns
 an ELF containing the generated native function symbols and code. There is no
 compilation cache/remote service and no benchmark execution in this tool.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,9 @@ def main() -> None:
     args = parser.parse_args()
     version = importlib.metadata.version("wasmtime")
     if version != args.expected_version:
-        parser.error(f"Wasmtime version mismatch: expected {args.expected_version}, got {version}")
+        parser.error(
+            f"Wasmtime version mismatch: expected {args.expected_version}, got {version}"
+        )
     wasm = args.wasm.read_bytes()
     config = wasmtime.Config()
     # Match the canonical Wasmtime benchmark host's compilation policy.
