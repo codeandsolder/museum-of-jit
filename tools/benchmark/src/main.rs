@@ -65,7 +65,7 @@ struct RunArgs {
 fn run(
     root: &Path,
     cfg: &RuntimeConfig,
-    args: RunArgs,
+    args: &RunArgs,
     cancelled: &AtomicBool,
 ) -> Result<ExitCode> {
     let timeout = args.plan.validate(args.workload)?;
@@ -156,7 +156,7 @@ fn main() -> Result<ExitCode> {
         } => run(
             &root,
             &config,
-            RunArgs {
+            &RunArgs {
                 workload,
                 implementations,
                 plan,

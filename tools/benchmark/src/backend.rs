@@ -15,7 +15,7 @@ use crate::{
     process::Session,
 };
 
-pub(crate) fn sha256(path: &Path) -> Result<String> {
+pub fn sha256(path: &Path) -> Result<String> {
     let mut digest = Sha256::new();
     io::copy(&mut BufReader::new(fs::File::open(path)?), &mut digest)?;
     Ok(format!("{:x}", digest.finalize()))
@@ -59,13 +59,14 @@ fn command(root: &Path, path: &Path) -> Command {
 }
 
 fn build_command(session: &Session<'_>, cfg: &RuntimeConfig, tool: &Path) -> Command {
-    if let Some(cpus) = &cfg.build_cpus {
-        let mut cmd = Command::new("taskset");
-        cmd.args(["-c", cpus]).arg(rooted(session.root(), tool));
-        cmd
-    } else {
-        command(session.root(), tool)
-    }
+    cfg.build_cpus.as_ref().map_or_else(
+        || command(session.root(), tool),
+        |cpus| {
+            let mut cmd = Command::new("taskset");
+            cmd.args(["-c", cpus]).arg(rooted(session.root(), tool));
+            cmd
+        },
+    )
 }
 
 fn managed_cache(session: &Session<'_>, cfg: &RuntimeConfig) -> Result<PathBuf> {
@@ -194,11 +195,7 @@ fn library_path(command: &mut Command, directory: &Path) -> Result<()> {
 }
 
 /// Pinned LLVM21 static archive build, preserving target libm symbol binding.
-pub(crate) fn build_llvm(
-    session: &mut Session<'_>,
-    cfg: &RuntimeConfig,
-    output: &Path,
-) -> Result<()> {
+pub fn build_llvm(session: &mut Session<'_>, cfg: &RuntimeConfig, output: &Path) -> Result<()> {
     let config = executable(session.root(), &cfg.llvm_config)?;
     let wrapper = managed_cache(session, cfg)?;
     let mut version = Command::new(&config);
@@ -371,13 +368,14 @@ fn uv_python(session: &Session<'_>, cfg: &RuntimeConfig) -> Command {
 }
 
 fn wasmtime_python(session: &Session<'_>, cfg: &RuntimeConfig) -> Command {
-    if let Some(python) = &cfg.wasmtime_python {
-        command(session.root(), python)
-    } else {
-        let mut cmd = uv_python(session, cfg);
-        cmd.args(["--with", "wasmtime==50.0.1", "python"]);
-        cmd
-    }
+    cfg.wasmtime_python.as_ref().map_or_else(
+        || {
+            let mut cmd = uv_python(session, cfg);
+            cmd.args(["--with", "wasmtime==50.0.1", "python"]);
+            cmd
+        },
+        |python| command(session.root(), python),
+    )
 }
 
 fn emit_wasm(session: &mut Session<'_>, cfg: &RuntimeConfig, source: &Path) -> Result<PathBuf> {
@@ -392,7 +390,7 @@ fn emit_wasm(session: &mut Session<'_>, cfg: &RuntimeConfig, source: &Path) -> R
     Ok(path)
 }
 
-pub(crate) struct Prepared {
+pub struct Prepared {
     pub command: Command,
     pub version: String,
     pub binary_sha256: Option<String>,
@@ -563,7 +561,7 @@ fn prepare_wasm(
     Prepared::new(cmd, version, Some(&module))
 }
 
-pub(crate) fn prepare(
+pub fn prepare(
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
     implementation: &Implementation,

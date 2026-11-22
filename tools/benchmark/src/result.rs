@@ -23,7 +23,7 @@ use crate::{
 };
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Host {
+pub struct Host {
     hostname: String,
     arch: String,
     cpu_model: String,
@@ -83,9 +83,10 @@ impl Host {
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Corpus {
+pub struct Corpus {
     id: &'static str,
-    pub corpus_sha256: String,
+    #[serde(rename = "corpus_sha256")]
+    sha256: String,
     #[serde(skip)]
     pub path: PathBuf,
     #[serde(skip)]
@@ -114,7 +115,7 @@ impl Corpus {
         );
         Ok(Self {
             id: workload.id(),
-            corpus_sha256: sha256(&path)?,
+            sha256: sha256(&path)?,
             path,
             expected_check,
         })
@@ -122,7 +123,7 @@ impl Corpus {
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Revision {
+pub struct Revision {
     pub commit: String,
     pub dirty: bool,
 }
@@ -185,7 +186,7 @@ enum Status {
 }
 
 #[derive(Serialize)]
-pub(crate) struct Row<'a> {
+pub struct Row<'a> {
     schema_version: u32,
     run_id: String,
     timestamp_utc: String,
@@ -210,7 +211,7 @@ pub(crate) struct Row<'a> {
 }
 
 impl Row<'_> {
-    pub fn succeeded(&self) -> bool {
+    pub const fn succeeded(&self) -> bool {
         matches!(self.status, Status::Success)
     }
     fn accept(&mut self, parsed: Measurements, evidence: Evidence) {
@@ -252,7 +253,7 @@ impl Row<'_> {
 }
 
 /// Shared immutable context. Each exhibit receives an independent session.
-pub(crate) struct RunContext<'a> {
+pub struct RunContext<'a> {
     pub root: &'a Path,
     pub config: &'a RuntimeConfig,
     pub host: &'a Host,

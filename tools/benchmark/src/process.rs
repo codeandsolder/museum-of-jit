@@ -49,6 +49,7 @@ impl GroupChild {
             Err(error) => return Err(error.into()),
         }
         let status = self.child.wait()?;
+        self.finished = true;
         // The harness is a Linux subreaper. Reap adopted group members,
         // including grandchildren that were left behind by a failed tool.
         loop {
@@ -58,7 +59,6 @@ impl GroupChild {
                 Err(error) => return Err(error.into()),
             }
         }
-        self.finished = true;
         Ok(status)
     }
 
@@ -104,7 +104,7 @@ fn utf8(value: &OsStr) -> Result<String> {
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct CommandRecord {
+pub struct CommandRecord {
     pub argv: Vec<String>,
     pub environment: std::collections::BTreeMap<String, Option<String>>,
     pub stage: &'static str,
@@ -132,7 +132,7 @@ impl CommandRecord {
     }
 }
 
-pub(crate) struct Output {
+pub struct Output {
     pub code: i32,
     pub stdout: String,
     pub stderr: String,
@@ -140,7 +140,7 @@ pub(crate) struct Output {
 
 /// One benchmark owns a scratch directory, an absolute deadline, and all
 /// external invocations. No subprocess inherits a writable output pipe.
-pub(crate) struct Session<'a> {
+pub struct Session<'a> {
     root: &'a Path,
     scratch: TempDir,
     deadline: Instant,
@@ -168,7 +168,7 @@ impl<'a> Session<'a> {
         })
     }
 
-    pub fn root(&self) -> &Path {
+    pub const fn root(&self) -> &Path {
         self.root
     }
     pub fn scratch(&self) -> &Path {

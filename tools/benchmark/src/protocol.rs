@@ -4,13 +4,13 @@ use serde::Serialize;
 use crate::config::{Backend, Plan, PythonEngine};
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Sample {
+pub struct Sample {
     pub hashes_per_second: f64,
     pub sink: String,
 }
 
 #[derive(Default, Debug, Serialize)]
-pub(crate) struct Evidence {
+pub struct Evidence {
     #[serde(skip_serializing_if = "Option::is_none")]
     simd_lanes: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -28,7 +28,7 @@ pub(crate) struct Evidence {
 }
 
 #[derive(Debug, Serialize)]
-pub(crate) struct Measurements {
+pub struct Measurements {
     pub check: String,
     pub build_us: Option<f64>,
     pub first_call_us: Option<f64>,
@@ -218,7 +218,7 @@ fn evidence(backend: &Backend, text: &str) -> Result<Evidence> {
     Ok(evidence)
 }
 
-pub(crate) fn validate(
+pub fn validate(
     backend: &Backend,
     text: &str,
     plan: Plan,

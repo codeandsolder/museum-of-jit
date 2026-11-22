@@ -10,7 +10,7 @@ use std::{
 
 #[derive(Debug, Parser)]
 #[command(version, about = "Run the Museum's reproducible benchmark exhibits")]
-pub(crate) struct Cli {
+pub struct Cli {
     /// Repository root (defaults to the current directory).
     #[arg(long, global = true, default_value = ".")]
     pub root: PathBuf,
@@ -22,7 +22,7 @@ pub(crate) struct Cli {
 }
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum Action {
+pub enum Action {
     List {
         #[arg(long, value_enum, default_value_t = Workload::HashwxFixedV1)]
         workload: Workload,
@@ -49,7 +49,7 @@ pub(crate) enum Action {
 
 #[derive(Clone, Copy, Debug, ValueEnum, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum Workload {
+pub enum Workload {
     HashwxFixedV1,
     ChallengeSha256V1,
 }
@@ -71,7 +71,7 @@ impl Workload {
 }
 
 #[derive(Clone, Copy, Debug, clap::Args)]
-pub(crate) struct Plan {
+pub struct Plan {
     #[arg(long, default_value = "30000", value_parser = decimal_count)]
     pub warmup: u32,
     #[arg(long, default_value = "300000", value_parser = positive_count)]
@@ -125,7 +125,7 @@ impl Plan {
 /// interpreted relative to the repository root. Bare executable names use PATH.
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub(crate) struct RuntimeConfig {
+pub struct RuntimeConfig {
     pub cargo: PathBuf,
     pub rustc: PathBuf,
     pub sccache_client: PathBuf,
@@ -194,7 +194,7 @@ impl RuntimeConfig {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Catalog {
+pub struct Catalog {
     pub implementation: Vec<Implementation>,
 }
 
@@ -237,7 +237,7 @@ impl Catalog {
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct Implementation {
+pub struct Implementation {
     pub id: String,
     pub mode: ImplementationMode,
     pub runtime: String,
@@ -247,7 +247,7 @@ pub(crate) struct Implementation {
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum ImplementationMode {
+pub enum ImplementationMode {
     Idiomatic,
     GeneratedSourceOrBytecode,
     DirectIrOrMachineCode,
@@ -256,7 +256,7 @@ pub(crate) enum ImplementationMode {
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum ChallengeMode {
+pub enum ChallengeMode {
     Portable,
     Optimized,
     MatchOptimized,
@@ -283,7 +283,7 @@ impl ChallengeMode {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
-pub(crate) enum IrPolicy {
+pub enum IrPolicy {
     O0,
     O1,
     O2,
@@ -303,21 +303,21 @@ impl IrPolicy {
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum PythonEngine {
+pub enum PythonEngine {
     Cpython,
     Pypy,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum WasmEngine {
+pub enum WasmEngine {
     V8,
     Wasmtime,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
-pub(crate) enum Backend {
+pub enum Backend {
     RustDynasm,
     RustChallenge,
     Dotnet {
