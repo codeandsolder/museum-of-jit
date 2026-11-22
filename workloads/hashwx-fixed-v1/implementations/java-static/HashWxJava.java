@@ -1267,9 +1267,9 @@ public final class HashWxJava {
         v1 ^= v2; v3 ^= v0; v2 = Long.rotateLeft(v2,32);
         return out3 ^ v3 ^ r8;
     }
-    static int count(String name,int fallback,boolean allowZero){String raw=System.getenv(name);if(raw==null)return fallback;try{int value=Integer.parseInt(raw);if(allowZero?value<0:value<=0)throw new IllegalArgumentException(name+" has invalid count: "+raw);return value;}catch(NumberFormatException e){throw new IllegalArgumentException(name+" has invalid count: "+raw,e);}}
+    static int count(String raw,boolean allowZero){try{if(!raw.matches("[0-9]+"))throw new IllegalArgumentException("invalid decimal count: "+raw);int value=Integer.parseInt(raw);if(allowZero?value<0:value<=0)throw new IllegalArgumentException("invalid count: "+raw);return value;}catch(NumberFormatException e){throw new IllegalArgumentException("invalid count: "+raw,e);}}
     public static void main(String[] args) {
-        int warmup=count("MUSEUM_WARMUP",30000,true),n=count("MUSEUM_ITERATIONS",300000,false),samples=count("MUSEUM_SAMPLES",7,false);
+        if(args.length!=3)throw new IllegalArgumentException("expected WARMUP ITERATIONS SAMPLES");int warmup=count(args[0],true),n=count(args[1],false),samples=count(args[2],false);
         long mem=U.allocateMemory(16392); try {
             long c=hash(123456L,mem); System.out.printf("CHECK %016x%n",c);
             for(int i=0;i<warmup;i++) hash(i,mem);

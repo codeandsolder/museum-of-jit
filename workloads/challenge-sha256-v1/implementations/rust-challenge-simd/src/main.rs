@@ -60,16 +60,22 @@ fn check(message: &SingleBlockMessage) -> Result<String, String> {
     Ok(format!("{:08x}{:08x}", digest[0], digest[1]))
 }
 
-fn parse_env(name: &str, default: u64, minimum: u64) -> Result<u64, String> {
-    let raw = std::env::var(name).unwrap_or_else(|_| default.to_string());
-    let value: u64 = raw.parse().map_err(|_| format!("invalid {name}: {raw}"))?;
-    if value < minimum || value > 160_000_000 {
-        return Err(format!("{name} out of range: {value}"));
+fn parse_count(raw: &str, minimum: u64) -> Result<u64, String> {
+    let value: u64 = raw.parse().map_err(|_| format!("invalid count: {raw}"))?;
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || value < minimum || value > 160_000_000 {
+        return Err(format!("count out of range: {value}"));
     }
     Ok(value)
 }
 
 fn main() -> Result<(), String> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let [warmup, iterations, samples] = args.as_slice() else {
+        return Err("usage: museum-challenge-sha256-reference WARMUP ITERATIONS SAMPLES".into());
+    };
+    let warmup = parse_count(warmup, 0)?;
+    let iterations = parse_count(iterations, 1)?;
+    let samples = parse_count(samples, 1)?;
     let prefix = prefix();
     let message = SingleBlockMessage::new(&prefix, 0)
         .ok_or("challenge-solvers rejected 42-byte fixed prefix")?;
@@ -84,9 +90,6 @@ fn main() -> Result<(), String> {
         ));
     }
 
-    let warmup = parse_env("MUSEUM_WARMUP", 30_000, 0)?;
-    let iterations = parse_env("MUSEUM_ITERATIONS", 300_000, 1)?;
-    let samples = parse_env("MUSEUM_SAMPLES", 7, 1)?;
     #[cfg(target_arch = "x86_64")]
     let lane_count = if std::arch::is_x86_feature_detected!("avx512f") {
         16

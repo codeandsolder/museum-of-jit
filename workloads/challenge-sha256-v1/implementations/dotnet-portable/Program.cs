@@ -5,12 +5,11 @@ using Museum.ChallengeSha256;
 
 internal static class Program
 {
-    private static int EnvInteger(string key, int defaultValue, int minimum)
+    private static int Count(string raw, int minimum)
     {
-        string? raw = Environment.GetEnvironmentVariable(key);
-        int value = raw is null ? defaultValue : int.Parse(raw, CultureInfo.InvariantCulture);
+        int value = int.Parse(raw, NumberStyles.None, CultureInfo.InvariantCulture);
         if (value < minimum || value > Sha256Kernel.CandidatesPerRow * Sha256Kernel.MaxRows)
-            throw new ArgumentOutOfRangeException(key, value, "invalid nonce count");
+            throw new ArgumentOutOfRangeException(nameof(raw), value, "invalid nonce count");
         return value;
     }
 
@@ -31,22 +30,22 @@ internal static class Program
     {
         try
         {
-            if (args.Contains("--self-test", StringComparer.Ordinal))
+            if (args.Length == 1 && args[0] == "--self-test")
             {
                 Sha256Kernel.SelfTest();
                 Console.WriteLine($"PASS portable SIMD lanes={Vector<uint>.Count}");
                 return 0;
             }
-            if (args.Length != 2 || args[0] != "--mode")
-                throw new ArgumentException("usage: ChallengeSha256 --mode portable|optimized|match|match-optimized|scalar|bcl OR --self-test");
+            if (args.Length != 5 || args[0] != "--mode")
+                throw new ArgumentException("usage: ChallengeSha256 --mode portable|optimized|match|match-optimized|scalar|bcl WARMUP ITERATIONS SAMPLES OR --self-test");
 
             string mode = args[1];
+            int warmup = Count(args[2], 0);
+            int iterations = Count(args[3], 1);
+            int samples = Count(args[4], 1);
             Sha256Kernel.SelfTest();
             Console.WriteLine($"ENGINE dotnet MODE {mode} VECTOR_LANES {Vector<uint>.Count}");
             Console.WriteLine($"CHECK {Sha256Kernel.Check()}");
-            int warmup = EnvInteger("MUSEUM_WARMUP", 30000, 0);
-            int iterations = EnvInteger("MUSEUM_ITERATIONS", 300000, 1);
-            int samples = EnvInteger("MUSEUM_SAMPLES", 7, 1);
             _ = Run(mode, warmup);
 
             for (int sample = 0; sample < samples; sample++)

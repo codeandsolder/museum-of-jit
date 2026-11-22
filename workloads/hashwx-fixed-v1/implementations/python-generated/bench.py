@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 import argparse
-import importlib
 import json
-import os
 import platform
 import sys
 import time
 from pathlib import Path
-from types import FunctionType
 
 MASK = (1 << 64) - 1
 SIGN = 1 << 63
@@ -124,12 +121,12 @@ def emit_op(
         raise ValueError(op)
 
 
-def count_cpython_executors(hash_one: FunctionType) -> int | None:
+def count_cpython_executors(hash_one) -> int | None:
     try:
-        opcode = importlib.import_module("_opcode")
+        import _opcode
     except ImportError:
         return None
-    get_executor = getattr(opcode, "get_executor", None)
+    get_executor = getattr(_opcode, "get_executor", None)
     if get_executor is None:
         return None
     executor_ids = set()
@@ -197,7 +194,22 @@ def main() -> None:
         action="store_true",
         help="record installed CPython JIT executors outside timed samples",
     )
+    ap.add_argument("warmup")
+    ap.add_argument("iterations")
+    ap.add_argument("samples")
     args = ap.parse_args()
+
+    def count(raw: str, minimum: int) -> int:
+        if not raw or not raw.isascii() or not raw.isdecimal():
+            ap.error(f"invalid decimal count: {raw!r}")
+        value = int(raw)
+        if not minimum <= value <= 2**31 - 1:
+            ap.error(f"count out of range: {value}")
+        return value
+
+    warmup = count(args.warmup, 0)
+    iterations = count(args.iterations, 1)
+    samples = count(args.samples, 1)
     engine = args.engine
     if engine == "auto":
         engine = "pypy" if platform.python_implementation() == "PyPy" else "cpython"
@@ -205,7 +217,7 @@ def main() -> None:
         ap.error("--trace-executors only supports the CPython implementation")
     if engine == "pypy":
         try:
-            intop = importlib.import_module("__pypy__").intop
+            from __pypy__ import intop
         except ImportError as exc:
             raise SystemExit("PyPy intop implementation requires PyPy") from exc
         ns = {
@@ -235,20 +247,6 @@ def main() -> None:
     first_us = (time.perf_counter_ns() - t0) / 1000.0
     if check != EXPECTED_CHECK:
         raise SystemExit(f"wrong result: {check:016x} != {EXPECTED_CHECK:016x}")
-
-    def count(name: str, default: int, minimum: int) -> int:
-        raw = os.environ.get(name, str(default))
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
-        if value < minimum:
-            raise SystemExit(f"{name} must be >= {minimum}, got {value}")
-        return value
-
-    warmup = count("MUSEUM_WARMUP", 30000, 0)
-    iterations = count("MUSEUM_ITERATIONS", 300000, 1)
-    samples = count("MUSEUM_SAMPLES", 7, 1)
     for n in range(warmup):
         hash_one(n, mem)
     jit = getattr(sys, "_jit", None)

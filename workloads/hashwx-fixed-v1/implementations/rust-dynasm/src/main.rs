@@ -1931,23 +1931,24 @@ fn emit_phase(ops: &mut dynasmrt::x64::Assembler, mem: bool) {
     }
     dynasm!(ops; dec esi ; jnz =>rep);
 }
-fn bench_count(name: &str, default: u64, allow_zero: bool) -> u64 {
-    match std::env::var(name) {
-        Ok(raw) => {
-            let n = raw
-                .parse::<u64>()
-                .unwrap_or_else(|_| panic!("{name} must be a non-negative integer, got {raw:?}"));
-            assert!(allow_zero || n > 0, "{name} must be > 0");
-            n
-        }
-        Err(std::env::VarError::NotPresent) => default,
-        Err(err) => panic!("cannot read {name}: {err}"),
+fn bench_count(raw: &str, minimum: u64) -> Result<u64, String> {
+    let value = raw
+        .parse::<u64>()
+        .map_err(|_| format!("invalid decimal count: {raw}"))?;
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=i32::MAX as u64).contains(&value) {
+        return Err(format!("benchmark count out of range: {raw}"));
     }
+    Ok(value)
 }
-fn main() {
-    let warmup = bench_count("MUSEUM_WARMUP", 30000, true);
-    let n = bench_count("MUSEUM_ITERATIONS", 300000, false);
-    let samples = bench_count("MUSEUM_SAMPLES", 7, false);
+
+fn main() -> Result<(), String> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let [warmup, iterations, samples] = args.as_slice() else {
+        return Err("usage: museum-hashwx-dynasm WARMUP ITERATIONS SAMPLES".into());
+    };
+    let warmup = bench_count(warmup, 0)?;
+    let iterations = bench_count(iterations, 1)?;
+    let samples = bench_count(samples, 1)?;
     let t = Instant::now();
     let j = Jit::compile();
     let build = t.elapsed();
@@ -1964,10 +1965,11 @@ fn main() {
     for _ in 0..samples {
         let mut sink = 0u64;
         let t = Instant::now();
-        for i in 0..n {
-            sink ^= unsafe { j.hash(i) }
+        for i in 0..iterations {
+            sink ^= unsafe { j.hash(i) };
         }
         let sec = t.elapsed().as_secs_f64();
-        println!("RATE {:.3} sink={:016x}", n as f64 / sec, sink);
+        println!("RATE {:.3} sink={:016x}", iterations as f64 / sec, sink);
     }
+    Ok(())
 }

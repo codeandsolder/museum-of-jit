@@ -491,18 +491,12 @@ impl Compiled {
     }
 }
 
-fn count(name: &str, default: u64, allow_zero: bool) -> Result<u64, Box<dyn Error>> {
-    match std::env::var(name) {
-        Ok(text) => {
-            let n = text.parse::<u64>()?;
-            if !allow_zero && n == 0 {
-                return Err(format!("{name} must be positive").into());
-            }
-            Ok(n)
-        }
-        Err(std::env::VarError::NotPresent) => Ok(default),
-        Err(e) => Err(e.into()),
+fn count(raw: &str, minimum: u64) -> Result<u64, Box<dyn Error>> {
+    let value = raw.parse::<u64>()?;
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || !(minimum..=i32::MAX as u64).contains(&value) {
+        return Err(format!("invalid benchmark count: {raw}").into());
     }
+    Ok(value)
 }
 
 fn hash_salts(compiled: &Compiled, input_path: &str) -> Result<(), Box<dyn Error>> {
@@ -570,22 +564,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         [mode, path] if mode == "--dump-code" => Some(std::path::Path::new(path)),
         _ => None,
     };
-    let (batch_mode, oracle_input, batch_input) = match args.as_slice() {
-        [] => (false, None, None),
-        [mode] if mode == "--batch" => (true, None, None),
-        [mode, path] if mode == "--hash-salts" => (false, Some(path.as_str()), None),
-        [mode, _path] if mode == "--dump-code" => (true, None, None),
-        [mode, path] if mode == "--batch-cases" => (true, None, Some(path.as_str())),
+    let (batch_mode, oracle_input, batch_input, dimensions) = match args.as_slice() {
+        [warmup, iterations, samples] => (false, None, None, Some([warmup, iterations, samples])),
+        [mode, warmup, iterations, samples] if mode == "--batch" => {
+            (true, None, None, Some([warmup, iterations, samples]))
+        }
+        [mode, path] if mode == "--hash-salts" => (false, Some(path.as_str()), None, None),
+        [mode, _path] if mode == "--dump-code" => (true, None, None, None),
+        [mode, path] if mode == "--batch-cases" => (true, None, Some(path.as_str()), None),
         _ => {
             return Err("usage: museum-hashwx-cranelift-direct \
-            [--version | --batch | --hash-salts SALTS.hex | --batch-cases CASES.hex | --dump-code OUTPUT_DIR]"
+            [[--batch] WARMUP ITERATIONS SAMPLES | --version | --hash-salts SALTS.hex | --batch-cases CASES.hex | --dump-code OUTPUT_DIR]"
                 .into());
         }
     };
     let input = std::env::var("MUSEUM_PROGRAM_JSON")?;
-    let warmup = count("MUSEUM_WARMUP", 30_000, true)?;
-    let iterations = count("MUSEUM_ITERATIONS", 300_000, false)?;
-    let samples = count("MUSEUM_SAMPLES", 7, false)?;
+    let dimensions = dimensions
+        .map(|[warmup, iterations, samples]| {
+            Ok::<_, Box<dyn Error>>((count(warmup, 0)?, count(iterations, 1)?, count(samples, 1)?))
+        })
+        .transpose()?;
     let t0 = Instant::now();
     let corpus: Corpus = serde_json::from_str(&std::fs::read_to_string(input)?)?;
     validate(&corpus)?;
@@ -613,6 +611,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if let Some(path) = batch_input {
         return batch_cases(&compiled, path);
     }
+    let (warmup, iterations, samples) = dimensions.ok_or("benchmark dimensions missing")?;
     println!("MODE {}", if batch_mode { "jit-batch" } else { "direct" });
     println!("BUILD_US {build_us:.3} FIRST_US {first_us:.3} CHECK {check:016x}");
     if batch_mode {

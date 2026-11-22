@@ -46,8 +46,8 @@ production reference rather than identical synthetic work.
 
 ~~~bash
 uv run --no-project --python 3 tools/bench.py --workload challenge-sha256-v1 --list
-MUSEUM_WARMUP=30000 MUSEUM_ITERATIONS=300000 MUSEUM_SAMPLES=7 \
-  uv run --no-project --python 3 tools/bench.py \
+uv run --no-project --python 3 tools/bench.py \
+  --warmup 30000 --iterations 300000 --samples 7 \
   --workload challenge-sha256-v1 \
   --impl dotnet-challenge-portable \
   --impl dotnet-challenge-scalar \
@@ -72,9 +72,9 @@ CPU set using `MUSEUM_BUILD_CPUSET`. The actual managed and native
 benchmark processes inherit the single-core affinity:
 
 ~~~bash
-MUSEUM_BUILD_CPUSET=0-7 MUSEUM_WARMUP=1000000 \
-MUSEUM_ITERATIONS=10000000 MUSEUM_SAMPLES=7 \
+MUSEUM_BUILD_CPUSET=0-7 \
 taskset -c 0 uv run --no-project --python 3 tools/bench.py \
+  --warmup 1000000 --iterations 10000000 --samples 7 \
   --workload challenge-sha256-v1 \
   --impl dotnet-challenge-portable \
   --impl dotnet-challenge-scalar \

@@ -1,4 +1,5 @@
-"""Strict identity checks for the canonical LLVM O0-O3 JIT adapters.
+#!/usr/bin/env python3
+"""Strict identity checks for the canonical LLVM O0–O3 JIT adapters.
 
 Run: uv run --no-project --python 3.13 python -m unittest discover -s tools/tests
 This guards the benchmark's evidence layer, not HashWX algorithm correctness.
@@ -7,9 +8,13 @@ The independent 100k/627 Wasm differential tests cover the latter.
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
+import os
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("museum_bench", ROOT / "tools/bench.py")
@@ -47,11 +52,72 @@ class PolicyAttestationTests(unittest.TestCase):
                     output + f"IR_OPT {policy}\n",
                 ]
                 for malformed in incorrect:
-                    with (
-                        self.subTest(malformed=malformed),
-                        self.assertRaises(ValueError),
-                    ):
-                        bench.implementation_evidence(impl, malformed)
+                    with self.subTest(malformed=malformed):
+                        with self.assertRaises(ValueError):
+                            bench.implementation_evidence(impl, malformed)
+
+
+class BenchmarkArgumentTests(unittest.TestCase):
+    def test_count_and_timeout_bounds(self) -> None:
+        self.assertEqual(bench.parse_count("0", 0), 0)
+        self.assertEqual(bench.parse_count(str(bench.MAX_COUNT)), bench.MAX_COUNT)
+        for value in (
+            "0",
+            "-1",
+            "+1",
+            "1.0",
+            "1e2",
+            " 1",
+            "１２",
+            str(bench.MAX_COUNT + 1),
+        ):
+            with self.subTest(value=value):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    bench.parse_count(value)
+        for value in ("0", "-1", "nan", "inf", "-inf"):
+            with self.assertRaises(argparse.ArgumentTypeError):
+                bench.parse_timeout(value)
+
+    def test_explicit_dimensions_are_passed_and_recorded(self) -> None:
+        with tempfile.TemporaryDirectory() as path:
+            root = Path(path)
+            runner = root / "runner"
+            runner.write_text(
+                "#!/bin/sh\n"
+                'test "$#" = 3 && test "$1" = 0 && test "$2" = 128 && test "$3" = 2 || exit 64\n'
+                "printf 'CHECK fd5d450b767035c5\\nRATE 10.000 sink=0000000000000000\\nRATE 11.000 sink=0000000000000000\\n'\n"
+            )
+            runner.chmod(0o755)
+            spec = {
+                "runner": "runner",
+                "mode": "fixture",
+                "source": ".",
+                "runtime": "fixture",
+            }
+            env = dict(
+                os.environ,
+                MUSEUM_WARMUP="99",
+                MUSEUM_ITERATIONS="999",
+                MUSEUM_SAMPLES="7",
+            )
+            with (
+                patch.object(bench, "ROOT", root),
+                patch.object(bench, "runtime_version", return_value="fixture"),
+            ):
+                result = bench.run_one(
+                    "fixture",
+                    spec,
+                    env,
+                    {},
+                    "dummy",
+                    bench.BenchmarkPlan(0, 128, 2, 5.0),
+                )
+            self.assertEqual(result["status"], "success")
+            self.assertEqual(result["runtime"]["command"], ["runner", "0", "128", "2"])
+            self.assertEqual(result["warmup_iterations"], 0)
+            self.assertEqual(result["sample_iterations"], 128)
+            self.assertEqual(result["sample_count"], 2)
+            self.assertEqual(len(result["samples"]), 2)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 if [[ -n "${MUSEUM_CHALLENGE_RUST_BIN:-}" ]]; then
   test -x "$MUSEUM_CHALLENGE_RUST_BIN" || { echo "missing prebuilt Rust binary" >&2; exit 70; }
   printf 'BINARY_SHA256 %s\n' "$(sha256sum "$MUSEUM_CHALLENGE_RUST_BIN" | cut -d' ' -f1)"
-  exec "$MUSEUM_CHALLENGE_RUST_BIN"
+  exec "$MUSEUM_CHALLENGE_RUST_BIN" "$@"
 fi
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
@@ -31,4 +31,4 @@ binary=$("${build[@]}" | jq -ers '
   if length == 1 then .[0] else error("expected one Cargo benchmark executable") end')
 test -x "$binary" || { echo "Cargo benchmark executable unavailable" >&2; exit 70; }
 printf 'BINARY_SHA256 %s\n' "$(sha256sum "$binary" | cut -d' ' -f1)"
-"$binary"
+"$binary" "$@"
