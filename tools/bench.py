@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
@@ -7,9 +8,11 @@ import math
 import os
 import platform
 import re
+import signal
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 import uuid
@@ -52,21 +55,53 @@ def parse_timeout(raw: str) -> float:
     return value
 
 
+def run_command(
+    argv: list[str], env: dict[str, str] | None, timeout: float
+) -> subprocess.CompletedProcess[str]:
+    # The launcher owns the entire process group and scratch tree, not just
+    # the shell. File-backed output avoids hanging on inherited pipe FDs.
+    # All current runners target POSIX hosts and honor the standard TMPDIR.
+    with tempfile.TemporaryDirectory(prefix="museum-run-") as scratch:
+        child_env = dict(os.environ if env is None else env, TMPDIR=scratch)
+        with (
+            tempfile.TemporaryFile(dir=scratch) as stdout,
+            tempfile.TemporaryFile(dir=scratch) as stderr,
+        ):
+            proc = subprocess.Popen(
+                argv,
+                cwd=ROOT,
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                start_new_session=True,
+            )
+            timed_out = False
+            try:
+                proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+            finally:
+                # Includes interruption, normal exit with leftover children,
+                # and timeout. Never kill another runner or shared cache daemon.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
+            stdout.seek(0)
+            stderr.seek(0)
+            out = stdout.read().decode("utf-8", errors="replace")
+            err = stderr.read().decode("utf-8", errors="replace")
+            if timed_out:
+                raise subprocess.TimeoutExpired(argv, timeout, output=out, stderr=err)
+            return subprocess.CompletedProcess(argv, proc.returncode, out, err)
+
+
 def command_output(argv: list[str], env: dict[str, str] | None = None) -> str:
     try:
-        p = subprocess.run(
-            argv,
-            cwd=ROOT,
-            env=env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            timeout=20,
-            check=False,
-        )
+        p = run_command(argv, env, timeout=20)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return "unavailable"
-    text = p.stdout.strip()
+    text = (p.stdout + p.stderr).strip()
     return text or f"exit={p.returncode}"
 
 
@@ -215,6 +250,19 @@ def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> ParsedOutpu
     }
 
 
+def validate_dimensions(text: str, plan: BenchmarkPlan) -> None:
+    # Require an attestation from the benchmark implementation, NOT from
+    # the shell wrapper: older prebuilt executables can ignore argv entirely.
+    expected = "BENCHMARK_DIMENSIONS v1 " + " ".join(plan.dimensions())
+    actual = [
+        line for line in text.splitlines() if line.startswith("BENCHMARK_DIMENSIONS")
+    ]
+    if actual != [expected]:
+        raise ValueError(
+            f"benchmark dimensions not attested: expected {expected!r}, got {actual!r}"
+        )
+
+
 def implementation_evidence(impl: str, text: str) -> dict[str, object]:
     if impl == "rust-challenge-simd":
         match = re.findall(
@@ -309,6 +357,21 @@ def validate_challenge_sink(
             )
 
 
+def validate_benchmark_output(
+    impl: str, text: str, plan: BenchmarkPlan, expected_check: str
+) -> tuple[ParsedOutput, dict[str, object]]:
+    validate_dimensions(text, plan)
+    parsed = parse_output(text, expected_check)
+    if len(parsed["samples"]) != plan.samples:
+        raise ValueError(
+            f"sample count {len(parsed['samples'])} does not match "
+            f"requested samples={plan.samples}"
+        )
+    evidence = implementation_evidence(impl, text)
+    validate_challenge_sink(impl, parsed, plan.iterations)
+    return parsed, evidence
+
+
 def run_one(
     impl: str,
     spec: dict[str, str],
@@ -373,15 +436,7 @@ def run_one(
     timeout = plan.timeout
     started = time.perf_counter()
     try:
-        proc = subprocess.run(
-            argv,
-            cwd=ROOT,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=timeout,
-        )
+        proc = run_command(argv, env, timeout)
     except subprocess.TimeoutExpired as exc:
         elapsed = time.perf_counter() - started
         stdout = exc.stdout or ""
@@ -421,14 +476,9 @@ def run_one(
         print(f"{impl:24s} FAILED exit={proc.returncode}", file=sys.stderr)
         return result
     try:
-        parsed = parse_output(proc.stdout, expected_check)
-        if len(parsed["samples"]) != plan.samples:
-            raise ValueError(
-                f"sample count {len(parsed['samples'])} does not match "
-                f"requested samples={plan.samples}"
-            )
-        evidence = implementation_evidence(impl, proc.stdout)
-        validate_challenge_sink(impl, parsed, plan.iterations)
+        parsed, evidence = validate_benchmark_output(
+            impl, proc.stdout, plan, expected_check
+        )
     except ValueError as exc:
         result = base | {
             "status": "invalid",

@@ -27,6 +27,7 @@ def main() -> None:
     warmup = count(sys.argv[1], 0)
     iterations = count(sys.argv[2])
     samples = count(sys.argv[3])
+    print(f"BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}")
     proc = subprocess.run(
         [binary, str(warmup), str(iterations), str(samples)],
         text=True,

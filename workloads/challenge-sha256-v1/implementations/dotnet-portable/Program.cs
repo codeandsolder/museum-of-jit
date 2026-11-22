@@ -43,6 +43,7 @@ internal static class Program
             int warmup = Count(args[2], 0);
             int iterations = Count(args[3], 1);
             int samples = Count(args[4], 1);
+            Console.WriteLine($"BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}");
             Sha256Kernel.SelfTest();
             Console.WriteLine($"ENGINE dotnet MODE {mode} VECTOR_LANES {Vector<uint>.Count}");
             Console.WriteLine($"CHECK {Sha256Kernel.Check()}");

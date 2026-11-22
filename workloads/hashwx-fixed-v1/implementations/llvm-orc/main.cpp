@@ -525,6 +525,8 @@ int main(int argc, char **argv) {
     batch_cases(compiled, argv[2]);
     return EXIT_SUCCESS;
   }
+  std::cout << "BENCHMARK_DIMENSIONS v1 " << warmup << ' ' << iterations
+            << ' ' << samples << '\n';
   std::cout << "ENGINE llvm-orc VERSION " << LLVM_VERSION_STRING << '\n';
   std::cout << "MODE jit-batch\n";
   std::cout << "IR_OPT " << policy.name << '\n';

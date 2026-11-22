@@ -699,6 +699,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return batch_cases(&compiled, path);
     }
     let (warmup, iterations, samples) = dimensions.ok_or("benchmark dimensions missing")?;
+    println!("BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}");
     println!("MODE {}", if batch_mode { "jit-batch" } else { "direct" });
     println!("BUILD_US {build_us:.3} FIRST_US {first_us:.3} CHECK {check:016x}");
     if batch_mode {

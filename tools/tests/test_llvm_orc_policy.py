@@ -10,7 +10,9 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import os
+import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -81,6 +83,51 @@ class BenchmarkArgumentTests(unittest.TestCase):
             with self.assertRaises(argparse.ArgumentTypeError):
                 bench.parse_timeout(value)
 
+    def test_reject_missing_wrong_duplicate_and_unknown_dimensions(self) -> None:
+        plan = bench.BenchmarkPlan(0, 128, 2, 1.0)
+        valid = "BENCHMARK_DIMENSIONS v1 0 128 2\n"
+        bench.validate_dimensions(valid, plan)
+        for output in (
+            "",
+            valid.replace("128", "127"),
+            valid + valid,
+            valid.replace("v1", "v2"),
+        ):
+            with self.assertRaises(ValueError):
+                bench.validate_dimensions(output, plan)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX process-group ownership")
+    def test_timeout_owns_descendants_and_scratch(self) -> None:
+        # Spawn a real child which survives the shell unless the whole group
+        # is cleaned up. File-backed output must preserve the diagnostics.
+        argv = [
+            "/bin/sh",
+            "-c",
+            'mkdir "$TMPDIR/owned"; sleep 60 & printf "%s\\n%s\\n" "$!" "$TMPDIR"; wait',
+        ]
+        with self.assertRaises(subprocess.TimeoutExpired) as error:
+            bench.run_command(argv, None, 0.5)
+        child, scratch = error.exception.output.strip().splitlines()
+        self.assertFalse(Path(scratch).exists())
+        # Linux may leave a briefly unreaped zombie; it cannot execute or
+        # write anything. Check actual liveness rather than just /proc.
+        if Path("/proc").exists():
+            for _ in range(100):
+                try:
+                    stat = (
+                        Path(f"/proc/{child}/stat")
+                        .read_text(encoding="utf-8")
+                        .rsplit(")", 1)[1]
+                        .split()
+                    )
+                except FileNotFoundError:
+                    break
+                if stat[0] == "Z":
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("timed-out runner child is still executing")
+
     def test_explicit_dimensions_are_passed_and_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as path:
             root = Path(path)
@@ -88,7 +135,7 @@ class BenchmarkArgumentTests(unittest.TestCase):
             runner.write_text(
                 "#!/bin/sh\n"
                 'test "$#" = 3 && test "$1" = 0 && test "$2" = 128 && test "$3" = 2 || exit 64\n'
-                "printf 'CHECK fd5d450b767035c5\\nRATE 10.000 sink=0000000000000000\\nRATE 11.000 sink=0000000000000000\\n'\n"
+                "printf 'BENCHMARK_DIMENSIONS v1 0 128 2\\nCHECK fd5d450b767035c5\\nRATE 10.000 sink=0000000000000000\\nRATE 11.000 sink=0000000000000000\\n'\n"
             )
             runner.chmod(0o755)
             spec = {
