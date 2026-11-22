@@ -9,6 +9,9 @@ hashwx = { git = "https://github.com/codeandsolder/hashwx-rs", rev = "44d5543273
 zipp-gpu = { git = "https://github.com/f2i-com/zipp.org", rev = "9507aa98bb4dba013eaab4e684b5cbe39e5d593c" }
 zipp-vm = { git = "https://github.com/f2i-com/zipp.org", rev = "9507aa98bb4dba013eaab4e684b5cbe39e5d593c" }
 serde_json = "1.0.149"
+wgpu = { version = "30.0.2", default-features = false, features = ["std", "vulkan", "dx12", "metal", "wgsl"] }
+pollster = "1.0.3"
+bytemuck = "1.25.2"
 
 [profile.release]
 lto = "thin"

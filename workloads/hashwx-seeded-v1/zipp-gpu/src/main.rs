@@ -1,3 +1,5 @@
+mod cuda;
+mod direct;
 mod shader;
 
 use std::{error::Error, time::Instant};
@@ -200,14 +202,28 @@ fn gpu_report(
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let args: Vec<_> = std::env::args().skip(1).collect();
+    let mut args: Vec<_> = std::env::args().skip(1).collect();
+    let export = args.first().is_some_and(|arg| arg == "export");
+    let dest = if export {
+        if args.len() < 3 {
+            return Err("export requires a directory and workload arguments".into());
+        }
+        args.remove(0);
+        Some(std::path::PathBuf::from(args.remove(0)))
+    } else {
+        None
+    };
+    let direct = args.first().is_some_and(|arg| arg == "direct");
+    if direct {
+        args.remove(0);
+    }
     let (algorithm, count, samples, backend, seed) = match args.as_slice() {
         [algorithm, count, samples, backend] => (algorithm, count, samples, backend, SEED),
         [algorithm, count, samples, backend, seed] => {
             (algorithm, count, samples, backend, seed_from_hex(seed)?)
         }
         _ => return Err(
-            "usage: museum-zipp-gpu hashx|hashwx COUNT SAMPLES auto|vulkan|dx12|metal [SEED_HEX]"
+            "usage: museum-zipp-gpu [direct | export DIR] hashx|hashwx COUNT SAMPLES auto|vulkan|dx12|metal [SEED_HEX]"
                 .into(),
         ),
     };
@@ -223,6 +239,16 @@ fn run() -> Result<(), Box<dyn Error>> {
     }
     let salts = inputs(count);
     let case = prepare(algorithm, &seed, &salts, samples)?;
+    if let Some(dest) = dest {
+        cuda::export(algorithm, &seed, &salts, &case, &dest)?;
+        return Ok(());
+    }
+    if direct {
+        let mut report = direct::report(&case, &salts, algorithm, samples, backend)?;
+        report["seed"] = json!(seed);
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
     let mut host = GpuHost::open(&GpuOptions {
         backend: (backend != "auto").then(|| backend.clone()),
         ..GpuOptions::default()

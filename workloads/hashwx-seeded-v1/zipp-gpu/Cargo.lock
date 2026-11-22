@@ -434,9 +434,12 @@ dependencies = [
 name = "museum-zipp-gpu"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "hashwx",
  "naga",
+ "pollster",
  "serde_json",
+ "wgpu",
  "zipp-gpu",
  "zipp-vm",
 ]
