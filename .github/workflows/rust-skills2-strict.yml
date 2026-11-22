@@ -33,3 +33,18 @@ jobs:
       # Python is an intentional benchmark language (CPython, PyPy, RPython
       # and Wasmtime bindings). The shared Ruff and ty checks remain enabled.
       ban-python-outside-ci: false
+
+  tool-contracts:
+    name: Benchmark tool contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: latest-known
+          enable-cache: false
+      - run: shellcheck tools/build-cpython-jit.sh tools/build-rpython-jitdriver.sh
+      - run: uv run --no-project python -m unittest discover -s tools/tests -v
