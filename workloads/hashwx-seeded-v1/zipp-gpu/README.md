@@ -40,3 +40,9 @@ WGSL/pipeline compilation. The returned wall times are milliseconds. This
 pilot does not yet represent the full alternating-order multi-seed release
 gate in the parent exhibit. No production performance claim follows from
 shader generation alone.
+
+The optional fifth command-line argument is a 64-digit hexadecimal seed.
+Reports include native single-thread CPU JIT compilation and per-batch
+times on identical inputs. Every timed GPU readback is checked against
+the already independently verified warmup result outside the timed interval.
+CPU timings include output materialization but not reference comparison.

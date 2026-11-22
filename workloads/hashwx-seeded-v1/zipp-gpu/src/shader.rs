@@ -1,4 +1,7 @@
-use std::fmt::Write as _;
+use std::{
+    error::Error,
+    fmt::{self, Write as _},
+};
 
 use hashwx::{HashXInstruction, HashXProgram, Op, ProgramSet};
 
@@ -11,6 +14,10 @@ fn word(value: u64) -> String {
     )
 }
 
+fn signed_word(value: i32) -> String {
+    word(i64::from(value).cast_unsigned())
+}
+
 fn header() -> String {
     let mut out = include_str!("words.wgsl").to_owned();
     out.push_str(
@@ -20,7 +27,7 @@ fn header() -> String {
     out
 }
 
-fn entry(out: &mut String, scratch: bool) {
+fn entry(out: &mut String, scratch: bool) -> fmt::Result {
     let argument = if scratch { ", gid.x" } else { "" };
     writeln!(
         out,
@@ -28,10 +35,9 @@ fn entry(out: &mut String, scratch: bool) {
          if (gid.x >= arrayLength(&inputs)) {{ return; }}\n\
          outputs[gid.x] = hash(inputs[gid.x]{argument});\n}}"
     )
-    .unwrap();
 }
 
-pub fn hashx(program: &HashXProgram) -> String {
+pub fn hashx(program: &HashXProgram) -> Result<String, Box<dyn Error>> {
     let mut out = header();
     let keys = program.register_key().map(word);
     writeln!(
@@ -45,8 +51,7 @@ pub fn hashx(program: &HashXProgram) -> String {
          var r = array<Word, 8>(v[0],v[1],v[2],v[3],t[0],t[1],t[2],t[3]);\n\
          var allowed = true; var mulh_result = 0u;",
         keys[0], keys[1], keys[2], keys[3]
-    )
-    .unwrap();
+    )?;
     let mut target = false;
     for instruction in program.instructions() {
         use HashXInstruction as I;
@@ -83,7 +88,7 @@ pub fn hashx(program: &HashXProgram) -> String {
                 "r[{}] = add64(r[{}], {});",
                 dst.index(),
                 dst.index(),
-                word(src as i64 as u64)
+                signed_word(src)
             ),
             I::Sub { dst, src } => format!(
                 "r[{}] = sub64(r[{}], r[{}]);",
@@ -93,7 +98,7 @@ pub fn hashx(program: &HashXProgram) -> String {
             ),
             I::Xor { dst, src } => format!("r[{}] ^= r[{}];", dst.index(), src.index()),
             I::XorConst { dst, src } => {
-                format!("r[{}] ^= {};", dst.index(), word(src as i64 as u64))
+                format!("r[{}] ^= {};", dst.index(), signed_word(src))
             }
             I::Rotate { dst, right_rotate } => format!(
                 "r[{}] = ror64(r[{}], {right_rotate}u);",
@@ -101,31 +106,37 @@ pub fn hashx(program: &HashXProgram) -> String {
                 dst.index()
             ),
             I::Target => {
-                assert!(!target);
+                if target {
+                    return Err("unexpected HashX target nesting".into());
+                }
                 target = true;
                 "loop {".to_owned()
             }
             I::Branch { mask } => {
-                assert!(target);
+                if !target {
+                    return Err("HashX branch without target".into());
+                }
                 target = false;
                 format!(
                     "if (!allowed || (mulh_result & {mask}u) != 0u) {{ break; }} allowed = false; }}"
                 )
             }
         };
-        writeln!(out, "{line}").unwrap();
+        writeln!(out, "{line}")?;
     }
-    assert!(!target);
+    if target {
+        return Err("unexpected HashX target nesting".into());
+    }
     out.push_str(
         "let x = sip(State(add64(r[0],key[0]),add64(r[1],key[1]),r[2],r[3]));\n\
          let y = sip(State(r[4],r[5],add64(r[6],key[2]),add64(r[7],key[3])));\n\
          return x[0] ^ y[0];\n}\n",
     );
-    entry(&mut out, false);
-    out
+    entry(&mut out, false)?;
+    Ok(out)
 }
 
-pub fn hashwx(program: &ProgramSet) -> String {
+pub fn hashwx(program: &ProgramSet) -> Result<String, Box<dyn Error>> {
     let mut out = header();
     out.push_str(
         "@group(0) @binding(2) var<storage, read_write> scratch: array<u32>;\n\
@@ -159,8 +170,7 @@ pub fn hashwx(program: &ProgramSet) -> String {
         word(0x646f_7261_6e64_6f6d ^ k1),
         word(0x6c79_6765_6e65_7261 ^ k0),
         word(0x7465_6462_7974_6573 ^ k1)
-    )
-    .unwrap();
+    )?;
     for memory in [false, true] {
         out.push_str("for (var rep=0u; rep<4u; rep++) { var budget=32u;\n");
         for p in program.programs() {
@@ -168,7 +178,7 @@ pub fn hashwx(program: &ProgramSet) -> String {
             if !memory {
                 out.push_str("cursor -= 64u;\n");
                 for reg in 0..8 {
-                    writeln!(out, "store_word(base,cursor+{}u,r[{reg}]);", 56 - reg * 8).unwrap();
+                    writeln!(out, "store_word(base,cursor+{}u,r[{reg}]);", 56 - reg * 8)?;
                 }
             }
             for ins in p.body() {
@@ -185,31 +195,32 @@ pub fn hashwx(program: &ProgramSet) -> String {
                     Op::MulAdd => format!("mul64(add64({d},Word({imm}u,0u)), {s})"),
                     Op::Rmcg => format!("ror64(mul64({d},r[8]),{imm}u)"),
                     op => {
-                        use Op::*;
+                        use Op::{
+                            AddAsr, AddLsr, AddRor, SubAsr, SubLsr, SubRor, XorAsr, XorLsr, XorRor,
+                        };
                         let shift = match op {
                             XorRor | AddRor | SubRor => "ror64",
                             XorAsr | AddAsr | SubAsr => "asr64",
                             XorLsr | AddLsr | SubLsr => "shr64",
-                            _ => unreachable!(),
+                            _ => return Err("invalid HashWX shift opcode".into()),
                         };
                         let left = format!("{shift}({d},{imm}u)");
                         match op {
                             XorRor | XorAsr | XorLsr => format!("{left} ^ {s}"),
                             AddRor | AddAsr | AddLsr => format!("add64({left},{s})"),
                             SubRor | SubAsr | SubLsr => format!("sub64({left},{s})"),
-                            _ => unreachable!(),
+                            _ => return Err("invalid HashWX shift opcode".into()),
                         }
                     }
                 };
-                writeln!(out, "{d} = {expr};").unwrap();
+                writeln!(out, "{d} = {expr};")?;
             }
             if !p.unconditional() {
                 writeln!(
                     out,
                     "if ((r[{}].x & 32u) != 0u) {{ break; }}",
                     p.body()[0].dst()
-                )
-                .unwrap();
+                )?;
             }
             out.push_str("if (budget == 0u) { break; } budget--; }\n");
         }
@@ -220,8 +231,8 @@ pub fn hashwx(program: &ProgramSet) -> String {
          let hi = sip(State(r[4],r[5],r[6],r[7]));\n\
          return lo[3] ^ hi[3] ^ r[8];\n}\n",
     );
-    entry(&mut out, true);
-    out
+    entry(&mut out, true)?;
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -230,22 +241,23 @@ mod tests {
     use hashwx::{HashXProgram, generate};
 
     #[test]
-    fn generated_shaders_parse_and_validate() {
+    fn generated_shaders_parse_and_validate() -> Result<(), Box<dyn std::error::Error>> {
         for seed in [[0; 32], [1; 32], [255; 32], super::super::SEED] {
-            let mut shaders = vec![hashwx(&generate(&seed))];
+            let mut shaders = vec![hashwx(&generate(&seed))?];
             if let Ok(program) = HashXProgram::generate(&seed) {
-                shaders.push(hashx(&program));
+                shaders.push(hashx(&program)?);
             }
             for source in shaders {
                 let module = naga::front::wgsl::parse_str(&source)
-                    .unwrap_or_else(|error| panic!("{}", error.emit_to_string(&source)));
+                    .map_err(|error| error.emit_to_string(&source))?;
                 naga::valid::Validator::new(
                     naga::valid::ValidationFlags::all(),
                     naga::valid::Capabilities::empty(),
                 )
                 .validate(&module)
-                .unwrap_or_else(|error| panic!("{}", error.emit_to_string(&source)));
+                .map_err(|error| error.emit_to_string(&source))?;
             }
         }
+        Ok(())
     }
 }

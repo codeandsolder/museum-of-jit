@@ -46,7 +46,7 @@ fn milliseconds(start: Instant) -> f64 {
 }
 
 fn inputs(count: usize) -> Vec<u64> {
-    let mut values = vec![0, 1, u64::MAX, 1 << 32, (1 << 63) - 1, 1 << 63, 123456];
+    let mut values = vec![0, 1, u64::MAX, 1 << 32, (1 << 63) - 1, 1 << 63, 123_456];
     let mut state = 0x9124_afe1_2473_dcb3_u64;
     while values.len() < count {
         state ^= state << 13;
@@ -108,7 +108,7 @@ fn prepare(
             let jit = HashWx::compile_program(&program)?;
             let build = milliseconds(start);
             let times = cpu_samples(salts, &expected, samples, |salt| jit.hash(salt))?;
-            (shader::hashwx(&program), expected, build, times)
+            (shader::hashwx(&program)?, expected, build, times)
         }
         Algorithm::HashX => {
             let program = HashXProgram::generate(seed)?;
@@ -118,7 +118,7 @@ fn prepare(
             let jit = HashX::compile_program(&program)?;
             let build = milliseconds(start);
             let times = cpu_samples(salts, &expected, samples, |salt| jit.hash(salt))?;
-            (shader::hashx(&program), expected, build, times)
+            (shader::hashx(&program)?, expected, build, times)
         }
     };
     Ok(Case {
@@ -139,10 +139,10 @@ fn gpu_report(
     let words: Vec<u32> = salts
         .iter()
         .flat_map(|salt| {
-            let [a, b, c, d, e, f, g, h] = salt.to_le_bytes();
+            let [lo0, lo1, lo2, lo3, hi0, hi1, hi2, hi3] = salt.to_le_bytes();
             [
-                u32::from_le_bytes([a, b, c, d]),
-                u32::from_le_bytes([e, f, g, h]),
+                u32::from_le_bytes([lo0, lo1, lo2, lo3]),
+                u32::from_le_bytes([hi0, hi1, hi2, hi3]),
             ]
         })
         .collect();
@@ -166,7 +166,13 @@ fn gpu_report(
     if values.len() != salts.len() * 2 {
         return Err("wrong GPU output length".into());
     }
-    for ((pair, &reference), &salt) in values.chunks_exact(2).zip(&case.expected).zip(salts) {
+    for ((pair, &reference), &salt) in values
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .zip(&case.expected)
+        .zip(salts)
+    {
         let lo = pair[0]
             .as_u64()
             .and_then(|n| u32::try_from(n).ok())
@@ -239,7 +245,7 @@ fn main() -> std::process::ExitCode {
                 .join()
                 .map_err(|_| "benchmark thread panicked".to_owned())
         })
-        .and_then(core::convert::identity);
+        .flatten();
     if let Err(error) = outcome {
         eprintln!("{error}");
         return std::process::ExitCode::FAILURE;
