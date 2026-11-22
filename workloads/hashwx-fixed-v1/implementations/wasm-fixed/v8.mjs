@@ -3,12 +3,10 @@ import fs from "node:fs";
 const EXPECTED = 0xfd5d450b767035c5n;
 const MASK = (1n << 64n) - 1n;
 
-function count(name, fallback, allowZero = false) {
-  const raw = process.env[name];
-  if (raw === undefined) return fallback;
+function count(raw, minimum = 1) {
   const value = Number(raw);
-  if (!Number.isSafeInteger(value) || (allowZero ? value < 0 : value <= 0)) {
-    throw new Error(`${name} has invalid count: ${raw}`);
+  if (!/^[0-9]+$/.test(raw) || !Number.isSafeInteger(value) || value < minimum || value > 2147483647) {
+    throw new Error(`invalid count: ${raw}`);
   }
   return value;
 }
@@ -22,11 +20,12 @@ function hex64(value) {
 }
 
 const path = process.argv[2];
-if (!path) throw new Error("usage: node v8.mjs module.wasm");
+if (process.argv.length !== 6) throw new Error("usage: node v8.mjs module.wasm WARMUP ITERATIONS SAMPLES");
+const warmup = count(process.argv[3], 0);
+const iterations = count(process.argv[4]);
+const samples = count(process.argv[5]);
+console.log(`BENCHMARK_DIMENSIONS v1 ${warmup} ${iterations} ${samples}`);
 const bytes = fs.readFileSync(path);
-const warmup = count("MUSEUM_WARMUP", 30000, true);
-const iterations = count("MUSEUM_ITERATIONS", 300000);
-const samples = count("MUSEUM_SAMPLES", 7);
 
 let t0 = process.hrtime.bigint();
 const module = new WebAssembly.Module(bytes);

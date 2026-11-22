@@ -4,7 +4,7 @@ use challenge_solvers::solver::{SOLVE_TYPE_MASK, Solver};
 use sha2::{Digest as _, Sha256};
 use std::sync::{Arc, Barrier};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const TARGET: u64 = 0xbadd_cafe_1234_5678;
 const SHA256_FIRST: &str = "b4b920f70c0de8df";
@@ -23,15 +23,17 @@ impl Mode {
     }
 }
 
-fn prefix(worker: usize) -> [u8; 42] {
+fn prefix(worker: usize) -> Result<[u8; 42], String> {
     let mut result = [b'x'; 42];
     result[.."challenge-disasterer|sha256|".len()].copy_from_slice(b"challenge-disasterer|sha256|");
     // Worker zero retains the museum fixture. Others hash distinct messages
     // of exactly the same layout and length, identically for both backends.
     if worker != 0 {
-        result[40] = b'0' + u8::try_from(worker).expect("worker ID fits");
+        result[40] = *b"01234567"
+            .get(worker)
+            .ok_or("worker ID exceeds the eight-slot fixture")?;
     }
-    result
+    Ok(result)
 }
 
 fn run_solver<S>(
@@ -80,7 +82,7 @@ fn execute(
 }
 
 fn check_oracle(worker: usize) -> Result<(), String> {
-    let p = prefix(worker);
+    let p = prefix(worker)?;
     let message = SingleBlockMessage::new(&p, 0).ok_or("invalid message")?;
     if message.digit_index != 42 || message.no_trailing_zeros || message.nonce_addend != 0 {
         return Err("fixture layout changed".into());
@@ -89,9 +91,8 @@ fn check_oracle(worker: usize) -> Result<(), String> {
     text[..42].copy_from_slice(&p);
     text[42..].copy_from_slice(b"100000000");
     let digest = Sha256::digest(text);
-    let expected: [u32; 8] = core::array::from_fn(|i| {
-        u32::from_be_bytes(digest[4 * i..4 * i + 4].try_into().expect("4 bytes"))
-    });
+    let (words, _) = digest.as_chunks::<4>();
+    let expected: [u32; 8] = core::array::from_fn(|i| u32::from_be_bytes(words[i]));
     if worker == 0 && format!("{:08x}{:08x}", expected[0], expected[1]) != SHA256_FIRST {
         return Err("known SHA-256 fixture changed".into());
     }
@@ -118,7 +119,7 @@ fn pin(cpu: usize) -> Result<(), String> {
         }
         libc::CPU_ZERO(&mut set);
         libc::CPU_SET(cpu, &mut set);
-        if libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &set) != 0 {
+        if libc::sched_setaffinity(0, std::mem::size_of::<libc::cpu_set_t>(), &raw const set) != 0 {
             return Err(format!(
                 "affinity CPU {cpu}: {}",
                 std::io::Error::last_os_error()
@@ -128,16 +129,21 @@ fn pin(cpu: usize) -> Result<(), String> {
     Ok(())
 }
 
-fn trial(mode: Mode, cpus: &[usize], per_worker: u64, warmup: u64) -> Result<(u64, u128), String> {
+fn trial(
+    mode: Mode,
+    cpus: &[usize],
+    per_worker: u64,
+    warmup: u64,
+) -> Result<(u64, Duration), String> {
     let barrier = Arc::new(Barrier::new(cpus.len() + 1));
-    let (duration, attempts) = thread::scope(|scope| -> Result<(u128, u64), String> {
+    let (duration, attempts) = thread::scope(|scope| -> Result<(Duration, u64), String> {
         let mut workers = Vec::with_capacity(cpus.len());
         for (worker_id, &cpu) in cpus.iter().enumerate() {
             let barrier = Arc::clone(&barrier);
             workers.push(scope.spawn(move || {
                 let ready = (|| -> Result<SingleBlockMessage, String> {
                     pin(cpu)?;
-                    let message = SingleBlockMessage::new(&prefix(worker_id), 0)
+                    let message = SingleBlockMessage::new(&prefix(worker_id)?, 0)
                         .ok_or("message setup failed")?;
                     if execute(mode, &message, warmup, TARGET, u64::MAX)?.is_some() {
                         return Err("unexpected SHA-256 warmup target hit".into());
@@ -164,17 +170,18 @@ fn trial(mode: Mode, cpus: &[usize], per_worker: u64, warmup: u64) -> Result<(u6
                     first_error.get_or_insert(err);
                 }
                 Err(_) => {
-                    first_error.get_or_insert("worker panic".into());
+                    first_error.get_or_insert_with(|| "worker panic".into());
                 }
             }
         }
-        let elapsed = start.elapsed().as_nanos();
+        let elapsed = start.elapsed();
         if let Some(err) = first_error {
             return Err(err);
         }
         Ok((elapsed, total))
     })?;
-    let expected = per_worker * u64::try_from(cpus.len()).expect("threads fits");
+    let expected =
+        per_worker * u64::try_from(cpus.len()).map_err(|_| "thread count cannot fit in u64")?;
     if attempts != expected {
         return Err(format!(
             "aggregate attempted count mismatch: {attempts} vs {expected}"
@@ -183,13 +190,14 @@ fn trial(mode: Mode, cpus: &[usize], per_worker: u64, warmup: u64) -> Result<(u6
     Ok((attempts, duration))
 }
 
-fn arg(name: &str, default: u64) -> Result<u64, String> {
+fn arg(items: &[String], name: &str, default: u64) -> Result<u64, String> {
     let key = format!("--{name}");
-    let items: Vec<String> = std::env::args().collect();
-    match items.windows(2).find(|x| x[0] == key) {
-        Some(args) => args[1].parse().map_err(|e| format!("{name}: {e}")),
-        None => Ok(default),
-    }
+    items
+        .windows(2)
+        .find(|x| x[0] == key)
+        .map_or(Ok(default), |args| {
+            args[1].parse().map_err(|e| format!("{name}: {e}"))
+        })
 }
 
 fn main() -> Result<(), String> {
@@ -211,9 +219,9 @@ fn main() -> Result<(), String> {
     {
         return Err("the requested SHA-NI/portable-SIMD backends are unavailable".into());
     }
-    let per_worker = arg("iterations", 80_000_000)?;
-    let warmup = arg("warmup", 1_000_000)?;
-    let samples = arg("samples", 5)?;
+    let per_worker = arg(&args, "iterations", 80_000_000)?;
+    let warmup = arg(&args, "warmup", 1_000_000)?;
+    let samples = arg(&args, "samples", 5)?;
     if per_worker == 0
         || per_worker > 160_000_000
         || warmup > 160_000_000
@@ -244,7 +252,10 @@ fn main() -> Result<(), String> {
             };
             for mode in order {
                 let (attempts, elapsed) = trial(mode, &cpus[..n], per_worker, warmup)?;
-                let rate = (attempts as f64) * 1e9 / elapsed as f64;
+                let work = u32::try_from(attempts)
+                    .map_err(|_| "attempt count exceeds the eight-worker limit")?;
+                let rate = f64::from(work) / elapsed.as_secs_f64();
+                let elapsed = elapsed.as_nanos();
                 println!(
                     "SAMPLE backend={} threads={n} rep={sample} attempts={attempts} elapsed_ns={elapsed} hps={rate:.3}",
                     mode.label()

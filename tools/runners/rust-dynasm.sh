@@ -17,4 +17,4 @@ else
 fi
 cargo +1.99.0 run --locked --release --quiet \
   --manifest-path "$ROOT/workloads/hashwx-fixed-v1/implementations/rust-dynasm/Cargo.toml" \
-  --target-dir "$tmp/target"
+  --target-dir "$tmp/target" -- "$@"

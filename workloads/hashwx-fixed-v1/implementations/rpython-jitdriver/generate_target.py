@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import TypedDict
 
 ROOT = Path(__file__).resolve().parents[2]
 PROGRAM = ROOT / "program.json"
@@ -289,7 +290,16 @@ if __name__ == "__main__":
 """
 
 
-def image_literals(document: dict) -> dict[str, str]:
+class Program(TypedDict):
+    instructions: list[dict[str, int]]
+    unconditional: bool
+
+
+class ProgramDocument(TypedDict):
+    programs: list[Program]
+
+
+def image_literals(document: ProgramDocument) -> dict[str, str]:
     ops: list[int] = []
     srcs: list[int] = []
     dsts: list[int] = []
@@ -323,7 +333,7 @@ def main() -> None:
     rendered = TARGET_TEMPLATE
     for marker, literal in image_literals(document).items():
         rendered = rendered.replace(marker, literal)
-    Path(args.output).write_text(rendered)
+    Path(args.output).write_text(rendered, encoding="utf-8")
 
 
 if __name__ == "__main__":

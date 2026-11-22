@@ -6,8 +6,7 @@ use std::time::Instant;
 
 fn prefix() -> [u8; 42] {
     let mut buf = [b'x'; 42];
-    buf[.."challenge-disasterer|sha256|".len()]
-        .copy_from_slice(b"challenge-disasterer|sha256|");
+    buf[.."challenge-disasterer|sha256|".len()].copy_from_slice(b"challenge-disasterer|sha256|");
     buf
 }
 
@@ -19,16 +18,15 @@ where
     solver.set_limit(limit);
     // Full 64-bit equality test. A hit is exceedingly unlikely; fail rather than
     // silently misreport attempted work if one occurs.
-    let solution = solver.solve_nonce_only::<SOLVE_TYPE_MASK>(
-        0xbadd_cafe_1234_5678,
-        u64::MAX,
-    );
+    let solution = solver.solve_nonce_only::<SOLVE_TYPE_MASK>(0xbadd_cafe_1234_5678, u64::MAX);
     if solution.is_some() {
         return Err("unexpected target collision during benchmark".into());
     }
     let attempts = solver.attempted_nonces();
     if attempts != limit {
-        return Err(format!("attempt accounting mismatch: {attempts} != {limit}"));
+        return Err(format!(
+            "attempt accounting mismatch: {attempts} != {limit}"
+        ));
     }
     Ok(attempts)
 }
@@ -62,16 +60,23 @@ fn check(message: &SingleBlockMessage) -> Result<String, String> {
     Ok(format!("{:08x}{:08x}", digest[0], digest[1]))
 }
 
-fn parse_env(name: &str, default: u64, minimum: u64) -> Result<u64, String> {
-    let raw = std::env::var(name).unwrap_or_else(|_| default.to_string());
-    let value: u64 = raw.parse().map_err(|_| format!("invalid {name}: {raw}"))?;
-    if value < minimum || value > 160_000_000 {
-        return Err(format!("{name} out of range: {value}"));
+fn parse_count(raw: &str, minimum: u64) -> Result<u64, String> {
+    let value: u64 = raw.parse().map_err(|_| format!("invalid count: {raw}"))?;
+    if !raw.bytes().all(|b| b.is_ascii_digit()) || value < minimum || value > 160_000_000 {
+        return Err(format!("count out of range: {value}"));
     }
     Ok(value)
 }
 
 fn main() -> Result<(), String> {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    let [warmup, iterations, samples] = args.as_slice() else {
+        return Err("usage: museum-challenge-sha256-reference WARMUP ITERATIONS SAMPLES".into());
+    };
+    let warmup = parse_count(warmup, 0)?;
+    let iterations = parse_count(iterations, 1)?;
+    let samples = parse_count(samples, 1)?;
+    println!("BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}");
     let prefix = prefix();
     let message = SingleBlockMessage::new(&prefix, 0)
         .ok_or("challenge-solvers rejected 42-byte fixed prefix")?;
@@ -81,16 +86,19 @@ fn main() -> Result<(), String> {
     let expected = "b4b920f70c0de8df";
     let oracle = check(&message)?;
     if oracle != expected {
-        return Err(format!("reference changed: expected {expected}, got {oracle}"));
+        return Err(format!(
+            "reference changed: expected {expected}, got {oracle}"
+        ));
     }
 
-    let warmup = parse_env("MUSEUM_WARMUP", 30_000, 0)?;
-    let iterations = parse_env("MUSEUM_ITERATIONS", 300_000, 1)?;
-    let samples = parse_env("MUSEUM_SAMPLES", 7, 1)?;
     #[cfg(target_arch = "x86_64")]
-    let lane_count = if std::arch::is_x86_feature_detected!("avx512f") { 16 }
-        else if std::arch::is_x86_feature_detected!("avx2") { 8 }
-        else { 1 };
+    let lane_count = if std::arch::is_x86_feature_detected!("avx512f") {
+        16
+    } else if std::arch::is_x86_feature_detected!("avx2") {
+        8
+    } else {
+        1
+    };
     #[cfg(not(target_arch = "x86_64"))]
     let lane_count = 1;
     println!("ENGINE rust-challenge MODE simd VECTOR_LANES {lane_count}");
@@ -100,7 +108,9 @@ fn main() -> Result<(), String> {
         let start = Instant::now();
         let work = run(&message, iterations)?;
         let seconds = start.elapsed().as_secs_f64();
-        let rate = (work as f64) / seconds;
+        let work_for_rate =
+            u32::try_from(work).map_err(|_| "work exceeds the nonce fixture limit")?;
+        let rate = f64::from(work_for_rate) / seconds;
         // Provenance sink is exact attempted count, not digest XOR; the optimized
         // production solver only materializes matching digests.
         println!("RATE {rate:.6} sink={work:016x}");

@@ -467,11 +467,8 @@ void batch_cases(const Compiled &c, const std::string &path) {
   }
   require(in.eof(), "batch cases file read failure");
 }
-std::uint64_t count_from_env(const char *name, std::uint64_t otherwise,
-                             bool zero_ok) {
-  const char *text = std::getenv(name);
-  if (!text)
-    return otherwise;
+std::uint64_t count_arg(const char *text, const char *name,
+                        bool zero_ok) {
   std::string_view digits(text);
   require(!digits.empty(), std::string("empty ") + name);
   std::uint64_t value = 0;
@@ -482,7 +479,8 @@ std::uint64_t count_from_env(const char *name, std::uint64_t otherwise,
             std::string("overflow in ") + name);
     value = value * 10 + digit;
   }
-  require(zero_ok || value > 0, std::string(name) + " must be positive");
+  require((zero_ok || value > 0) && value <= 2147483647,
+          std::string(name) + " out of range");
   return value;
 }
 double micros(Clock::time_point t0) {
@@ -501,15 +499,16 @@ int main(int argc, char **argv) {
       (argc == 3 && std::string_view(argv[1]) == "--hash-salts");
   const bool batch_file =
       (argc == 3 && std::string_view(argv[1]) == "--batch-cases");
-  require(argc == 1 || hash_file || batch_file,
-          "usage: llvm-orc-hashwx [--version | --hash-salts SALTS.hex | "
+  const bool benchmark = argc == 4;
+  require(benchmark || hash_file || batch_file,
+          "usage: llvm-orc-hashwx [WARMUP ITERATIONS SAMPLES | --version | --hash-salts SALTS.hex | "
           "--batch-cases CASES.hex]");
   const char *path = std::getenv("MUSEUM_PROGRAM_JSON");
   require(path && *path,
           "MUSEUM_PROGRAM_JSON must point to canonical program.json");
-  const auto warmup = count_from_env("MUSEUM_WARMUP", 30000, true);
-  const auto iterations = count_from_env("MUSEUM_ITERATIONS", 300000, false);
-  const auto samples = count_from_env("MUSEUM_SAMPLES", 7, false);
+  const auto warmup = benchmark ? count_arg(argv[1], "warmup", true) : 0;
+  const auto iterations = benchmark ? count_arg(argv[2], "iterations", false) : 0;
+  const auto samples = benchmark ? count_arg(argv[3], "samples", false) : 0;
   const auto start = Clock::now();
   const auto corpus = parse_corpus(read_text(path));
   auto compiled = compile(corpus, policy);
@@ -526,6 +525,8 @@ int main(int argc, char **argv) {
     batch_cases(compiled, argv[2]);
     return EXIT_SUCCESS;
   }
+  std::cout << "BENCHMARK_DIMENSIONS v1 " << warmup << ' ' << iterations
+            << ' ' << samples << '\n';
   std::cout << "ENGINE llvm-orc VERSION " << LLVM_VERSION_STRING << '\n';
   std::cout << "MODE jit-batch\n";
   std::cout << "IR_OPT " << policy.name << '\n';

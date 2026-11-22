@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib.metadata
-import os
 import sys
 import time
 from pathlib import Path
@@ -13,26 +12,25 @@ EXPECTED = 0xFD5D450B767035C5
 MASK = (1 << 64) - 1
 
 
-def count(name: str, fallback: int, allow_zero: bool = False) -> int:
-    raw = os.environ.get(name)
-    if raw is None:
-        return fallback
-    try:
-        value = int(raw)
-    except ValueError as exc:
-        raise SystemExit(f"{name} has invalid count: {raw}") from exc
-    if value < 0 if allow_zero else value <= 0:
-        raise SystemExit(f"{name} has invalid count: {raw}")
+def count(raw: str, minimum: int = 1) -> int:
+    if not raw or not raw.isascii() or not raw.isdecimal():
+        raise SystemExit(f"invalid decimal count: {raw!r}")
+    value = int(raw)
+    if not minimum <= value <= 2**31 - 1:
+        raise SystemExit(f"count out of range: {value}")
     return value
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: wasmtime_host.py module.wasm")
+    if len(sys.argv) != 5:
+        raise SystemExit(
+            "usage: wasmtime_host.py module.wasm WARMUP ITERATIONS SAMPLES"
+        )
+    warmup = count(sys.argv[2], 0)
+    iterations = count(sys.argv[3])
+    samples = count(sys.argv[4])
+    print(f"BENCHMARK_DIMENSIONS v1 {warmup} {iterations} {samples}")
     module_bytes = Path(sys.argv[1]).read_bytes()
-    warmup = count("MUSEUM_WARMUP", 30000, True)
-    iterations = count("MUSEUM_ITERATIONS", 300000)
-    samples = count("MUSEUM_SAMPLES", 7)
 
     t0 = time.perf_counter_ns()
     config = wasmtime.Config()
@@ -45,6 +43,8 @@ def main() -> None:
     exports = instance.exports(store)
     hash_one = exports["hash"]
     bench = exports["bench"]
+    if not isinstance(hash_one, wasmtime.Func) or not isinstance(bench, wasmtime.Func):
+        raise TypeError("hash and bench exports must be Wasm functions")
 
     t0 = time.perf_counter_ns()
     check = int(hash_one(store, 123456)) & MASK

@@ -1,49 +1,108 @@
 #!/usr/bin/env python3
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
+import math
 import os
 import platform
 import re
+import signal
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 import tomllib
 import uuid
 from pathlib import Path
+from typing import NamedTuple, TypedDict
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORKLOAD = "hashwx-fixed-v1"
 EXPECTED_CHECK = "fd5d450b767035c5"
 
-BENCH_DEFAULTS = {
-    "MUSEUM_WARMUP": (30000, 0),
-    "MUSEUM_ITERATIONS": (300000, 1),
-    "MUSEUM_SAMPLES": (7, 1),
-}
+# The wire protocol is three decimal integers in positional order. Limit
+# them to the common signed 32-bit range of all benchmark runtimes.
+MAX_COUNT = (1 << 31) - 1
+CHALLENGE_MAX_COUNT = 160_000_000
 
 
-def normalize_benchmark_env(env: dict[str, str]) -> None:
-    for name, (default, minimum) in BENCH_DEFAULTS.items():
-        raw = env.get(name, str(default))
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
-        if value < minimum:
-            raise SystemExit(f"{name} must be >= {minimum}, got {value}")
-        env[name] = str(value)
+class BenchmarkPlan(NamedTuple):
+    warmup: int
+    iterations: int
+    samples: int
+    timeout: float
+
+    def dimensions(self) -> list[str]:
+        return [str(self.warmup), str(self.iterations), str(self.samples)]
 
 
-def command_output(argv: list[str], env=None) -> str:
+def parse_count(raw: str, minimum: int = 1) -> int:
+    if not re.fullmatch(r"[0-9]+", raw):
+        raise argparse.ArgumentTypeError("expected a decimal integer")
+    value = int(raw)
+    if not minimum <= value <= MAX_COUNT:
+        raise argparse.ArgumentTypeError(f"expected {minimum}..{MAX_COUNT}")
+    return value
+
+
+def parse_timeout(raw: str) -> float:
+    value = float(raw)
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError("timeout must be finite and positive")
+    return value
+
+
+def run_command(
+    argv: list[str], env: dict[str, str] | None, timeout: float
+) -> subprocess.CompletedProcess[str]:
+    # The launcher owns the entire process group and scratch tree, not just
+    # the shell. File-backed output avoids hanging on inherited pipe FDs.
+    # All current runners target POSIX hosts and honor the standard TMPDIR.
+    with tempfile.TemporaryDirectory(prefix="museum-run-") as scratch:
+        child_env = dict(os.environ if env is None else env, TMPDIR=scratch)
+        with (
+            tempfile.TemporaryFile(dir=scratch) as stdout,
+            tempfile.TemporaryFile(dir=scratch) as stderr,
+        ):
+            proc = subprocess.Popen(
+                argv,
+                cwd=ROOT,
+                env=child_env,
+                stdin=subprocess.DEVNULL,
+                stdout=stdout,
+                stderr=stderr,
+                start_new_session=True,
+            )
+            timed_out = False
+            try:
+                proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+            finally:
+                # Includes interruption, normal exit with leftover children,
+                # and timeout. Never kill another runner or shared cache daemon.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
+            stdout.seek(0)
+            stderr.seek(0)
+            out = stdout.read().decode("utf-8", errors="replace")
+            err = stderr.read().decode("utf-8", errors="replace")
+            if timed_out:
+                raise subprocess.TimeoutExpired(argv, timeout, output=out, stderr=err)
+            return subprocess.CompletedProcess(argv, proc.returncode, out, err)
+
+
+def command_output(argv: list[str], env: dict[str, str] | None = None) -> str:
     try:
-        p = subprocess.run(argv, cwd=ROOT, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20, check=False)
+        p = run_command(argv, env, timeout=20)
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return "unavailable"
-    text = p.stdout.strip()
-    return text if text else f"exit={p.returncode}"
+    text = (p.stdout + p.stderr).strip()
+    return text or f"exit={p.returncode}"
 
 
 def runtime_version(impl: str, env: dict[str, str]) -> str:
@@ -51,7 +110,9 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         return command_output(["rustc", "+1.99.0", "--version"], env)
     if impl == "rust-challenge-simd":
         if env.get("MUSEUM_CHALLENGE_RUST_BIN"):
-            return env.get("MUSEUM_CHALLENGE_RUSTC_VERSION", "rustc nightly-2026-11-03 (prebuilt)")
+            return env.get(
+                "MUSEUM_CHALLENGE_RUSTC_VERSION", "rustc nightly-2026-11-03 (prebuilt)"
+            )
         return command_output(["rustc", "+nightly-2026-11-03", "--version"], env)
     if impl.startswith("dotnet-"):
         return command_output([env.get("MUSEUM_DOTNET", "dotnet"), "--version"], env)
@@ -61,26 +122,40 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
         binary = env.get("MUSEUM_LLVM_ORC_BIN")
         policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
         run_env = dict(env, MUSEUM_LLVM_IR_OPT=policy)
-        return command_output([binary, "--version"], run_env) if binary else f"LLVM ORC 21.1.8 / {policy} IR (build in runner)"
+        return (
+            command_output([binary, "--version"], run_env)
+            if binary
+            else f"LLVM ORC 21.1.8 / {policy} IR (build in runner)"
+        )
     if impl in ("cranelift-direct", "cranelift-batch"):
         binary = env.get("MUSEUM_CRANELIFT_BIN")
-        return command_output([binary, "--version"], env) if binary else "Cranelift 0.137.1 (build in runner)"
+        return (
+            command_output([binary, "--version"], env)
+            if binary
+            else "Cranelift 0.137.1 (build in runner)"
+        )
     if impl == "cpython-jit":
         return command_output([env.get("MUSEUM_CPYTHON", "python3"), "--version"], env)
     if impl == "pypy-intop":
         return command_output([env.get("MUSEUM_PYPY", "pypy3"), "--version"], env)
     if impl == "v8-wasm":
-        return command_output([
-            env.get("MUSEUM_NODE", "node"),
-            "-p",
-            "process.version + ' / V8 ' + process.versions.v8",
-        ], env)
+        return command_output(
+            [
+                env.get("MUSEUM_NODE", "node"),
+                "-p",
+                "process.version + ' / V8 ' + process.versions.v8",
+            ],
+            env,
+        )
     if impl == "wasmtime-wasm":
-        return command_output([
-            env.get("MUSEUM_WASMTIME_PY", "python3"),
-            "-c",
-            "import importlib.metadata; print('wasmtime ' + importlib.metadata.version('wasmtime'))",
-        ], env)
+        return command_output(
+            [
+                env.get("MUSEUM_WASMTIME_PY", "python3"),
+                "-c",
+                "import importlib.metadata; print('wasmtime ' + importlib.metadata.version('wasmtime'))",
+            ],
+            env,
+        )
     if impl == "rpython-jitdriver":
         binary = env.get("MUSEUM_RPYTHON_HASHWX")
         if not binary:
@@ -89,12 +164,15 @@ def runtime_version(impl: str, env: dict[str, str]) -> str:
     return "unknown"
 
 
-def host_info() -> dict:
+def host_info() -> dict[str, object]:
     cpu_model = "unknown"
     family = model_id = None
     flags: list[str] = []
     try:
-        text = Path("/proc/cpuinfo").read_text()
+        text = Path("/proc/cpuinfo").read_text(encoding="utf-8")
+    except OSError:
+        pass
+    else:
         block = text.split("\n\n", 1)[0]
         fields = {}
         for line in block.splitlines():
@@ -105,8 +183,6 @@ def host_info() -> dict:
         family = fields.get("cpu family")
         model_id = fields.get("model")
         flags = fields.get("flags", "").split()
-    except OSError:
-        pass
     try:
         osr = platform.freedesktop_os_release()
         os_name = osr.get("PRETTY_NAME") or osr.get("NAME") or platform.system()
@@ -129,21 +205,42 @@ def host_info() -> dict:
     }
 
 
-def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
+class Sample(TypedDict):
+    hashes_per_second: float
+    sink: str
+
+
+class ParsedOutput(TypedDict):
+    check: str
+    build_us: float | None
+    first_call_us: float | None
+    code_bytes: int | None
+    samples: list[Sample]
+
+
+def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> ParsedOutput:
     checks = re.findall(r"\bCHECK\s+([0-9a-fA-F]{16})\b", text)
-    rates = [(float(rate), sink.lower()) for rate, sink in re.findall(r"\bRATE\s+([0-9]+(?:\.[0-9]+)?)\s+sink=([0-9a-fA-F]{16})", text)]
+    rates = [
+        (float(rate), sink.lower())
+        for rate, sink in re.findall(
+            r"\bRATE\s+([0-9]+(?:\.[0-9]+)?)\s+sink=([0-9a-fA-F]{16})", text
+        )
+    ]
     if not checks:
         raise ValueError("benchmark produced no CHECK line")
     if checks[-1].lower() != expected_check:
         raise ValueError(f"wrong CHECK {checks[-1]}, expected {expected_check}")
     if not rates:
         raise ValueError("benchmark produced no RATE lines")
-    def number(name: str):
+
+    def number(name: str) -> float | None:
         m = re.search(rf"\b{name}\s+([0-9]+(?:\.[0-9]+)?)", text)
         return float(m.group(1)) if m else None
-    def integer(name: str):
+
+    def integer(name: str) -> int | None:
         m = re.search(rf"\b{name}\s+(\d+)", text)
         return int(m.group(1)) if m else None
+
     return {
         "check": checks[-1].lower(),
         "build_us": number("BUILD_US"),
@@ -153,9 +250,24 @@ def parse_output(text: str, expected_check: str = EXPECTED_CHECK) -> dict:
     }
 
 
-def implementation_evidence(impl: str, text: str) -> dict:
+def validate_dimensions(text: str, plan: BenchmarkPlan) -> None:
+    # Require an attestation from the benchmark implementation, NOT from
+    # the shell wrapper: older prebuilt executables can ignore argv entirely.
+    expected = "BENCHMARK_DIMENSIONS v1 " + " ".join(plan.dimensions())
+    actual = [
+        line for line in text.splitlines() if line.startswith("BENCHMARK_DIMENSIONS")
+    ]
+    if actual != [expected]:
+        raise ValueError(
+            f"benchmark dimensions not attested: expected {expected!r}, got {actual!r}"
+        )
+
+
+def implementation_evidence(impl: str, text: str) -> dict[str, object]:
     if impl == "rust-challenge-simd":
-        match = re.findall(r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text)
+        match = re.findall(
+            r"(?m)^ENGINE rust-challenge MODE simd VECTOR_LANES (\d+)$", text
+        )
         hashes = re.findall(r"(?m)^BINARY_SHA256 ([0-9a-f]{64})$", text)
         if len(match) != 1 or len(hashes) != 1:
             raise ValueError("missing Rust SIMD or binary provenance attestation")
@@ -176,19 +288,36 @@ def implementation_evidence(impl: str, text: str) -> dict:
         match = re.findall(r"(?m)^ENGINE dotnet MODE (\S+) VECTOR_LANES (\d+)$", text)
         expected_mode = dotnet_challenge_modes[impl]
         if len(match) != 1 or match[0][0] != expected_mode:
-            raise ValueError(f"missing or wrong .NET challenge backend attestation for {impl}")
+            raise ValueError(
+                f"missing or wrong .NET challenge backend attestation for {impl}"
+            )
         return {"simd_lanes": int(match[0][1]), "backend": expected_mode}
     if impl == "llvm-orc" or impl in ("llvm-orc-o0", "llvm-orc-o1", "llvm-orc-o3"):
-        expected_policy = "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
+        expected_policy = (
+            "O2" if impl == "llvm-orc" else impl.rsplit("-", 1)[-1].upper()
+        )
         mode = re.findall(r"(?m)^MODE (\S+)$", text)
         engine = re.findall(r"(?m)^ENGINE (\S+) VERSION (\S+)$", text)
         policy = re.findall(r"(?m)^IR_OPT (\S+)$", text)
-        if mode != ["jit-batch"] or len(engine) != 1 or engine[0][0] != "llvm-orc" or policy != [expected_policy]:
-            raise ValueError(f"LLVM ORC adapter must attest to mode=jit-batch and IR_OPT={expected_policy}")
-        return {"jit_batch_internal": True, "llvm_ir_optimization": expected_policy, "llvm_codegen": "Aggressive"}
+        if (
+            mode != ["jit-batch"]
+            or len(engine) != 1
+            or engine[0][0] != "llvm-orc"
+            or policy != [expected_policy]
+        ):
+            raise ValueError(
+                f"LLVM ORC adapter must attest to mode=jit-batch and IR_OPT={expected_policy}"
+            )
+        return {
+            "jit_batch_internal": True,
+            "llvm_ir_optimization": expected_policy,
+            "llvm_codegen": "Aggressive",
+        }
     if impl == "cranelift-batch":
         if not re.search(r"\bMODE\s+jit-batch\b", text):
-            raise ValueError("Cranelift batch adapter did not execute the JIT-local batch loop")
+            raise ValueError(
+                "Cranelift batch adapter did not execute the JIT-local batch loop"
+            )
         return {"jit_batch_internal": True}
     if impl != "cpython-jit":
         return {}
@@ -208,10 +337,16 @@ def implementation_evidence(impl: str, text: str) -> dict:
     return {"jit_enabled": True, "jit_executors": executor_count}
 
 
-def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> None:
+def validate_challenge_sink(
+    impl: str, parsed: ParsedOutput, sample_iterations: int
+) -> None:
     # Hit-only solvers must attest to the complete attempted candidate count;
     # their count sink cannot be compared to the digest-XOR sink.
-    if impl not in ("dotnet-challenge-match", "dotnet-challenge-match-optimized", "rust-challenge-simd"):
+    if impl not in (
+        "dotnet-challenge-match",
+        "dotnet-challenge-match-optimized",
+        "rust-challenge-simd",
+    ):
         return
     expected = f"{sample_iterations:016x}"
     for index, sample in enumerate(parsed["samples"]):
@@ -222,46 +357,86 @@ def validate_challenge_sink(impl: str, parsed: dict, sample_iterations: int) -> 
             )
 
 
+def validate_benchmark_output(
+    impl: str, text: str, plan: BenchmarkPlan, expected_check: str
+) -> tuple[ParsedOutput, dict[str, object]]:
+    validate_dimensions(text, plan)
+    parsed = parse_output(text, expected_check)
+    if len(parsed["samples"]) != plan.samples:
+        raise ValueError(
+            f"sample count {len(parsed['samples'])} does not match "
+            f"requested samples={plan.samples}"
+        )
+    evidence = implementation_evidence(impl, text)
+    validate_challenge_sink(impl, parsed, plan.iterations)
+    return parsed, evidence
+
+
 def run_one(
-    impl: str, spec: dict, env: dict[str, str], host: dict,
-    corpus_sha: str, workload_id: str = DEFAULT_WORKLOAD,
+    impl: str,
+    spec: dict[str, str],
+    env: dict[str, str],
+    host: dict[str, object],
+    corpus_sha: str,
+    plan: BenchmarkPlan,
+    workload_id: str = DEFAULT_WORKLOAD,
     expected_check: str = EXPECTED_CHECK,
-) -> dict:
+) -> dict[str, object]:
     runner = ROOT / spec["runner"]
     if not runner.is_file():
         raise FileNotFoundError(runner)
     try:
-        revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout.strip()
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        ).stdout.strip()
     except subprocess.CalledProcessError:
         revision = None
-    base = {
+    argv = [str(runner), *plan.dimensions()]
+    runtime: dict[str, object] = {
+        "name": spec["runtime"],
+        "version": runtime_version(impl, env),
+        "command": [str(runner.relative_to(ROOT)), *plan.dimensions()],
+        "jit_configuration": {
+            key: env[key]
+            for key in (
+                "DOTNET_MaxVectorTBitWidth",
+                "DOTNET_PreferredVectorBitWidth",
+                "DOTNET_EnableAVX2",
+                "DOTNET_EnableAVX512F",
+                "DOTNET_EnableHWIntrinsic",
+                "COMPlus_TieredPGO",
+                "COMPlus_TieredCompilation",
+            )
+            if key in env
+        },
+    }
+    base: dict[str, object] = {
         "schema_version": 1,
         "run_id": str(uuid.uuid4()),
         "timestamp_utc": dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z"),
         "host": host,
         "workload": {"id": workload_id, "corpus_sha256": corpus_sha},
-        "implementation": {"id": impl, "mode": spec["mode"], "source": spec["source"], "revision": revision},
-        "runtime": {
-            "name": spec["runtime"], "version": runtime_version(impl, env),
-            "command": [str(runner.relative_to(ROOT))],
-            "jit_configuration": {
-                key: env[key] for key in (
-                    "DOTNET_MaxVectorTBitWidth", "DOTNET_PreferredVectorBitWidth",
-                    "DOTNET_EnableAVX2", "DOTNET_EnableAVX512F",
-                    "DOTNET_EnableHWIntrinsic", "COMPlus_TieredPGO",
-                    "COMPlus_TieredCompilation",
-                ) if key in env
-            },
+        "implementation": {
+            "id": impl,
+            "mode": spec["mode"],
+            "source": spec["source"],
+            "revision": revision,
         },
-        "warmup_iterations": int(env["MUSEUM_WARMUP"]),
-        "sample_iterations": int(env["MUSEUM_ITERATIONS"]),
-        "sample_count": int(env["MUSEUM_SAMPLES"]),
+        "runtime": runtime,
+        "warmup_iterations": plan.warmup,
+        "sample_iterations": plan.iterations,
+        "sample_count": plan.samples,
         "samples": [],
     }
-    timeout = float(env.get("MUSEUM_RUN_TIMEOUT", "120"))
+    timeout = plan.timeout
     started = time.perf_counter()
     try:
-        proc = subprocess.run([str(runner)], cwd=ROOT, env=env, text=True, capture_output=True, check=False, timeout=timeout)
+        proc = run_command(argv, env, timeout)
     except subprocess.TimeoutExpired as exc:
         elapsed = time.perf_counter() - started
         stdout = exc.stdout or ""
@@ -271,47 +446,73 @@ def run_one(
         if isinstance(stderr, bytes):
             stderr = stderr.decode(errors="replace")
         result = base | {
-            "status": "timeout", "exit_code": None, "error": f"runner exceeded {timeout:g} seconds",
-            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
-            "stdout": stdout, "stderr": stderr, "elapsed_seconds": elapsed,
+            "status": "timeout",
+            "exit_code": None,
+            "error": f"runner exceeded {timeout:g} seconds",
+            "build_us": None,
+            "first_call_us": None,
+            "code_bytes": None,
+            "check": None,
+            "stdout": stdout,
+            "stderr": stderr,
+            "elapsed_seconds": elapsed,
         }
         print(f"{impl:24s} TIMEOUT after {elapsed:.1f}s", file=sys.stderr)
         return result
     elapsed = time.perf_counter() - started
     if proc.returncode != 0:
         result = base | {
-            "status": "failed", "exit_code": proc.returncode, "error": f"runner exited with status {proc.returncode}",
-            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
-            "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+            "status": "failed",
+            "exit_code": proc.returncode,
+            "error": f"runner exited with status {proc.returncode}",
+            "build_us": None,
+            "first_call_us": None,
+            "code_bytes": None,
+            "check": None,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "elapsed_seconds": elapsed,
         }
         print(f"{impl:24s} FAILED exit={proc.returncode}", file=sys.stderr)
         return result
     try:
-        parsed = parse_output(proc.stdout, expected_check)
-        if len(parsed["samples"]) != int(env["MUSEUM_SAMPLES"]):
-            raise ValueError(
-                f"sample count {len(parsed['samples'])} does not match "
-                f"MUSEUM_SAMPLES={env['MUSEUM_SAMPLES']}"
-            )
-        evidence = implementation_evidence(impl, proc.stdout)
-        validate_challenge_sink(impl, parsed, int(env["MUSEUM_ITERATIONS"]))
+        parsed, evidence = validate_benchmark_output(
+            impl, proc.stdout, plan, expected_check
+        )
     except ValueError as exc:
         result = base | {
-            "status": "invalid", "exit_code": proc.returncode, "error": str(exc),
-            "build_us": None, "first_call_us": None, "code_bytes": None, "check": None,
-            "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+            "status": "invalid",
+            "exit_code": proc.returncode,
+            "error": str(exc),
+            "build_us": None,
+            "first_call_us": None,
+            "code_bytes": None,
+            "check": None,
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+            "elapsed_seconds": elapsed,
         }
         print(f"{impl:24s} INVALID {exc}", file=sys.stderr)
         return result
     result = base | {
-        "status": "success", "exit_code": proc.returncode, "error": None,
-        "build_us": parsed["build_us"], "first_call_us": parsed["first_call_us"],
-        "code_bytes": parsed["code_bytes"], "check": parsed["check"], "samples": parsed["samples"],
-        "stdout": proc.stdout, "stderr": proc.stderr, "elapsed_seconds": elapsed,
+        "status": "success",
+        "exit_code": proc.returncode,
+        "error": None,
+        "build_us": parsed["build_us"],
+        "first_call_us": parsed["first_call_us"],
+        "code_bytes": parsed["code_bytes"],
+        "check": parsed["check"],
+        "samples": parsed["samples"],
+        "stdout": proc.stdout,
+        "stderr": proc.stderr,
+        "elapsed_seconds": elapsed,
     }
-    result["runtime"].update(evidence)
-    rates = [x["hashes_per_second"] for x in result["samples"]]
-    print(f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}", file=sys.stderr)
+    runtime.update(evidence)
+    rates = [x["hashes_per_second"] for x in parsed["samples"]]
+    print(
+        f"{impl:24s} median={statistics.median(rates):12.3f} H/s samples={len(rates)}",
+        file=sys.stderr,
+    )
     return result
 
 
@@ -321,6 +522,17 @@ def main() -> None:
     parser.add_argument("--workload", default=DEFAULT_WORKLOAD)
     parser.add_argument("--impl", action="append", default=[])
     parser.add_argument("--output")
+    parser.add_argument(
+        "--warmup", type=lambda raw: parse_count(raw, 0), default=30_000
+    )
+    parser.add_argument("--iterations", type=parse_count, default=300_000)
+    parser.add_argument("--samples", type=parse_count, default=7)
+    parser.add_argument(
+        "--timeout",
+        type=parse_timeout,
+        default=120.0,
+        help="runner deadline in seconds",
+    )
     args = parser.parse_args()
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.workload):
         raise SystemExit(f"invalid workload name: {args.workload!r}")
@@ -339,7 +551,12 @@ def main() -> None:
     if unknown:
         raise SystemExit(f"unknown implementation(s): {', '.join(unknown)}")
     env = os.environ.copy()
-    normalize_benchmark_env(env)
+    plan = BenchmarkPlan(args.warmup, args.iterations, args.samples, args.timeout)
+    if (
+        args.workload == "challenge-sha256-v1"
+        and max(plan.warmup, plan.iterations, plan.samples) > CHALLENGE_MAX_COUNT
+    ):
+        parser.error(f"challenge counts must not exceed {CHALLENGE_MAX_COUNT}")
     fixture = workload / "fixture.json"
     if fixture.is_file():
         expected_check = json.loads(fixture.read_text())["expected_check"]
@@ -349,7 +566,19 @@ def main() -> None:
         corpus_file = workload / "program.json"
     corpus_sha = hashlib.sha256(corpus_file.read_bytes()).hexdigest()
     host = host_info()
-    results = [run_one(name, specs[name], env, host, corpus_sha, args.workload, expected_check) for name in names]
+    results = [
+        run_one(
+            name,
+            specs[name],
+            env,
+            host,
+            corpus_sha,
+            plan,
+            args.workload,
+            expected_check,
+        )
+        for name in names
+    ]
     rendered = json.dumps(results, indent=2) + "\n"
     if args.output:
         out = Path(args.output)
