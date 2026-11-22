@@ -1,16 +1,156 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (( $# != 3 )); then
-    echo "usage: $0 RUNTIME_ROOT BUILD_DIR SYSROOT" >&2
+usage() {
+    cat <<'USAGE'
+Usage: build-cpython-jit.sh RUNTIME_ROOT BUILD_DIR SYSROOT [OPTIONS]
+
+  --object-dir DIR            Object directory (default: BUILD_DIR/obj).
+                              An override must be outside BUILD_DIR.
+  --jobs COUNT                Positive make job count (default: 4).
+  --sccache-probe-port PORT    Existing cache endpoint for configure probes.
+  --sccache-jit-port PORT      Existing cache endpoint for JIT stencils
+                              (default: the probe endpoint).
+  --max-glibc VERSION          Maximum permitted GLIBC symbol version.
+  --plan                      Validate and print the resolved build inputs
+                              without creating files or acquiring runtimes.
+  --help                      Show this usage.
+USAGE
+}
+
+invalid() {
+    printf '%s\n' "$*" >&2
+    exit 64
+}
+
+if [[ $# == 1 && $1 == --help ]]; then
+    usage
+    exit 0
+fi
+if (( $# < 3 )); then
+    usage >&2
     exit 64
 fi
 
-RUNTIME_ROOT="$(realpath -m "$1")"
-BUILD_DIR="$(realpath -m "$2")"
-SYSROOT="$(realpath "$3")"
+for path in "$1" "$2" "$3"; do
+    [[ -n "$path" && "$path" != --* ]] || invalid "expected RUNTIME_ROOT BUILD_DIR SYSROOT"
+done
+RUNTIME_ROOT="$(realpath -m -- "$1")"
+BUILD_DIR="$(realpath -m -- "$2")"
+SYSROOT="$(realpath -m -- "$3")"
+REPO_ROOT="$(realpath -- "$(dirname -- "$(realpath -- "$0")")/..")"
 PREFIX="$BUILD_DIR/install"
-OBJDIR="$(realpath -m "${MUSEUM_CPYTHON_OBJDIR:-$BUILD_DIR/obj}")"
+OBJDIR="$BUILD_DIR/obj"
+MAKE_JOBS=4
+PROBE_PORT=
+JIT_PORT=
+MAX_GLIBC=
+PLAN_ONLY=0
+shift 3
+declare -A seen_options=()
+while (( $# )); do
+    option=$1
+    shift
+    case "$option" in
+        --object-dir|--jobs|--sccache-probe-port|--sccache-jit-port|--max-glibc|--plan) ;;
+        *) invalid "unknown option: $option" ;;
+    esac
+    [[ ! ${seen_options[$option]+set} ]] || invalid "duplicate option: $option"
+    seen_options[$option]=1
+    if [[ "$option" == --plan ]]; then
+        PLAN_ONLY=1
+        continue
+    fi
+    (( $# )) && [[ -n "$1" && "$1" != --* ]] || invalid "missing value for $option"
+    value=$1
+    shift
+    case "$option" in
+        --object-dir) OBJDIR="$(realpath -m -- "$value")" ;;
+        --jobs)
+            if ! [[ "$value" =~ ^[1-9][0-9]{0,9}$ ]] || (( value > 2147483647 )); then
+                invalid "invalid make job count: $value"
+            fi
+            MAKE_JOBS=$value
+            ;;
+        --sccache-probe-port|--sccache-jit-port)
+            if ! [[ "$value" =~ ^[1-9][0-9]{0,4}$ ]] || (( value > 65535 )); then
+                invalid "invalid cache port: $value"
+            fi
+            if [[ "$option" == --sccache-probe-port ]]; then
+                PROBE_PORT=$value
+            else
+                JIT_PORT=$value
+            fi
+            ;;
+        --max-glibc)
+            [[ "$value" =~ ^[0-9]+(\.[0-9]+)+$ ]] || invalid "invalid GLIBC version: $value"
+            MAX_GLIBC=$value
+            ;;
+    esac
+done
+if [[ ! ${seen_options[--sccache-jit-port]+set} ]]; then
+    JIT_PORT=$PROBE_PORT
+fi
+
+overlaps() {
+    [[ "$1" == / || "$2" == / || "$1" == "$2" || "$1" == "$2"/* || "$2" == "$1"/* ]]
+}
+
+# Autoconf, the generated Makefile and the generated compiler scripts share
+# these paths, so unsupported path metacharacters must fail before acquisition.
+for path in "$RUNTIME_ROOT" "$BUILD_DIR" "$SYSROOT" "$OBJDIR"; do
+    [[ "$path" =~ ^/[[:alnum:]_./+-]+$ ]] || invalid "unsupported build path: $path"
+done
+for protected_path in "$SYSROOT" "$RUNTIME_ROOT" "$REPO_ROOT"; do
+    if overlaps "$BUILD_DIR" "$protected_path" || overlaps "$OBJDIR" "$protected_path"; then
+        invalid "build/object directories overlap protected path: $protected_path"
+    fi
+done
+if overlaps "$RUNTIME_ROOT" "$SYSROOT" || overlaps "$RUNTIME_ROOT" "$REPO_ROOT"; then
+    invalid "runtime acquisition directory overlaps sysroot or checkout"
+fi
+if [[ "$OBJDIR" == "$BUILD_DIR/obj" ]]; then
+    # Do not follow an existing object-directory symlink during recursive cleanup.
+    [[ ! -L "$OBJDIR" ]] || invalid "default object directory is a symlink: $OBJDIR"
+elif overlaps "$BUILD_DIR" "$OBJDIR"; then
+    invalid "custom object directory must be outside the build directory"
+fi
+
+# The build-key mismatch path recursively removes both object and install
+# trees. Never claim a populated arbitrary directory merely because it was
+# passed as an output argument. Reuse requires an exact owner marker.
+check_owner() {
+    local path=$1 owner=$2 marker="$1/.museum-cpython-owner" contents ancestor
+    ancestor="$(dirname -- "$path")"
+    while [[ "$ancestor" != / ]]; do
+        if [[ -e "$ancestor/.museum-cpython-owner" || -L "$ancestor/.museum-cpython-owner" ]]; then
+            [[ "$ancestor" == "$owner" && "$path" == "$owner/obj" ]] ||
+                invalid "build path is nested inside another owned directory: $ancestor"
+        fi
+        ancestor="$(dirname -- "$ancestor")"
+    done
+    [[ ! -L "$marker" ]] || invalid "directory ownership marker is a symlink: $marker"
+    if [[ -e "$path" ]]; then
+        [[ -d "$path" ]] || invalid "build path is not a directory: $path"
+        if [[ -f "$marker" ]]; then
+            [[ "$(cat -- "$marker")" == "$owner" ]] || invalid "directory owned by another build: $path"
+        else
+            contents="$(find "$path" -mindepth 1 -maxdepth 1 -print -quit)" ||
+                invalid "cannot inspect build directory: $path"
+            [[ -z "$contents" ]] || invalid "refusing nonempty unowned build directory: $path"
+        fi
+    fi
+}
+
+claim_directory() {
+    local path=$1 owner=$2
+    check_owner "$path" "$owner"
+    mkdir -p -- "$path"
+    printf '%s\n' "$owner" > "$path/.museum-cpython-owner"
+}
+
+check_owner "$BUILD_DIR" "$BUILD_DIR"
+check_owner "$OBJDIR" "$BUILD_DIR"
 
 if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
     echo "the pinned CPython JIT toolchain currently supports Linux x86_64 only" >&2
@@ -19,6 +159,16 @@ fi
 if [[ ! -d "$SYSROOT/usr/include" || ! -d "$SYSROOT/usr/lib" ]]; then
     echo "SYSROOT does not look like a complete Linux sysroot: $SYSROOT" >&2
     exit 66
+fi
+
+print_plan() {
+    printf 'runtime_root=%s\nbuild_dir=%s\nsysroot=%s\nobjdir=%s\n' "$RUNTIME_ROOT" "$BUILD_DIR" "$SYSROOT" "$OBJDIR"
+    printf 'make_jobs=%s\nsccache_probe_port=%s\nsccache_jit_port=%s\nmax_glibc=%s\n' \
+        "$MAKE_JOBS" "${PROBE_PORT:-default}" "${JIT_PORT:-default}" "${MAX_GLIBC:-unrestricted}"
+}
+if (( PLAN_ONLY )); then
+    print_plan
+    exit 0
 fi
 
 PYTHON_ARCHIVE=Python-3.15.2.tar.xz
@@ -31,14 +181,25 @@ LLVM_SHA256=b3b7f2801d15d50736acea3c73982994d025b01c2f035b91ae3b49d1b575732b
 LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/$LLVM_ARCHIVE"
 LLVM_DIR=LLVM-21.1.8-Linux-X64
 
-for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp cp patch; do
+for tool in curl tar sha256sum uv rg file make pkg-config sccache cmp sleep mktemp cp patch flock; do
     command -v "$tool" >/dev/null || {
         echo "required tool not found: $tool" >&2
         exit 69
     }
 done
 
-mkdir -p "$RUNTIME_ROOT" "$BUILD_DIR"
+# Keep directory inode locks for the entire build, including configure and
+# install. The object reset below preserves its directory inode.
+mkdir -p -- "$BUILD_DIR"
+exec {build_lock}<"$BUILD_DIR"
+flock -n "$build_lock" || invalid "build directory is already in use: $BUILD_DIR"
+claim_directory "$BUILD_DIR" "$BUILD_DIR"
+mkdir -p -- "$OBJDIR"
+exec {object_lock}<"$OBJDIR"
+flock -n "$object_lock" || invalid "object directory is already in use: $OBJDIR"
+claim_directory "$OBJDIR" "$BUILD_DIR"
+mkdir -p -- "$RUNTIME_ROOT"
+print_plan > "$BUILD_DIR/build-config.txt"
 
 acquire_xz() {
     local url=$1 archive=$2 sha256=$3 directory=$4 sentinel=$5
@@ -107,9 +268,6 @@ LLD_REAL=/usr/bin/ld.lld
 LLD_SHA256="$(sha256sum "$(realpath "$LLD_REAL")" | cut -d' ' -f1)"
 LLD_VERSION="$("$LLD_REAL" --version)"
 CLANG_SHA256="$(sha256sum "$(realpath "$CC_REAL")" | cut -d' ' -f1)"
-MAKE_JOBS="${MUSEUM_CPYTHON_MAKE_JOBS:-4}"
-PROBE_PORT="${MUSEUM_SCCACHE_PROBE_PORT:-}"
-JIT_PORT="${MUSEUM_SCCACHE_JIT_PORT:-$PROBE_PORT}"
 
 for tool in "$CC_REAL" "$CXX_REAL"; do
     [[ -x "$tool" ]] || {
@@ -120,25 +278,6 @@ for tool in "$CC_REAL" "$CXX_REAL"; do
         echo "required tool cannot run on the build host: $tool" >&2
         exit 69
     }
-done
-
-if [[ "$BUILD_DIR" == / ]]; then
-    echo "refusing to use / as BUILD_DIR" >&2
-    exit 64
-fi
-case "$OBJDIR" in
-    /)
-        echo "refusing unsafe OBJDIR: $OBJDIR" >&2
-        exit 64
-        ;;
-esac
-for protected_path in "$BUILD_DIR" "$RUNTIME_ROOT" "$SYSROOT"; do
-    case "$protected_path" in
-        "$OBJDIR"|"$OBJDIR"/*)
-            echo "refusing OBJDIR that contains protected path $protected_path: $OBJDIR" >&2
-            exit 64
-            ;;
-    esac
 done
 
 SYSROOT_LIBC="$(find "$SYSROOT/lib" "$SYSROOT/usr/lib" -type f -name 'libc.so.6' -print -quit 2>/dev/null || true)"
@@ -220,7 +359,9 @@ if [[ -f "$BUILD_KEY" ]] && cmp -s "$BUILD_KEY" "$BUILD_KEY_NEXT"; then
     rm -f "$BUILD_KEY_NEXT"
 else
     reuse_build=0
-    rm -rf "${OBJDIR:?}" "${PREFIX:?}"
+    check_owner "$OBJDIR" "$BUILD_DIR"
+    find "${OBJDIR:?}" -mindepth 1 -maxdepth 1 ! -name .museum-cpython-owner -exec rm -rf -- {} +
+    rm -rf -- "${PREFIX:?}"
     mv "$BUILD_KEY_NEXT" "$BUILD_KEY"
 fi
 
@@ -679,10 +820,10 @@ if [[ -z "$max_glibc" ]]; then
     exit 70
 fi
 printf 'max_glibc=%s\n' "$max_glibc" | tee "$BUILD_DIR/abi-summary.txt"
-if [[ -n "${MUSEUM_CPYTHON_MAX_GLIBC:-}" ]]; then
-    highest="$(printf '%s\n%s\n' "$MUSEUM_CPYTHON_MAX_GLIBC" "$max_glibc" | sort -V | tail -n 1)"
-    if [[ "$highest" != "$MUSEUM_CPYTHON_MAX_GLIBC" ]]; then
-        echo "artifact requires GLIBC_$max_glibc, above requested GLIBC_$MUSEUM_CPYTHON_MAX_GLIBC" >&2
+if [[ -n "$MAX_GLIBC" ]]; then
+    highest="$(printf '%s\n%s\n' "$MAX_GLIBC" "$max_glibc" | sort -V | tail -n 1)"
+    if [[ "$highest" != "$MAX_GLIBC" ]]; then
+        echo "artifact requires GLIBC_$max_glibc, above requested GLIBC_$MAX_GLIBC" >&2
         exit 70
     fi
 fi
