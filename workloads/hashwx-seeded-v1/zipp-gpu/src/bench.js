@@ -49,9 +49,14 @@ async function runCase(shader, inputs, samples, memory) {
       device.queue.submit([encoder.finish()]);
       await staging.mapAsync(GPUMapMode.READ);
       const view = new Uint32Array(staging.getMappedRange());
-      if (step === 0) values = Array.from(view);
-      staging.unmap();
       const elapsed = performance.now() - start;
+      if (step === 0) values = Array.from(view);
+      else {
+        for (let i = 0; i < view.length; i++) {
+          if (view[i] !== values[i]) throw new Error("GPU output changed at word " + i);
+        }
+      }
+      staging.unmap();
       const executionError = await device.popErrorScope();
       if (executionError) throw new Error(executionError.message);
       if (step > 0) times.push(elapsed);
