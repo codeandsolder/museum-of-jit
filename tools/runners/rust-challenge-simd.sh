@@ -8,7 +8,8 @@ if [[ -n "${MUSEUM_CHALLENGE_RUST_BIN:-}" ]]; then
 fi
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-cp -a "$ROOT/workloads/challenge-sha256-v1/implementations/rust-challenge-simd/." "$tmp/"
+# Contain tool-created temporary files as well as the explicit target/output tree.
+export TMPDIR="$tmp"
 if [[ -n "${RUSTC_WRAPPER:-}" ]]; then
   test -x "$RUSTC_WRAPPER" || { echo "RUSTC_WRAPPER is not executable" >&2; exit 70; }
 elif [[ -f "$HOME/.cargo/config.toml" ]] && rg -q '^rustc-wrapper\s*=.*sccache' "$HOME/.cargo/config.toml"; then
@@ -17,12 +18,17 @@ else
   echo "no canonical sccache rustc-wrapper configured; refusing uncached build" >&2
   exit 70
 fi
-export CARGO_TARGET_DIR="$tmp/target"
-cd "$tmp"
+build=(cargo +nightly-2026-11-03 build --locked --release --quiet
+  --manifest-path "$ROOT/workloads/challenge-sha256-v1/implementations/rust-challenge-simd/Cargo.toml"
+  --target-dir "$tmp/target" --message-format=json-render-diagnostics)
 if [[ -n "${MUSEUM_BUILD_CPUSET:-}" ]]; then
-  taskset -c "$MUSEUM_BUILD_CPUSET" cargo +nightly-2026-11-03 build --locked --release --quiet
-else
-  cargo +nightly-2026-11-03 build --locked --release --quiet
+  build=(taskset -c "$MUSEUM_BUILD_CPUSET" "${build[@]}")
 fi
-printf 'BINARY_SHA256 %s\n' "$(sha256sum "$CARGO_TARGET_DIR/release/museum-challenge-sha256-reference" | cut -d' ' -f1)"
-exec "$CARGO_TARGET_DIR/release/museum-challenge-sha256-reference"
+binary=$("${build[@]}" | jq -ers '
+  [.[] | select(.reason == "compiler-artifact" and
+                 .target.name == "museum-challenge-sha256-reference" and
+                 .executable != null) | .executable] |
+  if length == 1 then .[0] else error("expected one Cargo benchmark executable") end')
+test -x "$binary" || { echo "Cargo benchmark executable unavailable" >&2; exit 70; }
+printf 'BINARY_SHA256 %s\n' "$(sha256sum "$binary" | cut -d' ' -f1)"
+"$binary"
