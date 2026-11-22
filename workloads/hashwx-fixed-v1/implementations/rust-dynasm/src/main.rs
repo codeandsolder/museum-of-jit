@@ -1,4 +1,4 @@
-use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm};
+use dynasmrt::{DynasmApi, DynasmLabelApi, dynasm, x64::Rq};
 use std::time::Instant;
 
 #[derive(Clone, Copy)]
@@ -21,14 +21,19 @@ enum Opcode {
 #[derive(Clone, Copy)]
 struct Instruction {
     op: Opcode,
-    src: u8,
-    dst: u8,
+    src: Rq,
+    dst: Rq,
     imm: i8,
 }
 
 impl Instruction {
     const fn new(op: Opcode, src: u8, dst: u8, imm: i8) -> Self {
-        Self { op, src, dst, imm }
+        Self {
+            op,
+            src: register(src),
+            dst: register(dst),
+            imm,
+        }
     }
 }
 
@@ -465,14 +470,10 @@ const K1: u64 = 0x1f1e_1d1c_1b1a_1918;
 const EXPECTED: u64 = 0xfd5d_450b_7670_35c5;
 
 #[expect(
-    clippy::useless_conversion,
-    reason = "dynasm 5.1 dynamic register macro expands to redundant u8 conversions"
-)]
-#[expect(
     clippy::used_underscore_binding,
     reason = "dynasm 5.1 references its own underscore-prefixed temporary bindings"
 )]
-fn emit_sip(ops: &mut dynasmrt::x64::Assembler, a: u8, b: u8, c: u8, d: u8) {
+fn emit_sip(ops: &mut dynasmrt::x64::Assembler, a: Rq, b: Rq, c: Rq, d: Rq) {
     dynasm!(ops;
      add Rq(a),Rq(b); add Rq(c),Rq(d); rol Rq(b),13; rol Rq(d),16; xor Rq(b),Rq(a); xor Rq(d),Rq(c); rol Rq(a),32;
      add Rq(c),Rq(b); add Rq(a),Rq(d); rol Rq(b),17; rol Rq(d),21; xor Rq(b),Rq(c); xor Rq(d),Rq(a); rol Rq(c),32
@@ -491,16 +492,16 @@ impl Jit {
   ; mov r10,QWORD i64::from_ne_bytes((0x6c79_6765_6e65_7261_u64^K0).to_ne_bytes())
   ; mov r11,QWORD i64::from_ne_bytes((0x7465_6462_7974_6573_u64^K1).to_ne_bytes())
   ; xor r11,rdi);
-        emit_sip(&mut ops, 8, 9, 10, 11);
+        emit_sip(&mut ops, Rq::R8, Rq::R9, Rq::R10, Rq::R11);
         dynasm!(ops; xor r8,rdi; xor r10,0xbb);
         for _ in 0..3 {
-            emit_sip(&mut ops, 8, 9, 10, 11);
+            emit_sip(&mut ops, Rq::R8, Rq::R9, Rq::R10, Rq::R11);
         }
         dynasm!(ops; mov r12,r11; mov r13,r10; mov r14,r9; mov r15,r8
   ; mov rax,QWORD i64::from_ne_bytes(K0.to_ne_bytes()); xor r8,rax; xor r10,rax
   ; mov rax,QWORD i64::from_ne_bytes(K1.to_ne_bytes()); xor r9,rax; xor r11,rax);
         for _ in 0..4 {
-            emit_sip(&mut ops, 8, 9, 10, 11);
+            emit_sip(&mut ops, Rq::R8, Rq::R9, Rq::R10, Rq::R11);
         }
         dynasm!(ops; mov rax,r11; mov rcx,r10; mov rdx,r9; mov rsi,r8
   ; mov r8,r12; mov r9,r13; mov r10,r14; mov r11,r15
@@ -509,8 +510,8 @@ impl Jit {
         emit_phase(&mut ops, false);
         emit_phase(&mut ops, true);
         dynasm!(ops; add rsp,16392);
-        emit_sip(&mut ops, 8, 9, 10, 11);
-        emit_sip(&mut ops, 12, 13, 14, 15);
+        emit_sip(&mut ops, Rq::R8, Rq::R9, Rq::R10, Rq::R11);
+        emit_sip(&mut ops, Rq::R12, Rq::R13, Rq::R14, Rq::R15);
         dynasm!(ops; mov rax,r11; xor rax,r15; xor rax,rbx; pop r15; pop r14; pop r13; pop r12; pop rbx; ret);
         let buf = ops
             .finalize()
@@ -539,21 +540,29 @@ impl Jit {
     }
 }
 
-const fn xr(register: u8) -> u8 {
-    if register < 8 { 8 + register } else { 3 }
+// The fixed instruction stream uses eight working registers and r8's
+// dedicated multiplier. Conversion happens at compile time in the fixture.
+const fn register(index: u8) -> Rq {
+    const REGISTERS: [Rq; 9] = [
+        Rq::R8,
+        Rq::R9,
+        Rq::R10,
+        Rq::R11,
+        Rq::R12,
+        Rq::R13,
+        Rq::R14,
+        Rq::R15,
+        Rq::RBX,
+    ];
+    REGISTERS[index as usize]
 }
 
-#[expect(
-    clippy::useless_conversion,
-    reason = "dynasm 5.1 dynamic register macro expands to redundant u8 conversions"
-)]
 #[expect(
     clippy::used_underscore_binding,
     reason = "dynasm 5.1 references its own underscore-prefixed temporary bindings"
 )]
-fn source(ops: &mut dynasmrt::x64::Assembler, src: u8) {
-    let s = xr(src);
-    dynasm!(ops ; mov eax,Rd(s) ; and eax,16383);
+fn source(ops: &mut dynasmrt::x64::Assembler, src: Rq) {
+    dynasm!(ops ; mov eax,Rd(src) ; and eax,16383);
 }
 enum Combine {
     Multiply,
@@ -563,16 +572,12 @@ enum Combine {
 }
 
 #[expect(
-    clippy::useless_conversion,
-    reason = "dynasm 5.1 dynamic register macro expands to redundant u8 conversions"
-)]
-#[expect(
     clippy::used_underscore_binding,
     reason = "dynasm 5.1 references its own underscore-prefixed temporary bindings"
 )]
 fn emit_op(ops: &mut dynasmrt::x64::Assembler, ins: Instruction, memory: bool) {
-    let dst = xr(ins.dst);
-    let src = xr(ins.src);
+    let dst = ins.dst;
+    let src = ins.src;
     let imm = ins.imm;
     let combine = match ins.op {
         Opcode::OrMultiply => {
@@ -646,10 +651,6 @@ fn emit_op(ops: &mut dynasmrt::x64::Assembler, ins: Instruction, memory: bool) {
     }
 }
 #[expect(
-    clippy::useless_conversion,
-    reason = "dynasm 5.1 dynamic register macro expands to redundant u8 conversions"
-)]
-#[expect(
     clippy::used_underscore_binding,
     reason = "dynasm 5.1 references its own underscore-prefixed temporary bindings"
 )]
@@ -666,7 +667,7 @@ fn emit_phase(ops: &mut dynasmrt::x64::Assembler, mem: bool) {
         for x in p.instructions {
             emit_op(ops, x, mem);
         }
-        let bf = xr(p.instructions[0].dst);
+        let bf = p.instructions[0].dst;
         dynasm!(ops; test edx,edx ; jz =>done);
         if !p.unconditional {
             dynasm!(ops; test Rd(bf),32 ; jnz =>done);
