@@ -13,4 +13,4 @@ if [[ -n "${MUSEUM_BUILD_CPUSET:-}" ]]; then
 else
   "$dotnet" publish "$tmp/ChallengeSha256.csproj" -c Release -o "$tmp/out" --nologo -v quiet >&2
 fi
-exec "$dotnet" "$tmp/out/ChallengeSha256.dll" --mode "$mode"
+"$dotnet" "$tmp/out/ChallengeSha256.dll" --mode "$mode"

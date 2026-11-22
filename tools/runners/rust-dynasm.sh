@@ -2,7 +2,6 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
-cp -a "$ROOT/workloads/hashwx-fixed-v1/implementations/rust-dynasm/." "$tmp/"
 # Never guess a host's sccache transport. Acer/Asus carry their canonical
 # rustc-wrapper in Cargo config; benchmark-only hosts must export RUSTC_WRAPPER
 # plus their canonical client endpoint before invoking this runner.
@@ -14,6 +13,6 @@ else
   echo "no canonical sccache rustc-wrapper configured; refusing an uncached Rust build" >&2
   exit 70
 fi
-export CARGO_TARGET_DIR="$tmp/target"
-cd "$tmp"
-cargo +1.99.0 run --locked --release --quiet
+cargo +1.99.0 run --locked --release --quiet \
+  --manifest-path "$ROOT/workloads/hashwx-fixed-v1/implementations/rust-dynasm/Cargo.toml" \
+  --target-dir "$tmp/target"

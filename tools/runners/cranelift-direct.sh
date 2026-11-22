@@ -3,10 +3,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 export MUSEUM_PROGRAM_JSON="$ROOT/workloads/hashwx-fixed-v1/program.json"
 args=()
-case "${MUSEUM_CRANELIFT_BATCH:-0}" in
+case "$#" in
   0) ;;
-  1) args=(--batch) ;;
-  *) echo 'MUSEUM_CRANELIFT_BATCH must be 0 or 1' >&2; exit 64 ;;
+  1) [[ "$1" == --batch ]] || { echo 'expected --batch' >&2; exit 64; }
+     args=(--batch) ;;
+  *) echo 'expected --batch or no arguments' >&2; exit 64 ;;
 esac
 if [[ -n "${MUSEUM_CRANELIFT_BIN:-}" ]]; then
     [[ -x "$MUSEUM_CRANELIFT_BIN" ]] || { echo "Cranelift executable unavailable: $MUSEUM_CRANELIFT_BIN" >&2; exit 69; }
@@ -24,7 +25,6 @@ fi
 export SCCACHE_START_SERVER=0 SCCACHE_NO_AUTO_START_SERVER=1
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
-cp -a "$ROOT/workloads/hashwx-fixed-v1/implementations/cranelift-direct/." "$tmp/"
-export CARGO_TARGET_DIR="$tmp/target"
-cargo +1.99.0 build --locked --release --manifest-path "$tmp/Cargo.toml" --quiet
-"$CARGO_TARGET_DIR/release/museum-hashwx-cranelift-direct" "${args[@]}"
+cargo +1.99.0 run --locked --release --quiet \
+  --manifest-path "$ROOT/workloads/hashwx-fixed-v1/implementations/cranelift-direct/Cargo.toml" \
+  --target-dir "$tmp/target" -- "${args[@]}"
