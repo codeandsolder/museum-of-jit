@@ -84,12 +84,13 @@ fn run(
         timeout,
         cancelled,
     };
+    let mut assets = backend::Artifacts::new()?;
     let mut rows = Vec::new();
     for implementation in implementations {
         if cancelled.load(Ordering::Relaxed) {
             break;
         }
-        rows.push(context.run(implementation)?);
+        rows.push(context.run(&mut assets, implementation)?);
     }
     write_results(args.output.as_deref(), root, &rows)?;
     // Every attempted exhibit is preserved in the raw output, including

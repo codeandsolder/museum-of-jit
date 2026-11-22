@@ -16,7 +16,7 @@ use nix::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    backend::{prepare, sha256},
+    backend::{Artifacts, BuildProvenance, prepare, sha256},
     config::{Implementation, ImplementationMode, Plan, RuntimeConfig, Workload},
     process::{CommandRecord, Session},
     protocol::{self, Evidence, Measurements, Sample},
@@ -146,6 +146,8 @@ struct RuntimeRecord<'a> {
     jit_configuration: BTreeMap<&'static str, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     binary_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    build_provenance: Option<BuildProvenance>,
     #[serde(flatten)]
     evidence: Evidence,
 }
@@ -171,6 +173,7 @@ impl<'a> RuntimeRecord<'a> {
             commands: Vec::new(),
             jit_configuration,
             binary_sha256: None,
+            build_provenance: None,
             evidence: Evidence::default(),
         }
     }
@@ -265,7 +268,11 @@ pub struct RunContext<'a> {
 }
 
 impl<'a> RunContext<'a> {
-    pub fn run(&self, implementation: &'a Implementation) -> Result<Row<'a>> {
+    pub fn run(
+        &self,
+        assets: &mut Artifacts,
+        implementation: &'a Implementation,
+    ) -> Result<Row<'a>> {
         let started = Instant::now();
         let mut session = Session::new(self.root, self.timeout, self.cancelled)?;
         let mut row = Row {
@@ -297,7 +304,7 @@ impl<'a> RunContext<'a> {
             stderr: String::new(),
             elapsed_seconds: 0.0,
         };
-        match self.execute(&mut session, implementation, &mut row) {
+        match self.execute(assets, &mut session, implementation, &mut row) {
             Ok(()) => {}
             Err(error) => {
                 if session.timed_out {
@@ -321,11 +328,13 @@ impl<'a> RunContext<'a> {
 
     fn execute(
         &self,
+        assets: &mut Artifacts,
         session: &mut Session<'_>,
         implementation: &Implementation,
         row: &mut Row<'_>,
     ) -> Result<()> {
         let prepared = prepare(
+            assets,
             session,
             self.config,
             implementation,
@@ -334,6 +343,7 @@ impl<'a> RunContext<'a> {
         )?;
         row.runtime.version = prepared.version;
         row.runtime.binary_sha256 = prepared.binary_sha256;
+        row.runtime.build_provenance = prepared.build_provenance;
         let output = session.invoke(prepared.command, "benchmark")?;
         let status = output.ensure_success("benchmark");
         row.stdout = output.stdout;

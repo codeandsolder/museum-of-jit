@@ -103,7 +103,7 @@ fn utf8(value: &OsStr) -> Result<String> {
         .context("non-UTF-8 command provenance")
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CommandRecord {
     pub argv: Vec<String>,
     pub environment: std::collections::BTreeMap<String, Option<String>>,

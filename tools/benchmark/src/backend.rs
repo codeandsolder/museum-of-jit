@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     env, fs,
     io::{self, BufReader},
     os::unix::fs::PermissionsExt,
@@ -7,12 +8,12 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail, ensure};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
     config::{Backend, Implementation, IrPolicy, Plan, PythonEngine, RuntimeConfig, WasmEngine},
-    process::Session,
+    process::{CommandRecord, Session},
 };
 
 pub fn sha256(path: &Path) -> Result<String> {
@@ -308,9 +309,9 @@ fn dotnet_build(
     cfg: &RuntimeConfig,
     source: &Path,
     project: &str,
+    output: &Path,
 ) -> Result<PathBuf> {
     let mut build = build_command(session, cfg, &cfg.dotnet);
-    let output = session.path("publish");
     dotnet_environment(session, &mut build);
     build
         .arg("publish")
@@ -318,7 +319,7 @@ fn dotnet_build(
         .arg("--artifacts-path")
         .arg(session.path("artifacts"))
         .args(["--disable-build-servers", "-c", "Release", "-o"])
-        .arg(&output)
+        .arg(output)
         .args(["--nologo", "-v", "quiet"]);
     session.checked(build, "build")?;
     let assembly = output.join(format!("{project}.dll"));
@@ -376,8 +377,13 @@ fn wasmtime_python(session: &Session<'_>, cfg: &RuntimeConfig) -> Command {
     )
 }
 
-fn emit_wasm(session: &mut Session<'_>, cfg: &RuntimeConfig, source: &Path) -> Result<PathBuf> {
-    let path = session.path("hashwx-fixed.wasm");
+fn emit_wasm(
+    session: &mut Session<'_>,
+    cfg: &RuntimeConfig,
+    source: &Path,
+    output: &Path,
+) -> Result<PathBuf> {
+    let path = output.join("hashwx-fixed.wasm");
     let mut cmd = uv_python(session, cfg);
     cmd.arg("python")
         .arg(source.join("emit_wasm.py"))
@@ -388,23 +394,125 @@ fn emit_wasm(session: &mut Session<'_>, cfg: &RuntimeConfig, source: &Path) -> R
     Ok(path)
 }
 
-pub struct Prepared {
-    pub command: Command,
-    pub version: String,
-    pub binary_sha256: Option<String>,
+/// Artifacts are shared only within one invocation, never persisted in a
+/// second compiler cache. Identity is the source manifest/translation unit,
+/// and all runtime/build settings are immutable for this invocation.
+pub struct Artifacts {
+    root: tempfile::TempDir,
+    built: BTreeMap<PathBuf, Artifact>,
 }
 
-impl Prepared {
-    fn new(command: Command, version: String, artifact: Option<&Path>) -> Result<Self> {
+#[derive(Clone, Debug, Serialize)]
+pub struct BuildProvenance {
+    reused: bool,
+    commands: Vec<CommandRecord>,
+}
+
+#[derive(Clone)]
+struct Artifact {
+    path: PathBuf,
+    sha256: String,
+    build: Option<BuildProvenance>,
+}
+
+impl Artifact {
+    fn external(path: PathBuf) -> Result<Self> {
         Ok(Self {
-            command,
-            version,
-            binary_sha256: artifact.map(sha256).transpose()?,
+            sha256: sha256(&path)?,
+            path,
+            build: None,
         })
     }
 }
 
+impl Artifacts {
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            root: tempfile::Builder::new()
+                .prefix("museum-artifacts-")
+                .tempdir()?,
+            built: BTreeMap::new(),
+        })
+    }
+
+    fn acquire(
+        &mut self,
+        key: PathBuf,
+        session: &mut Session<'_>,
+        build: impl FnOnce(&mut Session<'_>, &Path) -> Result<PathBuf>,
+    ) -> Result<Artifact> {
+        if let Some(cached) = self.built.get(&key) {
+            let mut artifact = cached.clone();
+            if let Some(build) = &mut artifact.build {
+                build.reused = true;
+            }
+            return Ok(artifact);
+        }
+        let directory = tempfile::Builder::new()
+            .prefix("build-")
+            .tempdir_in(self.root.path())?;
+        let start = session.records.len();
+        let path = build(session, directory.path())?;
+        ensure!(
+            path.starts_with(directory.path()),
+            "build output escaped owned artifact directory"
+        );
+        let artifact = Artifact {
+            sha256: sha256(&path)?,
+            path,
+            build: Some(BuildProvenance {
+                reused: false,
+                commands: session.records[start..].to_vec(),
+            }),
+        };
+        // The invocation-level root now owns cleanup for the reused artifact.
+        let _directory = directory.keep();
+        self.built.insert(key, artifact.clone());
+        Ok(artifact)
+    }
+
+    fn cargo(
+        &mut self,
+        session: &mut Session<'_>,
+        cfg: &RuntimeConfig,
+        source: &Path,
+        toolchain: &str,
+        binary: &str,
+    ) -> Result<Artifact> {
+        self.acquire(source.join("Cargo.toml"), session, |session, directory| {
+            let executable = rust_build(session, cfg, source, toolchain, binary)?;
+            let output = directory.join(binary);
+            // Cargo's ephemeral intermediates may live in session scratch.
+            // Retain exactly its reported final executable, not build trees.
+            fs::copy(executable, &output)?;
+            Ok(output)
+        })
+    }
+}
+
+pub struct Prepared {
+    pub command: Command,
+    pub version: String,
+    pub binary_sha256: Option<String>,
+    pub build_provenance: Option<BuildProvenance>,
+}
+
+impl Prepared {
+    fn new(command: Command, version: String, artifact: Option<Artifact>) -> Self {
+        let (binary_sha256, build_provenance) = artifact.map_or((None, None), |artifact| {
+            (Some(artifact.sha256), artifact.build)
+        });
+        Self {
+            command,
+            version,
+            binary_sha256,
+            build_provenance,
+        }
+    }
+}
+
 fn prepare_rust(
+    assets: &mut Artifacts,
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
     source: &Path,
@@ -415,33 +523,38 @@ fn prepare_rust(
     } else {
         ("1.99.0", "hashwx-zipp-raw")
     };
-    let (path, version) = if let Some(prebuilt) = cfg.rust_challenge.as_ref().filter(|_| challenge)
-    {
-        (
-            executable(session.root(), &prebuilt.binary)?,
-            prebuilt.rustc_version.clone(),
-        )
-    } else {
-        let version = rust_version(session, cfg, toolchain)?;
-        (
-            rust_build(session, cfg, source, toolchain, binary)?,
-            version,
-        )
-    };
-    Prepared::new(Command::new(&path), version, Some(&path))
+    let (artifact, version) =
+        if let Some(prebuilt) = cfg.rust_challenge.as_ref().filter(|_| challenge) {
+            (
+                Artifact::external(executable(session.root(), &prebuilt.binary)?)?,
+                prebuilt.rustc_version.clone(),
+            )
+        } else {
+            let version = rust_version(session, cfg, toolchain)?;
+            (
+                assets.cargo(session, cfg, source, toolchain, binary)?,
+                version,
+            )
+        };
+    Ok(Prepared::new(
+        Command::new(&artifact.path),
+        version,
+        Some(artifact),
+    ))
 }
 
 fn prepare_cranelift(
+    assets: &mut Artifacts,
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
     source: &Path,
     corpus: &Path,
     batch: bool,
 ) -> Result<Prepared> {
-    let path = if let Some(binary) = &cfg.cranelift_binary {
-        executable(session.root(), binary)?
+    let artifact = if let Some(binary) = &cfg.cranelift_binary {
+        Artifact::external(executable(session.root(), binary)?)?
     } else {
-        rust_build(
+        assets.cargo(
             session,
             cfg,
             source,
@@ -449,43 +562,48 @@ fn prepare_cranelift(
             "museum-hashwx-cranelift-direct",
         )?
     };
-    let mut probe = Command::new(&path);
+    let mut probe = Command::new(&artifact.path);
     probe.arg("--version");
     let version = session.version(probe)?;
     ensure!(
         version.contains("Cranelift 0.137.1"),
         "unexpected Cranelift version: {version}"
     );
-    let mut cmd = Command::new(&path);
+    let mut cmd = Command::new(&artifact.path);
     cmd.arg("--corpus").arg(corpus);
     if batch {
         cmd.arg("--batch");
     }
-    Prepared::new(cmd, version, Some(&path))
+    Ok(Prepared::new(cmd, version, Some(artifact)))
 }
 
 fn prepare_llvm(
+    assets: &mut Artifacts,
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
+    source: &Path,
     corpus: &Path,
     policy: IrPolicy,
 ) -> Result<Prepared> {
-    let path = if let Some(binary) = &cfg.llvm_binary {
-        executable(session.root(), binary)?
+    let artifact = if let Some(binary) = &cfg.llvm_binary {
+        Artifact::external(executable(session.root(), binary)?)?
     } else {
-        let path = session.path("llvm-orc-hashwx");
-        build_llvm(session, cfg, &path)?;
-        path
+        assets.acquire(source.join("main.cpp"), session, |session, directory| {
+            let path = directory.join("llvm-orc-hashwx");
+            build_llvm(session, cfg, &path)?;
+            Ok(path)
+        })?
     };
-    let mut probe = llvm_command(session, cfg, &path, policy)?;
+    let mut probe = llvm_command(session, cfg, &artifact.path, policy)?;
     probe.arg("--version");
     let version = session.version(probe)?;
-    let mut cmd = llvm_command(session, cfg, &path, policy)?;
+    let mut cmd = llvm_command(session, cfg, &artifact.path, policy)?;
     cmd.arg("--corpus").arg(corpus);
-    Prepared::new(cmd, version, Some(&path))
+    Ok(Prepared::new(cmd, version, Some(artifact)))
 }
 
 fn prepare_dotnet(
+    assets: &mut Artifacts,
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
     source: &Path,
@@ -495,13 +613,17 @@ fn prepare_dotnet(
     let mut probe = dotnet_command(session, cfg);
     probe.arg("--version");
     let version = session.version(probe)?;
-    let assembly = dotnet_build(session, cfg, source, project)?;
+    let artifact = assets.acquire(
+        source.join(format!("{project}.csproj")),
+        session,
+        |session, directory| dotnet_build(session, cfg, source, project, directory),
+    )?;
     let mut cmd = dotnet_command(session, cfg);
-    cmd.arg(&assembly);
+    cmd.arg(&artifact.path);
     if let Some(mode) = challenge {
         cmd.args(["--mode", mode.name()]);
     }
-    Prepared::new(cmd, version, Some(&assembly))
+    Ok(Prepared::new(cmd, version, Some(artifact)))
 }
 
 fn prepare_python(
@@ -522,16 +644,21 @@ fn prepare_python(
         cmd.env("PYTHON_JIT", "1");
     }
     cmd.arg(source.join("bench.py")).args(["--engine", mode]);
-    Prepared::new(cmd, version, None)
+    Ok(Prepared::new(cmd, version, None))
 }
 
 fn prepare_wasm(
+    assets: &mut Artifacts,
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
     source: &Path,
     engine: WasmEngine,
 ) -> Result<Prepared> {
-    let module = emit_wasm(session, cfg, source)?;
+    let module = assets.acquire(
+        source.join("emit_wasm.py"),
+        session,
+        |session, directory| emit_wasm(session, cfg, source, directory),
+    )?;
     let (version, mut cmd) = match engine {
         WasmEngine::V8 => {
             let mut probe = command(session.root(), &cfg.node);
@@ -550,11 +677,12 @@ fn prepare_wasm(
             (version, cmd)
         }
     };
-    cmd.arg(&module);
-    Prepared::new(cmd, version, Some(&module))
+    cmd.arg(&module.path);
+    Ok(Prepared::new(cmd, version, Some(module)))
 }
 
 pub fn prepare(
+    assets: &mut Artifacts,
     session: &mut Session<'_>,
     cfg: &RuntimeConfig,
     implementation: &Implementation,
@@ -563,10 +691,10 @@ pub fn prepare(
 ) -> Result<Prepared> {
     let source = session.root().join(&implementation.source);
     let mut prepared = match &implementation.backend {
-        Backend::RustDynasm => prepare_rust(session, cfg, &source, false),
-        Backend::RustChallenge => prepare_rust(session, cfg, &source, true),
+        Backend::RustDynasm => prepare_rust(assets, session, cfg, &source, false),
+        Backend::RustChallenge => prepare_rust(assets, session, cfg, &source, true),
         Backend::Dotnet { project, challenge } => {
-            prepare_dotnet(session, cfg, &source, project, *challenge)
+            prepare_dotnet(assets, session, cfg, &source, project, *challenge)
         }
         Backend::Java {
             class,
@@ -576,7 +704,7 @@ pub fn prepare(
             probe.arg("-version");
             let version = session.version(probe)?;
             let cmd = java_build(session, cfg, &source, class, *force_inline)?;
-            Prepared::new(cmd, version, None)
+            Ok(Prepared::new(cmd, version, None))
         }
         Backend::Python { engine } => prepare_python(session, cfg, &source, *engine),
         Backend::Rpython => {
@@ -589,11 +717,17 @@ pub fn prepare(
             let mut probe = Command::new(&path);
             probe.arg("--version");
             let version = session.version(probe)?;
-            Prepared::new(Command::new(&path), version, Some(&path))
+            Ok(Prepared::new(
+                Command::new(&path),
+                version,
+                Some(Artifact::external(path)?),
+            ))
         }
-        Backend::Wasm { engine } => prepare_wasm(session, cfg, &source, *engine),
-        Backend::Cranelift { batch } => prepare_cranelift(session, cfg, &source, corpus, *batch),
-        Backend::Llvm { policy } => prepare_llvm(session, cfg, corpus, *policy),
+        Backend::Wasm { engine } => prepare_wasm(assets, session, cfg, &source, *engine),
+        Backend::Cranelift { batch } => {
+            prepare_cranelift(assets, session, cfg, &source, corpus, *batch)
+        }
+        Backend::Llvm { policy } => prepare_llvm(assets, session, cfg, &source, corpus, *policy),
     }?;
     prepared.command.args(plan.dimensions());
     Ok(prepared)

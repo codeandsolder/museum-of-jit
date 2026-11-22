@@ -75,8 +75,9 @@ its actually parsed dimensions in exactly one
 executables must be rebuilt. The CLI captures the exact native benchmark
 and preceding tool argv, runtime version, known runtime JIT settings and
 artifact SHA-256 where available, in each JSON record. No global
-environment mutation or shell expansion is involved. Each run owns a
-process group and scratch directory, including timeouts and interrupts;
+environment mutation or shell expansion is involved. A sweep builds each unique source artifact once, shares only that owned
+artifact across its benchmark variants, and records reused build provenance.
+Each run owns a process group and scratch directory, including timeouts and interrupts;
 Linux child-subreaper ownership also reaps abandoned grandchildren.
 Failed, invalid and timed-out exhibits remain in the JSON report, and
 the CLI exits nonzero when any exhibit fails.
