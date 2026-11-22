@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if (( $# != 2 )); then
-    echo "usage: $0 RUNTIME_ROOT BUILD_DIR" >&2
+if (( $# < 2 || $# > 3 )); then
+    echo "usage: $0 RUNTIME_ROOT BUILD_DIR [CC]" >&2
     exit 64
 fi
 
@@ -48,7 +48,7 @@ acquire "$PYPY2_URL" "$PYPY2_ARCHIVE" "$PYPY2_SHA256" "$PYPY2_DIR"
 acquire "$RPYTHON_URL" "$RPYTHON_ARCHIVE" "$RPYTHON_SHA256" "$RPYTHON_DIR"
 
 SCCACHE_BIN="$(command -v sccache)"
-CC_BIN="${MUSEUM_RPYTHON_CC:-$(command -v gcc)}"
+CC_BIN="$(command -v "${3:-gcc}")"
 UV_BIN="$(command -v uv)"
 RG_BIN="$(command -v rg)"
 

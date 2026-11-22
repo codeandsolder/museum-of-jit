@@ -45,8 +45,8 @@ production reference rather than identical synthetic work.
 ## Reproduce
 
 ~~~bash
-uv run --no-project --python 3 tools/bench.py --workload challenge-sha256-v1 --list
-uv run --no-project --python 3 tools/bench.py \
+museum-bench list --workload challenge-sha256-v1
+museum-bench run \
   --warmup 30000 --iterations 300000 --samples 7 \
   --workload challenge-sha256-v1 \
   --impl dotnet-challenge-portable \
@@ -67,13 +67,11 @@ SIMD is not available, preserving correctness.
 ## CPU-pinned performance validation
 
 Builds and benchmarks should not be conflated. Pin the main runner to
-one logical CPU, but allow toolchain builds to use an explicit, wider
-CPU set using `MUSEUM_BUILD_CPUSET`. The actual managed and native
+one logical CPU, but allow toolchain builds to use an explicit wider CPU set via `build_cpus = "0-7"` in the selected runtime TOML. The actual managed and native
 benchmark processes inherit the single-core affinity:
 
 ~~~bash
-MUSEUM_BUILD_CPUSET=0-7 \
-taskset -c 0 uv run --no-project --python 3 tools/bench.py \
+taskset -c 0 museum-bench --config /path/to/runtime.toml run \
   --warmup 1000000 --iterations 10000000 --samples 7 \
   --workload challenge-sha256-v1 \
   --impl dotnet-challenge-portable \
@@ -91,8 +89,8 @@ than sixteen u32 lanes despite AVX-512 support.
 
 Where Rust is unavailable on the benchmark host, compile once on the
 development machine using canonical sccache and a compatible target,
-then set `MUSEUM_CHALLENGE_RUST_BIN` to the executable and
-`MUSEUM_CHALLENGE_RUSTC_VERSION` to the exact rustc version. The
+then configure a `[rust_challenge]` table in runtime TOML with `binary`
+and the exact `rustc_version`. The
 runner records the executable's SHA-256. The provided executable
 must implement the pinned source and pass the fixed SHA-256 oracle;
 a successful checksum is necessary but not sufficient to establish

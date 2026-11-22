@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import itertools
-import os
 import random
 import subprocess
 import sys
@@ -108,13 +107,11 @@ def main() -> None:
             [args.node, str(ORACLE), str(module), str(salts), str(wasm_hashes)],
             check=True,
         )
-        env = dict(os.environ, MUSEUM_PROGRAM_JSON=str(CORPUS))
         with jit_hashes.open("wb") as out:
             subprocess.run(
-                [str(binary), "--hash-salts", str(salts)],
+                [str(binary), "--corpus", str(CORPUS), "--hash-salts", str(salts)],
                 check=True,
                 stdout=out,
-                env=env,
             )
         digest = verify_lines(wasm_hashes, jit_hashes, args.count)
         print(

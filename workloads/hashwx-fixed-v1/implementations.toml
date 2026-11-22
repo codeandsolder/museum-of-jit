@@ -1,107 +1,125 @@
-[rust-dynasm]
+[[implementation]]
+id = "rust-dynasm"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/rust-dynasm.sh"
 runtime = "rust/dynasm"
 source = "workloads/hashwx-fixed-v1/implementations/rust-dynasm"
+backend = { kind = "rust-dynasm" }
 
-[dotnet-dynamic-il]
+[[implementation]]
+id = "dotnet-dynamic-il"
 mode = "generated-source-or-bytecode"
-runner = "tools/runners/dotnet-dynamic-il.sh"
 runtime = ".NET/RyuJIT"
 source = "workloads/hashwx-fixed-v1/implementations/dotnet-dynamic-il"
+backend = { kind = "dotnet", project = "HashwxDyn" }
 
-[dotnet-dynamic-pointer]
+[[implementation]]
+id = "dotnet-dynamic-pointer"
 mode = "generated-source-or-bytecode"
-runner = "tools/runners/dotnet-dynamic-pointer.sh"
 runtime = ".NET/RyuJIT"
 source = "workloads/hashwx-fixed-v1/implementations/dotnet-dynamic-pointer"
+backend = { kind = "dotnet", project = "HashwxDynPointer" }
 
-[dotnet-static]
+[[implementation]]
+id = "dotnet-static"
 mode = "idiomatic"
-runner = "tools/runners/dotnet-static.sh"
 runtime = ".NET/RyuJIT"
 source = "workloads/hashwx-fixed-v1/implementations/dotnet-static"
+backend = { kind = "dotnet", project = "HashwxCs" }
 
-[java-static]
+[[implementation]]
+id = "java-static"
 mode = "idiomatic"
-runner = "tools/runners/java-static.sh"
 runtime = "JVM"
 source = "workloads/hashwx-fixed-v1/implementations/java-static"
+backend = { kind = "java", class = "HashWxJava", force_inline = false }
 
-[java-split]
+[[implementation]]
+id = "java-split"
 mode = "idiomatic"
-runner = "tools/runners/java-split.sh"
 runtime = "JVM"
 source = "workloads/hashwx-fixed-v1/implementations/java-split"
+backend = { kind = "java", class = "HashWxSplit", force_inline = false }
 
-[java-split-force]
+[[implementation]]
+id = "java-split-force"
 mode = "idiomatic"
-runner = "tools/runners/java-split-force.sh"
 runtime = "JVM"
 source = "workloads/hashwx-fixed-v1/implementations/java-split-force"
+backend = { kind = "java", class = "HashWxSplitForce", force_inline = true }
 
-[cpython-jit]
+[[implementation]]
+id = "cpython-jit"
 mode = "generated-source-or-bytecode"
-runner = "tools/runners/cpython-jit.sh"
 runtime = "CPython JIT"
 source = "workloads/hashwx-fixed-v1/implementations/python-generated"
+backend = { kind = "python", engine = "cpython" }
 
-[pypy-intop]
+[[implementation]]
+id = "pypy-intop"
 mode = "generated-source-or-bytecode"
-runner = "tools/runners/pypy-intop.sh"
 runtime = "PyPy meta-JIT"
 source = "workloads/hashwx-fixed-v1/implementations/python-generated"
+backend = { kind = "python", engine = "pypy" }
 
-[v8-wasm]
+[[implementation]]
+id = "v8-wasm"
 mode = "generated-source-or-bytecode"
-runner = "tools/runners/v8-wasm.sh"
 runtime = "V8/WebAssembly"
 source = "workloads/hashwx-fixed-v1/implementations/wasm-fixed"
+backend = { kind = "wasm", engine = "v8" }
 
-[wasmtime-wasm]
+[[implementation]]
+id = "wasmtime-wasm"
 mode = "generated-source-or-bytecode"
-runner = "tools/runners/wasmtime-wasm.sh"
 runtime = "Wasmtime/Cranelift"
 source = "workloads/hashwx-fixed-v1/implementations/wasm-fixed"
+backend = { kind = "wasm", engine = "wasmtime" }
 
-[rpython-jitdriver]
+[[implementation]]
+id = "rpython-jitdriver"
 mode = "meta-jit-interpreter"
-runner = "tools/runners/rpython-jitdriver.sh"
 runtime = "RPython meta-JIT"
 source = "workloads/hashwx-fixed-v1/implementations/rpython-jitdriver"
+backend = { kind = "rpython" }
 
-[cranelift-direct]
+[[implementation]]
+id = "cranelift-direct"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/cranelift-direct.sh"
 runtime = "Cranelift native JIT"
 source = "workloads/hashwx-fixed-v1/implementations/cranelift-direct"
+backend = { kind = "cranelift", batch = false }
 
-[cranelift-batch]
+[[implementation]]
+id = "cranelift-batch"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/cranelift-batch.sh"
 runtime = "Cranelift native JIT (internal batch)"
 source = "workloads/hashwx-fixed-v1/implementations/cranelift-direct"
+backend = { kind = "cranelift", batch = true }
 
-[llvm-orc]
+[[implementation]]
+id = "llvm-orc"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/llvm-orc.sh"
 runtime = "LLVM ORC LLJIT (O2 IR / Aggressive codegen)"
 source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+backend = { kind = "llvm", policy = "O2" }
 
-[llvm-orc-o0]
+[[implementation]]
+id = "llvm-orc-o0"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/llvm-orc-o0.sh"
 runtime = "LLVM ORC LLJIT O0 IR / Aggressive codegen"
 source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+backend = { kind = "llvm", policy = "O0" }
 
-[llvm-orc-o1]
+[[implementation]]
+id = "llvm-orc-o1"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/llvm-orc-o1.sh"
 runtime = "LLVM ORC LLJIT O1 IR / Aggressive codegen"
 source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+backend = { kind = "llvm", policy = "O1" }
 
-[llvm-orc-o3]
+[[implementation]]
+id = "llvm-orc-o3"
 mode = "direct-ir-or-machine-code"
-runner = "tools/runners/llvm-orc-o3.sh"
 runtime = "LLVM ORC LLJIT O3 IR / Aggressive codegen"
 source = "workloads/hashwx-fixed-v1/implementations/llvm-orc"
+backend = { kind = "llvm", policy = "O3" }

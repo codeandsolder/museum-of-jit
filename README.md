@@ -9,7 +9,7 @@ The first exhibit is HashWX: a compact generated integer workload with branches,
 - **Same workload, honest backend.** An implementation may use the runtime in the most natural way available, but may not change the algorithm.
 - **Historical source is immutable.** `archive/` contains recovered experiment source. Normalized benchmark adapters live under `workloads/`.
 - **Results are raw data first.** Curated runs record host identity, runtime version, exact implementation revision, warmup, every measured sample, compile/build latency where observable, code size where observable, correctness check, and command provenance.
-- **No benchmark artifacts in the tree.** Runners build in temporary directories and clean them. The native Rust challenge runner requires `jq` to select Cargo's reported executable for binary provenance.
+- **No benchmark artifacts in the tree.** The native Rust harness owns per-run scratch directories and discovers real build artifacts from Cargo's JSON stream. No copied source trees, shell runner wrappers or jq are required.
 - **References stay visible.** Hand-written/native Rust and canonical upstream implementations are first-class reference points, not hidden baselines.
 - **Runtime abuse gets labelled.** `idiomatic`, `generated-source-or-bytecode`, `direct-ir-or-machine-code`, and `meta-jit-interpreter` are distinct implementation modes.
 
@@ -43,16 +43,44 @@ and benchmark limitations.
 
 ## Running
 
-Use `uv`; the orchestration code has no third-party Python dependencies.
+The maintained benchmark orchestrator is the native Linux Rust CLI
+`museum-bench`. Build it with the host's existing managed compiler cache,
+keeping its own artifacts outside the repository:
 
 ```bash
-uv run --no-project --python 3 tools/bench.py --list
-uv run --no-project --python 3 tools/bench.py --impl rust-dynasm
-uv run --no-project --python 3 tools/bench.py --impl all --output results/my-host.json
-uv run --no-project --python 3 tools/bench.py --workload challenge-sha256-v1 --list
+cargo install --locked --path tools/benchmark --root "$HOME/.local"
+museum-bench list
+museum-bench run --impl rust-dynasm
+museum-bench run --output results/my-host.json
+museum-bench list --workload challenge-sha256-v1
 ```
 
-Runtime-specific binaries can be supplied with environment variables documented by each runner. `tools/runtime-lock.toml` records the versions used for curated runs. Set benchmark dimensions explicitly with `--warmup`, `--iterations`, `--samples` (defaults 30000, 300000, 7) and the runner deadline with `--timeout` (seconds, default 120). The orchestrator validates and records the exact values and runner command in each result. Direct runner calls require three positional decimal counts in that order, e.g. `tools/runners/rust-dynasm.sh 0 128 1`. Counts must be in the common signed 32-bit range; the challenge workload additionally caps counts at 160000000. Warmup may be zero; iterations and sample count must be positive. Every implementation attests the parsed dimensions with exactly one `BENCHMARK_DIMENSIONS v1 WARMUP ITERATIONS SAMPLES` line; stale prebuilt executables must be rebuilt. Each run owns a separate process group and temporary directory, including on timeout. Java runners also accept `MUSEUM_JAVAC_RELEASE` so a newer `javac` can emit bytecode for an older JVM when comparing runtimes.
+Use `--root /path/to/museum-of-jit` when running outside the checkout.
+Host-specific runtime paths, prebuilt binaries, compiler selection and build
+CPU sets are explicitly loaded with `--config /path/to/runtime.toml`.
+[The example configuration](tools/runtime.example.toml) lists supported
+keys; no implicit config discovery or custom environment overrides exist.
+Bare executable names use the normal OS PATH; other paths are absolute or
+relative to the repository root. Source builds require the configured managed
+sccache client and disable automatic daemon startup. Benchmark runtime
+versions remain pinned as documented in `tools/runtime-lock.toml`.
+
+Set benchmark dimensions with `--warmup`, `--iterations`, `--samples`
+(defaults 30000, 300000, 7), and the whole-run deadline with `--timeout`
+(seconds, default 120). Counts use the common signed 32-bit range; the
+challenge workload additionally caps counts at 160000000. Warmup may be
+zero; iterations and samples must be positive. Every implementation attests
+its actually parsed dimensions in exactly one
+`BENCHMARK_DIMENSIONS v1 WARMUP ITERATIONS SAMPLES` line. Stale prebuilt
+executables must be rebuilt. The CLI captures the exact native benchmark
+and preceding tool argv, runtime version, known runtime JIT settings and
+artifact SHA-256 where available, in each JSON record. No global
+environment mutation or shell expansion is involved. A sweep builds each unique source artifact once, shares only that owned
+artifact across its benchmark variants, and records reused build provenance.
+Each run owns a process group and scratch directory, including timeouts and interrupts;
+Linux child-subreaper ownership also reaps abandoned grandchildren.
+Failed, invalid and timed-out exhibits remain in the JSON report, and
+the CLI exits nonzero when any exhibit fails.
 
 Host provenance includes the process CPU affinity on platforms that expose it, so pinned single-CPU runs cannot be mistaken for unconstrained runs.
 

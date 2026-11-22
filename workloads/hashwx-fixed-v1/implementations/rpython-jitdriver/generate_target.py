@@ -230,31 +230,32 @@ def hash_one(salt, mem):
     return regs[3] ^ regs[7] ^ regs[8]
 
 
-def parse_count(argv, index, default, allow_zero):
-    if len(argv) <= index:
-        return default
-    try:
-        value = int(argv[index])
-    except ValueError:
+def parse_count(raw, minimum):
+    if not raw or not raw.isdigit():
         return -1
-    if allow_zero:
-        if value < 0:
-            return -1
-    elif value <= 0:
+    try:
+        value = int(raw)
+    except (ValueError, OverflowError):
+        return -1
+    if value < minimum or value > 2147483647:
         return -1
     return value
 
 
 def entry_point(argv):
-    if len(argv) > 1 and argv[1] == "--version":
+    if len(argv) == 2 and argv[1] == "--version":
         print "RPython JitDriver / PyPy RPython 8.0.1"
         return 0
-    warmup = parse_count(argv, 1, 30000, True)
-    iterations = parse_count(argv, 2, 300000, False)
-    samples = parse_count(argv, 3, 7, False)
+    if len(argv) != 4:
+        print "expected WARMUP ITERATIONS SAMPLES"
+        return 2
+    warmup = parse_count(argv[1], 0)
+    iterations = parse_count(argv[2], 1)
+    samples = parse_count(argv[3], 1)
     if warmup < 0 or iterations < 1 or samples < 1:
         print "invalid benchmark counts"
         return 2
+    print "BENCHMARK_DIMENSIONS v1 " + str(warmup) + " " + str(iterations) + " " + str(samples)
     mem = [r_uint(0)] * 2050
     started = time.time()
     check = hash_one(r_uint(123456), mem)

@@ -345,17 +345,16 @@ struct IrPolicy {
   std::string_view name;
 };
 
-IrPolicy requested_ir_policy() {
-  const char *value = std::getenv("MUSEUM_LLVM_IR_OPT");
-  if (value == nullptr || std::string_view(value) == "O2")
+IrPolicy requested_ir_policy(std::string_view value) {
+  if (value == "O2")
     return {llvm::OptimizationLevel::O2, "O2"};
-  if (std::string_view(value) == "O0")
+  if (value == "O0")
     return {llvm::OptimizationLevel::O0, "O0"};
-  if (std::string_view(value) == "O1")
+  if (value == "O1")
     return {llvm::OptimizationLevel::O1, "O1"};
-  if (std::string_view(value) == "O3")
+  if (value == "O3")
     return {llvm::OptimizationLevel::O3, "O3"};
-  fail("MUSEUM_LLVM_IR_OPT must be exactly O0, O1, O2, or O3");
+  fail("--ir-opt must be exactly O0, O1, O2, or O3");
 }
 
 Compiled compile(const Corpus &corpus, IrPolicy policy) {
@@ -489,26 +488,39 @@ double micros(Clock::time_point t0) {
 } // anonymous namespace
 
 int main(int argc, char **argv) {
-  const auto policy = requested_ir_policy();
-  if (argc == 2 && std::string_view(argv[1]) == "--version") {
+  // Options are consumed before the mode. The default O2 applies to
+  // standalone diagnostic calls; the benchmark catalog always selects one.
+  --argc;
+  ++argv;
+  std::string_view policy_name = "O2";
+  if (argc >= 2 && std::string_view(argv[0]) == "--ir-opt") {
+    policy_name = argv[1];
+    argc -= 2;
+    argv += 2;
+  }
+  const auto policy = requested_ir_policy(policy_name);
+  if (argc == 1 && std::string_view(argv[0]) == "--version") {
     std::cout << "LLVM ORC LLJIT " << LLVM_VERSION_STRING << " / "
               << policy.name << " IR / Aggressive codegen\n";
     return EXIT_SUCCESS;
   }
+  require(argc >= 2 && std::string_view(argv[0]) == "--corpus",
+          "expected --corpus PROGRAM.json");
+  const char *path = argv[1];
+  argc -= 2;
+  argv += 2;
   const bool hash_file =
-      (argc == 3 && std::string_view(argv[1]) == "--hash-salts");
+      (argc == 2 && std::string_view(argv[0]) == "--hash-salts");
   const bool batch_file =
-      (argc == 3 && std::string_view(argv[1]) == "--batch-cases");
-  const bool benchmark = argc == 4;
+      (argc == 2 && std::string_view(argv[0]) == "--batch-cases");
+  const bool benchmark = argc == 3;
   require(benchmark || hash_file || batch_file,
-          "usage: llvm-orc-hashwx [WARMUP ITERATIONS SAMPLES | --version | --hash-salts SALTS.hex | "
-          "--batch-cases CASES.hex]");
-  const char *path = std::getenv("MUSEUM_PROGRAM_JSON");
-  require(path && *path,
-          "MUSEUM_PROGRAM_JSON must point to canonical program.json");
-  const auto warmup = benchmark ? count_arg(argv[1], "warmup", true) : 0;
-  const auto iterations = benchmark ? count_arg(argv[2], "iterations", false) : 0;
-  const auto samples = benchmark ? count_arg(argv[3], "samples", false) : 0;
+          "usage: llvm-orc-hashwx [--ir-opt O0|O1|O2|O3] "
+          "--corpus PROGRAM.json [WARMUP ITERATIONS SAMPLES | "
+          "--hash-salts SALTS.hex | --batch-cases CASES.hex]");
+  const auto warmup = benchmark ? count_arg(argv[0], "warmup", true) : 0;
+  const auto iterations = benchmark ? count_arg(argv[1], "iterations", false) : 0;
+  const auto samples = benchmark ? count_arg(argv[2], "samples", false) : 0;
   const auto start = Clock::now();
   const auto corpus = parse_corpus(read_text(path));
   auto compiled = compile(corpus, policy);
@@ -518,11 +530,11 @@ int main(int argc, char **argv) {
   const auto first_us = micros(first_start);
   require(check == ExpectedCheck, "independent fixture hash(123456) mismatch");
   if (hash_file) {
-    hash_salts(compiled, argv[2]);
+    hash_salts(compiled, argv[1]);
     return EXIT_SUCCESS;
   }
   if (batch_file) {
-    batch_cases(compiled, argv[2]);
+    batch_cases(compiled, argv[1]);
     return EXIT_SUCCESS;
   }
   std::cout << "BENCHMARK_DIMENSIONS v1 " << warmup << ' ' << iterations
