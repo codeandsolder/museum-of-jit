@@ -1,0 +1,50 @@
+# RTX3080 SM86 original global scratch layout, 44 reg/thread, compile -O3
+## block sweep, 4096 hashes
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.12377596,rate_MHs=1.928640,verified=4096,min_ms=2.10841608,max_ms=2.19039989
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=64,grid=64,spoiler=0,resident_ctas_sm=16,resident_warps_sm=32.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=64,spoiler=0,samples=7,median_ms=2.16268802,rate_MHs=1.893939,verified=4096,min_ms=2.15551996,max_ms=2.22480011
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=128,grid=32,spoiler=0,resident_ctas_sm=10,resident_warps_sm=40.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=128,spoiler=0,samples=7,median_ms=2.22207999,rate_MHs=1.843318,verified=4096,min_ms=2.20364809,max_ms=2.27132797
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=256,grid=16,spoiler=0,resident_ctas_sm=5,resident_warps_sm=40.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=256,spoiler=0,samples=7,median_ms=2.50470400,rate_MHs=1.635323,verified=4096,min_ms=2.50163198,max_ms=2.73100805
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=512,grid=8,spoiler=0,resident_ctas_sm=2,resident_warps_sm=32.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=512,spoiler=0,samples=7,median_ms=3.07696009,rate_MHs=1.331184,verified=4096,min_ms=3.06790400,max_ms=3.28396797
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=1024,grid=4,spoiler=0,resident_ctas_sm=1,resident_warps_sm=32.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=1024,spoiler=0,samples=7,median_ms=4.27929592,rate_MHs=0.957167,verified=4096,min_ms=4.25676823,max_ms=4.46979189
+## active CTA residency sweep, block32 count4096
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=4096,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=4096,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=4096,samples=7,median_ms=2.14937592,rate_MHs=1.905669,verified=4096,min_ms=2.14627194,max_ms=3.70790410
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=8192,resident_ctas_sm=11,resident_warps_sm=11.0,regs=44,local_bytes=0,shared_bytes=8192,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=8192,samples=7,median_ms=2.15961599,rate_MHs=1.896633,verified=4096,min_ms=2.14323211,max_ms=2.20412803
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=16384,resident_ctas_sm=5,resident_warps_sm=5.0,regs=44,local_bytes=0,shared_bytes=16384,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=16384,samples=7,median_ms=2.16678405,rate_MHs=1.890359,verified=4096,min_ms=2.14630389,max_ms=2.20908809
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=24576,resident_ctas_sm=4,resident_warps_sm=4.0,regs=44,local_bytes=0,shared_bytes=24576,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=24576,samples=7,median_ms=2.16268802,rate_MHs=1.893939,verified=4096,min_ms=2.14527988,max_ms=2.97472000
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=32768,resident_ctas_sm=3,resident_warps_sm=3.0,regs=44,local_bytes=0,shared_bytes=32768,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=32768,samples=7,median_ms=2.15449595,rate_MHs=1.901141,verified=4096,min_ms=2.14732790,max_ms=2.62928009
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=49152,resident_ctas_sm=2,resident_warps_sm=2.0,regs=44,local_bytes=0,shared_bytes=49152,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=49152,samples=7,median_ms=2.15347195,rate_MHs=1.902045,verified=4096,min_ms=2.14323211,max_ms=2.61836791
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=65536,resident_ctas_sm=1,resident_warps_sm=1.0,regs=44,local_bytes=0,shared_bytes=65536,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=65536,samples=7,median_ms=3.58911991,rate_MHs=1.141227,verified=4096,min_ms=3.55020809,max_ms=3.79286408
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=81920,resident_ctas_sm=1,resident_warps_sm=1.0,regs=44,local_bytes=0,shared_bytes=81920,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=81920,samples=7,median_ms=3.57990408,rate_MHs=1.144165,verified=4096,min_ms=3.55225611,max_ms=3.61603189
+## wave count / L2 working set sweep, 32-thread CTA
+shape,group=1,pitch=2049,shared_mode=0,count=256,block=32,grid=8,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=256,block=32,spoiler=0,samples=7,median_ms=0.91648000,rate_MHs=0.279330,verified=256,min_ms=0.91648000,max_ms=0.97308803
+shape,group=1,pitch=2049,shared_mode=0,count=512,block=32,grid=16,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=512,block=32,spoiler=0,samples=7,median_ms=1.58822405,rate_MHs=0.322373,verified=512,min_ms=1.58515203,max_ms=1.64889598
+shape,group=1,pitch=2049,shared_mode=0,count=1024,block=32,grid=32,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=1024,block=32,spoiler=0,samples=7,median_ms=1.69779205,rate_MHs=0.603136,verified=1024,min_ms=1.69167995,max_ms=2.10022402
+shape,group=1,pitch=2049,shared_mode=0,count=2048,block=32,grid=64,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=2048,block=32,spoiler=0,samples=7,median_ms=1.78995204,rate_MHs=1.144165,verified=2048,min_ms=1.77152002,max_ms=2.19545603
+shape,group=1,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.12787199,rate_MHs=1.924928,verified=4096,min_ms=2.11046410,max_ms=2.31526399
+shape,group=1,pitch=2049,shared_mode=0,count=8192,block=32,grid=256,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=8192,block=32,spoiler=0,samples=7,median_ms=3.21535993,rate_MHs=2.547771,verified=8192,min_ms=3.19897604,max_ms=3.43244791
+shape,group=1,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=5.95552015,rate_MHs=2.751061,verified=16384,min_ms=5.87775993,max_ms=6.40489578
+shape,group=1,pitch=2049,shared_mode=0,count=32768,block=32,grid=1024,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=32768,block=32,spoiler=0,samples=7,median_ms=12.67814445,rate_MHs=2.584605,verified=32768,min_ms=11.99001598,max_ms=13.77280045
+shape,group=1,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=1,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=24.61081505,rate_MHs=2.662894,verified=65536,min_ms=24.07935905,max_ms=26.59865570

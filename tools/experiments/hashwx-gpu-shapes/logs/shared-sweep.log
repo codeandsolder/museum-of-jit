@@ -1,0 +1,40 @@
+# CUDA shared-memory scratch, canonical fixed seed 4096 answers verified
+# count=4096
+shape,group=1,pitch=2049,shared_mode=1,count=4096,block=1,grid=4096,spoiler=16392,resident_ctas_sm=5,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=16392,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=4096,block=1,spoiler=16392,samples=7,median_ms=1.22982395,rate_MHs=3.330558,verified=4096,min_ms=1.22265601,max_ms=1.27814400
+shape,group=1,pitch=2049,shared_mode=1,count=4096,block=2,grid=2048,spoiler=32784,resident_ctas_sm=3,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=32784,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=4096,block=2,spoiler=32784,samples=7,median_ms=1.34553599,rate_MHs=3.044140,verified=4096,min_ms=1.34348798,max_ms=1.39283204
+shape,group=1,pitch=2049,shared_mode=1,count=4096,block=3,grid=1366,spoiler=49176,resident_ctas_sm=2,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=49176,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=4096,block=3,spoiler=49176,samples=7,median_ms=1.61984003,rate_MHs=2.528645,verified=4096,min_ms=1.61792004,max_ms=1.68073595
+shape,group=1,pitch=2049,shared_mode=1,count=4096,block=4,grid=1024,spoiler=65568,resident_ctas_sm=1,resident_warps_sm=0.1,regs=48,local_bytes=0,shared_bytes=65568,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=4096,block=4,spoiler=65568,samples=7,median_ms=2.66752005,rate_MHs=1.535509,verified=4096,min_ms=2.66649604,max_ms=2.92863989
+shape,group=1,pitch=2049,shared_mode=1,count=4096,block=5,grid=820,spoiler=81960,resident_ctas_sm=1,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=81960,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=4096,block=5,spoiler=81960,samples=7,median_ms=2.39104009,rate_MHs=1.713062,verified=4096,min_ms=2.38796806,max_ms=2.45084810
+shape,group=1,pitch=2049,shared_mode=1,count=4096,block=6,grid=683,spoiler=98352,resident_ctas_sm=1,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=98352,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=4096,block=6,spoiler=98352,samples=7,median_ms=2.16268802,rate_MHs=1.893939,verified=4096,min_ms=2.15961599,max_ms=2.37055993
+# count=16384
+shape,group=1,pitch=2049,shared_mode=1,count=16384,block=1,grid=16384,spoiler=16392,resident_ctas_sm=5,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=16392,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=16384,block=1,spoiler=16392,samples=7,median_ms=5.16505623,rate_MHs=3.172086,verified=16384,min_ms=4.94080019,max_ms=5.56646395
+shape,group=1,pitch=2049,shared_mode=1,count=16384,block=2,grid=8192,spoiler=32784,resident_ctas_sm=3,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=32784,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=16384,block=2,spoiler=32784,samples=7,median_ms=5.01657581,rate_MHs=3.265973,verified=16384,min_ms=5.01555204,max_ms=5.07971191
+shape,group=1,pitch=2049,shared_mode=1,count=16384,block=3,grid=5462,spoiler=49176,resident_ctas_sm=2,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=49176,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=16384,block=3,spoiler=49176,samples=7,median_ms=6.05798388,rate_MHs=2.704530,verified=16384,min_ms=6.05593586,max_ms=6.12009621
+shape,group=1,pitch=2049,shared_mode=1,count=16384,block=4,grid=4096,spoiler=65568,resident_ctas_sm=1,resident_warps_sm=0.1,regs=48,local_bytes=0,shared_bytes=65568,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=16384,block=4,spoiler=65568,samples=7,median_ms=10.41715240,rate_MHs=1.572791,verified=16384,min_ms=10.20108795,max_ms=10.82572842
+shape,group=1,pitch=2049,shared_mode=1,count=16384,block=5,grid=3277,spoiler=81960,resident_ctas_sm=1,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=81960,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=16384,block=5,spoiler=81960,samples=7,median_ms=9.22521591,rate_MHs=1.776002,verified=16384,min_ms=8.62105560,max_ms=10.72537613
+shape,group=1,pitch=2049,shared_mode=1,count=16384,block=6,grid=2731,spoiler=98352,resident_ctas_sm=1,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=98352,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=16384,block=6,spoiler=98352,samples=7,median_ms=7.78166389,rate_MHs=2.105462,verified=16384,min_ms=7.71379185,max_ms=8.33535957
+# count=65536
+shape,group=1,pitch=2049,shared_mode=1,count=65536,block=1,grid=65536,spoiler=16392,resident_ctas_sm=5,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=16392,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=7,median_ms=19.56044769,rate_MHs=3.350435,verified=65536,min_ms=19.15391922,max_ms=19.84409523
+shape,group=1,pitch=2049,shared_mode=1,count=65536,block=2,grid=32768,spoiler=32784,resident_ctas_sm=3,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=32784,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=7,median_ms=18.89382362,rate_MHs=3.468647,verified=65536,min_ms=18.88153648,max_ms=19.53075218
+shape,group=1,pitch=2049,shared_mode=1,count=65536,block=3,grid=21846,spoiler=49176,resident_ctas_sm=2,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=49176,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=7,median_ms=23.36684799,rate_MHs=2.804657,verified=65536,min_ms=22.80652809,max_ms=24.01484871
+shape,group=1,pitch=2049,shared_mode=1,count=65536,block=4,grid=16384,spoiler=65568,resident_ctas_sm=1,resident_warps_sm=0.1,regs=48,local_bytes=0,shared_bytes=65568,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=7,median_ms=39.80188751,rate_MHs=1.646555,verified=65536,min_ms=39.04204941,max_ms=41.56908798
+shape,group=1,pitch=2049,shared_mode=1,count=65536,block=5,grid=13108,spoiler=81960,resident_ctas_sm=1,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=81960,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=5,spoiler=81960,samples=7,median_ms=35.28294373,rate_MHs=1.857441,verified=65536,min_ms=34.69823837,max_ms=36.83539200
+shape,group=1,pitch=2049,shared_mode=1,count=65536,block=6,grid=10923,spoiler=98352,resident_ctas_sm=1,resident_warps_sm=0.2,regs=48,local_bytes=0,shared_bytes=98352,sm_count=68
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=7,median_ms=30.41587257,rate_MHs=2.154664,verified=65536,min_ms=30.40255928,max_ms=31.23200035

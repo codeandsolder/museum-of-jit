@@ -1,0 +1,31 @@
+# Paired repeat block=2 65536, branchless shared
+# repeat 1
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=12.79936028,rate_MHs=5.120256,verified=65536,min_ms=12.46720028,max_ms=13.54751968
+pitch=2056 result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=9,median_ms=16.74752045,rate_MHs=3.913176,verified=65536,min_ms=16.73638344,max_ms=18.07360077
+pitch=2050 result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=9,median_ms=17.16940880,rate_MHs=3.817021,verified=65536,min_ms=16.74444771,max_ms=18.90236855
+pitch=2064 result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=9,median_ms=17.38751984,rate_MHs=3.769140,verified=65536,min_ms=16.75263977,max_ms=18.99929619
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=12.30131245,rate_MHs=5.327562,verified=65536,min_ms=11.87417603,max_ms=13.52192020
+# repeat 2
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=11.88147163,rate_MHs=5.515815,verified=65536,min_ms=11.85791969,max_ms=13.94396782
+pitch=2056 result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=9,median_ms=16.75161552,rate_MHs=3.912220,verified=65536,min_ms=16.73727989,max_ms=18.98598480
+pitch=2050 result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=9,median_ms=17.16838455,rate_MHs=3.817249,verified=65536,min_ms=16.86163139,max_ms=18.66444778
+pitch=2064 result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=9,median_ms=17.16326332,rate_MHs=3.818388,verified=65536,min_ms=16.74547195,max_ms=19.24396706
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=11.98611164,rate_MHs=5.467661,verified=65536,min_ms=11.86508846,max_ms=12.74454403
+# repeat 3
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=11.87327957,rate_MHs=5.519621,verified=65536,min_ms=11.86390400,max_ms=12.50508785
+pitch=2056 result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=9,median_ms=16.74444771,rate_MHs=3.913894,verified=65536,min_ms=16.73932838,max_ms=17.40287971
+pitch=2050 result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=9,median_ms=16.96358490,rate_MHs=3.863334,verified=65536,min_ms=16.74649620,max_ms=17.79711914
+pitch=2064 result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=9,median_ms=16.96358490,rate_MHs=3.863334,verified=65536,min_ms=16.74137688,max_ms=18.19136047
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=11.92441559,rate_MHs=5.495951,verified=65536,min_ms=11.86918354,max_ms=12.90857601
+# repeat 4
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=12.00556755,rate_MHs=5.458801,verified=65536,min_ms=11.86918354,max_ms=12.91270447
+pitch=2056 result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=9,median_ms=16.75059128,rate_MHs=3.912459,verified=65536,min_ms=16.74137688,max_ms=16.86486435
+pitch=2050 result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=9,median_ms=16.79817581,rate_MHs=3.901376,verified=65536,min_ms=16.74035263,max_ms=18.06646347
+pitch=2064 result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=9,median_ms=16.95846367,rate_MHs=3.864501,verified=65536,min_ms=16.74454308,max_ms=17.74182320
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=12.30233574,rate_MHs=5.327118,verified=65536,min_ms=11.87020779,max_ms=13.11539173
+# repeat 5
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=11.91526413,rate_MHs=5.500172,verified=65536,min_ms=11.86303997,max_ms=12.96998405
+pitch=2056 result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=9,median_ms=16.80662346,rate_MHs=3.899415,verified=65536,min_ms=16.73625565,max_ms=18.35625648
+pitch=2050 result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=9,median_ms=16.79177666,rate_MHs=3.902863,verified=65536,min_ms=16.73216057,max_ms=17.55740738
+pitch=2064 result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=9,median_ms=17.18476868,rate_MHs=3.813610,verified=65536,min_ms=16.73932838,max_ms=18.15551949
+pitch=2049 result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=9,median_ms=12.09753609,rate_MHs=5.417301,verified=65536,min_ms=11.86611176,max_ms=13.11846447

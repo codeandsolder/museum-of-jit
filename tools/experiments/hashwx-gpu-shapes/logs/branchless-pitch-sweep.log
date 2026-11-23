@@ -1,0 +1,56 @@
+# Branchless 64-bit unaligned loads: shared-memory pitch, 4k/64k hash counts, 9 CUDA event samples
+# pitch=2050
+ptxas info    : Function properties for shape_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 293.717 ms
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=1,spoiler=16400,samples=9,median_ms=1.17760003,rate_MHs=3.478261,verified=4096,min_ms=1.16540802,max_ms=1.61587203
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=2,spoiler=32800,samples=9,median_ms=1.18783998,rate_MHs=3.448276,verified=4096,min_ms=1.18579197,max_ms=1.25232005
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=3,spoiler=49200,samples=9,median_ms=1.42540801,rate_MHs=2.873563,verified=4096,min_ms=1.42348802,max_ms=1.50847995
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=1,spoiler=16400,samples=9,median_ms=19.09657669,rate_MHs=3.431819,verified=65536,min_ms=19.03104019,max_ms=20.17689514
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=9,median_ms=16.95436859,rate_MHs=3.865434,verified=65536,min_ms=16.74137688,max_ms=17.40287971
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=3,spoiler=49200,samples=9,median_ms=20.43699265,rate_MHs=3.206734,verified=65536,min_ms=20.00998306,max_ms=21.45193672
+# pitch=2056
+ptxas info    : Function properties for shape_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 294.667 ms
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=1,spoiler=16448,samples=9,median_ms=1.17043197,rate_MHs=3.499563,verified=4096,min_ms=1.15814400,max_ms=1.37215996
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=2,spoiler=32896,samples=9,median_ms=1.18870401,rate_MHs=3.445769,verified=4096,min_ms=1.18681598,max_ms=1.25203204
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=3,spoiler=49344,samples=9,median_ms=1.41721594,rate_MHs=2.890174,verified=4096,min_ms=1.41619205,max_ms=1.64044797
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=1,spoiler=16448,samples=9,median_ms=19.11705589,rate_MHs=3.428143,verified=65536,min_ms=18.25484848,max_ms=20.95308876
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=9,median_ms=16.87283134,rate_MHs=3.884114,verified=65536,min_ms=16.73932838,max_ms=18.95731163
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=3,spoiler=49344,samples=9,median_ms=20.01305580,rate_MHs=3.274662,verified=65536,min_ms=20.00793648,max_ms=21.50927925
+# pitch=2064
+ptxas info    : Function properties for shape_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 293.980 ms
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=1,spoiler=16512,samples=9,median_ms=1.18067205,rate_MHs=3.469211,verified=4096,min_ms=1.17043197,max_ms=1.24598396
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=2,spoiler=33024,samples=9,median_ms=1.18886399,rate_MHs=3.445306,verified=4096,min_ms=1.18681598,max_ms=1.25833595
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=3,spoiler=49536,samples=9,median_ms=1.42438400,rate_MHs=2.875629,verified=4096,min_ms=1.42335999,max_ms=1.62918401
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=1,spoiler=16512,samples=9,median_ms=19.99462318,rate_MHs=3.277681,verified=65536,min_ms=18.20569611,max_ms=21.41798401
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=9,median_ms=17.17350388,rate_MHs=3.816111,verified=65536,min_ms=16.74342346,max_ms=19.02691269
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=3,spoiler=49536,samples=9,median_ms=20.64281654,rate_MHs=3.174761,verified=65536,min_ms=20.02326393,max_ms=21.24390411
+# pitch=2072
+ptxas info    : Function properties for shape_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 293.134 ms
+result,group=1,pitch=2072,shared_mode=1,count=4096,block=1,spoiler=16576,samples=9,median_ms=1.18054402,rate_MHs=3.469587,verified=4096,min_ms=1.17145598,max_ms=1.82681596
+result,group=1,pitch=2072,shared_mode=1,count=4096,block=2,spoiler=33152,samples=9,median_ms=1.73276806,rate_MHs=2.363848,verified=4096,min_ms=1.73055995,max_ms=1.79392004
+result,group=1,pitch=2072,shared_mode=1,count=4096,block=3,spoiler=49728,samples=9,median_ms=1.41721594,rate_MHs=2.890174,verified=4096,min_ms=1.41619205,max_ms=1.85036802
+result,group=1,pitch=2072,shared_mode=1,count=65536,block=1,spoiler=16576,samples=9,median_ms=19.06687927,rate_MHs=3.437164,verified=65536,min_ms=19.02489662,max_ms=19.61471939
+result,group=1,pitch=2072,shared_mode=1,count=65536,block=2,spoiler=33152,samples=9,median_ms=24.98457527,rate_MHs=2.623058,verified=65536,min_ms=24.97228813,max_ms=25.50144005
+result,group=1,pitch=2072,shared_mode=1,count=65536,block=3,spoiler=49728,samples=9,median_ms=20.44006348,rate_MHs=3.206252,verified=65536,min_ms=20.01916885,max_ms=21.07084846
+# pitch=2080
+ptxas info    : Function properties for shape_kernel
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 286.873 ms
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=1,spoiler=16640,samples=9,median_ms=1.17967999,rate_MHs=3.472128,verified=4096,min_ms=1.17043197,max_ms=1.23388803
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=2,spoiler=33280,samples=9,median_ms=1.72332799,rate_MHs=2.376797,verified=4096,min_ms=1.72134399,max_ms=1.78636801
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=3,spoiler=49920,samples=9,median_ms=1.41721594,rate_MHs=2.890174,verified=4096,min_ms=1.41619205,max_ms=1.63635194
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=1,spoiler=16640,samples=9,median_ms=19.20313644,rate_MHs=3.412776,verified=65536,min_ms=18.19955254,max_ms=20.52988815
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=2,spoiler=33280,samples=9,median_ms=25.58566475,rate_MHs=2.561434,verified=65536,min_ms=24.99276733,max_ms=28.10265541
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=3,spoiler=49920,samples=9,median_ms=20.01919937,rate_MHs=3.273657,verified=65536,min_ms=19.99974442,max_ms=23.10457611

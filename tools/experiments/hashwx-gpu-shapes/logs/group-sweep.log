@@ -1,0 +1,79 @@
+# RTX3080: compile-time group-interleaved global scratch layout
+# All binaries compare every output against 4096 canonical nonce fixtures
+# compile GROUP_SIZE=2
+compiler-g2: ptxas info    : Function properties for shape_kernel
+compiler-g2:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g2: ptxas info    : Used 44 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g2: ptxas info    : Compile time = 412.994 ms
+shape,group=2,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=2,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.23539209,rate_MHs=1.832341,verified=4096,min_ms=2.22630405,max_ms=2.32665610
+shape,group=2,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=2,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=6.51983976,rate_MHs=2.512945,verified=16384,min_ms=6.43680000,max_ms=6.63756800
+shape,group=2,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=2,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=27.65414429,rate_MHs=2.369844,verified=65536,min_ms=27.16774368,max_ms=29.67859268
+# compile GROUP_SIZE=4
+compiler-g4: ptxas info    : Function properties for shape_kernel
+compiler-g4:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g4: ptxas info    : Used 44 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g4: ptxas info    : Compile time = 410.643 ms
+shape,group=4,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=4,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.35926390,rate_MHs=1.736135,verified=4096,min_ms=2.35110402,max_ms=2.99008012
+shape,group=4,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=4,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=7.95443201,rate_MHs=2.059732,verified=16384,min_ms=7.84179211,max_ms=8.51558399
+shape,group=4,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=4,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=34.07884979,rate_MHs=1.923070,verified=65536,min_ms=33.95849609,max_ms=34.85184097
+# compile GROUP_SIZE=8
+compiler-g8: ptxas info    : Function properties for shape_kernel
+compiler-g8:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g8: ptxas info    : Used 44 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g8: ptxas info    : Compile time = 446.090 ms
+shape,group=8,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=8,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.53952003,rate_MHs=1.612903,verified=4096,min_ms=2.45043206,max_ms=2.86719990
+shape,group=8,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=8,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=8.92390442,rate_MHs=1.835968,verified=16384,min_ms=8.83404827,max_ms=9.19961643
+shape,group=8,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=44,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=8,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=39.58476639,rate_MHs=1.655586,verified=65536,min_ms=38.33139038,max_ms=40.20223999
+# compile GROUP_SIZE=16
+compiler-g16: ptxas info    : Function properties for shape_kernel
+compiler-g16:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g16: ptxas info    : Used 48 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g16: ptxas info    : Compile time = 399.821 ms
+shape,group=16,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=16,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.51904011,rate_MHs=1.626016,verified=4096,min_ms=2.34905601,max_ms=2.73068810
+shape,group=16,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=16,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=11.13497639,rate_MHs=1.471400,verified=16384,min_ms=10.86582375,max_ms=12.60441589
+shape,group=16,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=16,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=45.62944031,rate_MHs=1.436266,verified=65536,min_ms=45.41747284,max_ms=47.92934418
+# compile GROUP_SIZE=32
+compiler-g32: ptxas info    : Function properties for shape_kernel
+compiler-g32:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g32: ptxas info    : Used 48 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g32: ptxas info    : Compile time = 468.502 ms
+shape,group=32,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=32,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.67468810,rate_MHs=1.531394,verified=4096,min_ms=2.61120009,max_ms=2.68595195
+shape,group=32,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=32,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=12.59212780,rate_MHs=1.301130,verified=16384,min_ms=12.10675240,max_ms=13.59769630
+shape,group=32,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=32,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=52.73395157,rate_MHs=1.242767,verified=65536,min_ms=52.12812805,max_ms=55.52435303
+# compile GROUP_SIZE=64
+compiler-g64: ptxas info    : Function properties for shape_kernel
+compiler-g64:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g64: ptxas info    : Used 48 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g64: ptxas info    : Compile time = 409.282 ms
+shape,group=64,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=64,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.36543989,rate_MHs=1.731602,verified=4096,min_ms=2.35622406,max_ms=3.15187192
+shape,group=64,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=64,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=10.65779209,rate_MHs=1.537279,verified=16384,min_ms=10.34035206,max_ms=11.23676777
+shape,group=64,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=64,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=44.87270355,rate_MHs=1.460487,verified=65536,min_ms=44.45593643,max_ms=47.46684647
+# compile GROUP_SIZE=128
+compiler-g128: ptxas info    : Function properties for shape_kernel
+compiler-g128:     0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+compiler-g128: ptxas info    : Used 48 registers, used 0 barriers, 380 bytes cmem[0]
+compiler-g128: ptxas info    : Compile time = 410.250 ms
+shape,group=128,pitch=2049,shared_mode=0,count=4096,block=32,grid=128,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=128,pitch=2049,shared_mode=0,count=4096,block=32,spoiler=0,samples=7,median_ms=2.72896004,rate_MHs=1.500938,verified=4096,min_ms=2.70115209,max_ms=3.02767992
+shape,group=128,pitch=2049,shared_mode=0,count=16384,block=32,grid=512,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=128,pitch=2049,shared_mode=0,count=16384,block=32,spoiler=0,samples=7,median_ms=13.13075161,rate_MHs=1.247758,verified=16384,min_ms=12.26239967,max_ms=13.31807995
+shape,group=128,pitch=2049,shared_mode=0,count=65536,block=32,grid=2048,spoiler=0,resident_ctas_sm=16,resident_warps_sm=16.0,regs=48,local_bytes=0,shared_bytes=0,sm_count=68
+result,group=128,pitch=2049,shared_mode=0,count=65536,block=32,spoiler=0,samples=7,median_ms=53.22547150,rate_MHs=1.231290,verified=65536,min_ms=52.39039993,max_ms=54.81676865

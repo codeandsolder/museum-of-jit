@@ -1,0 +1,56 @@
+# Persistent shared-memory scratchpad CTA occupancy geometry, RTX3080 65,536 hashes
+# block=1
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=80.35113525,rate_MHs=0.815620,verified=65536,min_ms=78.71282959,max_ms=82.04624176
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=39.10655975,rate_MHs=1.675831,verified=65536,min_ms=38.84953690,max_ms=39.63369751
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=26.63430405,rate_MHs=2.460586,verified=65536,min_ms=26.39871979,max_ms=27.78895950
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=19.94956779,rate_MHs=3.285084,verified=65536,min_ms=19.62537575,max_ms=20.33987236
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=19.75807953,rate_MHs=3.316922,verified=65536,min_ms=19.49900818,max_ms=20.55120087
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=19.89529610,rate_MHs=3.294045,verified=65536,min_ms=19.81644821,max_ms=20.53120041
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=19.97414398,rate_MHs=3.281042,verified=65536,min_ms=19.46316719,max_ms=21.31049538
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=21.49695969,rate_MHs=3.048617,verified=65536,min_ms=20.86707115,max_ms=23.30112076
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=19.71097565,rate_MHs=3.324848,verified=65536,min_ms=19.56547165,max_ms=20.31084824
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=1,spoiler=16392,samples=5,median_ms=19.37305641,rate_MHs=3.382843,verified=65536,min_ms=19.13257599,max_ms=20.65920067
+# block=2
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=54.92531204,rate_MHs=1.193184,verified=65536,min_ms=54.59158325,max_ms=56.82073593
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=28.12211227,rate_MHs=2.330408,verified=65536,min_ms=27.66563225,max_ms=29.71763229
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=19.58912086,rate_MHs=3.345530,verified=65536,min_ms=18.79929543,max_ms=20.87939262
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=27.87840080,rate_MHs=2.350780,verified=65536,min_ms=27.48006439,max_ms=31.05792046
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=22.06972885,rate_MHs=2.969497,verified=65536,min_ms=21.94022369,max_ms=23.23660851
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=20.73459244,rate_MHs=3.160708,verified=65536,min_ms=20.58649635,max_ms=21.67500877
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=21.83577538,rate_MHs=3.001313,verified=65536,min_ms=21.82143974,max_ms=21.92608070
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=22.19107246,rate_MHs=2.953260,verified=65536,min_ms=21.81632042,max_ms=23.58988762
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=19.40480042,rate_MHs=3.377309,verified=65536,min_ms=19.20409584,max_ms=19.82873535
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=2,spoiler=32784,samples=5,median_ms=19.58195114,rate_MHs=3.346755,verified=65536,min_ms=19.13241577,max_ms=20.66227150
+# block=3
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=44.20505524,rate_MHs=1.482545,verified=65536,min_ms=44.20399857,max_ms=44.66809464
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=22.25859261,rate_MHs=2.944301,verified=65536,min_ms=22.25663948,max_ms=23.40700722
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=30.04243279,rate_MHs=2.181448,verified=65536,min_ms=29.39187241,max_ms=30.54182434
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=22.69798470,rate_MHs=2.887305,verified=65536,min_ms=22.29248047,max_ms=23.10041618
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=26.91481590,rate_MHs=2.434941,verified=65536,min_ms=26.67417526,max_ms=27.50771141
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=22.31295967,rate_MHs=2.937127,verified=65536,min_ms=22.29043198,max_ms=22.43315125
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=22.32320023,rate_MHs=2.935780,verified=65536,min_ms=22.31193542,max_ms=23.00531197
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=23.89920044,rate_MHs=2.742184,verified=65536,min_ms=23.69228745,max_ms=24.26060867
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=22.83990479,rate_MHs=2.869364,verified=65536,min_ms=22.55155182,max_ms=23.33593559
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=3,spoiler=49176,samples=5,median_ms=23.00076866,rate_MHs=2.849296,verified=65536,min_ms=22.53311920,max_ms=23.69126320
+# block=4
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=38.12249756,rate_MHs=1.719090,verified=65536,min_ms=37.51116943,max_ms=39.55744171
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=37.73952103,rate_MHs=1.736535,verified=65536,min_ms=37.56339264,max_ms=38.61808014
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=38.14400101,rate_MHs=1.718121,verified=65536,min_ms=37.71494293,max_ms=38.71449661
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=38.20339203,rate_MHs=1.715450,verified=65536,min_ms=37.98527908,max_ms=38.80755234
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=37.53062439,rate_MHs=1.746201,verified=65536,min_ms=37.51526260,max_ms=38.58691025
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=38.55971146,rate_MHs=1.699598,verified=65536,min_ms=37.60614395,max_ms=38.84953690
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=38.84236908,rate_MHs=1.687230,verified=65536,min_ms=38.15423965,max_ms=41.23145676
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=40.67324829,rate_MHs=1.611280,verified=65536,min_ms=40.21503830,max_ms=40.74515152
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=38.14297485,rate_MHs=1.718167,verified=65536,min_ms=37.60230255,max_ms=38.78911972
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=4,spoiler=65568,samples=5,median_ms=37.61033630,rate_MHs=1.742500,verified=65536,min_ms=37.53676987,max_ms=37.65436935
+# block=6
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=30.67600060,rate_MHs=2.136393,verified=65536,min_ms=29.87008095,max_ms=30.95952034
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=30.48447990,rate_MHs=2.149815,verified=65536,min_ms=29.69756889,max_ms=31.86790466
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=30.20492744,rate_MHs=2.169712,verified=65536,min_ms=30.01766396,max_ms=30.46451187
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=29.64480019,rate_MHs=2.210708,verified=65536,min_ms=29.63455963,max_ms=30.17420769
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=29.70931244,rate_MHs=2.205908,verified=65536,min_ms=29.66835213,max_ms=31.11526489
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=30.13324738,rate_MHs=2.174873,verified=65536,min_ms=29.93161583,max_ms=30.57859230
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=30.40291214,rate_MHs=2.155583,verified=65536,min_ms=30.11379242,max_ms=31.74604797
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=32.26111984,rate_MHs=2.031424,verified=65536,min_ms=31.25760078,max_ms=33.04953766
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=29.76051140,rate_MHs=2.202113,verified=65536,min_ms=29.74515152,max_ms=32.01440048
+result,group=1,pitch=2049,shared_mode=1,count=65536,block=6,spoiler=98352,samples=5,median_ms=30.36979294,rate_MHs=2.157934,verified=65536,min_ms=29.76665688,max_ms=32.61529541
