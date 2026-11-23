@@ -1,7 +1,8 @@
-//! Generate complete seed-specialized HashWX CUDA source and CPU-reference hashes.
+//! Generate complete seed-specialized `HashWX` CUDA source and CPU-reference hashes.
 //! The emitted programs are compiled using the same CUDA harness as the original fixture.
 
 use hashwx::{HashWx, Instruction, Op, ProgramSet};
+use std::fmt::Write as _;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -18,7 +19,11 @@ fn seed(index: u32) -> [u8; 32] {
     result
 }
 
-fn emit_instruction(instruction: Instruction, memory_phase: bool, out: &mut String) {
+fn emit_instruction(
+    instruction: Instruction,
+    memory_phase: bool,
+    out: &mut String,
+) -> std::fmt::Result {
     let dst = instruction.dst();
     let src = instruction.src();
     let imm = instruction.imm();
@@ -47,7 +52,7 @@ fn emit_instruction(instruction: Instruction, memory_phase: bool, out: &mut Stri
         Op::AddRor | Op::AddAsr | Op::AddLsr => format!("{shift}+{y}"),
         Op::SubRor | Op::SubAsr | Op::SubLsr => format!("{shift}-{y}"),
     };
-    out.push_str(&format!("r[{dst}]={value};\n"));
+    writeln!(out, "r[{dst}]={value};")
 }
 
 fn emit_cuda(program: &ProgramSet) -> Result<String, Box<dyn std::error::Error>> {
@@ -87,13 +92,10 @@ fn emit_cuda(program: &ProgramSet) -> Result<String, Box<dyn std::error::Error>>
                 );
             }
             for &instruction in subprogram.body() {
-                emit_instruction(instruction, memory_phase, &mut out);
+                emit_instruction(instruction, memory_phase, &mut out)?;
             }
             if !subprogram.unconditional() {
-                out.push_str(&format!(
-                    "if (r[{}]&32ULL) break;\n",
-                    subprogram.body()[0].dst()
-                ));
+                writeln!(out, "if (r[{}]&32ULL) break;", subprogram.body()[0].dst())?;
             }
             out.push_str("if (budget==0) break; --budget;\n}\n");
         }
@@ -182,7 +184,7 @@ mod tests {
                     for &ins in p.body() {
                         seen[ins.op() as usize] = true;
                         let mut rendered = String::new();
-                        emit_instruction(ins, phase != 0, &mut rendered);
+                        emit_instruction(ins, phase != 0, &mut rendered)?;
                         assert!(rendered.contains(&format!("r[{}]=", ins.dst())));
                     }
                 }
