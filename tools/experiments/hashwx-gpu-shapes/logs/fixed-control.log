@@ -1,0 +1,4 @@
+seed,seed=0,cubin_bytes=126752,compile_ms=2787.283,module_load_ms=0.499,regs=52,resident_ctas=3
+result,seed=0,count=463,compile_ms=2787.283,module_load_ms=0.499,median_kernel_ms=0.16179,rate_MHs=2.86170,verified=463,regs=52,resident_ctas=3,min_ms=0.16058,max_ms=0.34131
+result,seed=0,count=4096,compile_ms=2787.283,module_load_ms=0.499,median_kernel_ms=0.84173,rate_MHs=4.86618,verified=4096,regs=52,resident_ctas=3,min_ms=0.84070,max_ms=0.92090
+result,seed=0,count=65536,compile_ms=2787.283,module_load_ms=0.499,median_kernel_ms=14.66675,rate_MHs=4.46834,verified=65536,regs=52,resident_ctas=3,min_ms=12.43648,max_ms=15.19514

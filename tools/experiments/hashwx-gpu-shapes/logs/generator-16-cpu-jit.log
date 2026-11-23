@@ -1,0 +1,16 @@
+seed_index=0,hashes=65536,seed_prefix=00010203,program_generation_ms=0.0221,cuda_source_generation_ms=0.3744,cpu_jit_compile_ms=0.1163,cpu_oracle_total_ms=3200.6521
+seed_index=1,hashes=65536,seed_prefix=35363738,program_generation_ms=0.0098,cuda_source_generation_ms=0.4764,cpu_jit_compile_ms=0.0786,cpu_oracle_total_ms=460.7726
+seed_index=2,hashes=65536,seed_prefix=6a6b6c6d,program_generation_ms=0.0093,cuda_source_generation_ms=0.2723,cpu_jit_compile_ms=0.0637,cpu_oracle_total_ms=476.4738
+seed_index=3,hashes=65536,seed_prefix=9fa0a1a2,program_generation_ms=0.0093,cuda_source_generation_ms=0.7071,cpu_jit_compile_ms=0.0721,cpu_oracle_total_ms=292.1150
+seed_index=4,hashes=65536,seed_prefix=d4d5d6d7,program_generation_ms=0.0090,cuda_source_generation_ms=0.2582,cpu_jit_compile_ms=0.0796,cpu_oracle_total_ms=4010.5098
+seed_index=5,hashes=65536,seed_prefix=090a0b0c,program_generation_ms=0.0091,cuda_source_generation_ms=0.2549,cpu_jit_compile_ms=0.0505,cpu_oracle_total_ms=3815.3213
+seed_index=6,hashes=65536,seed_prefix=3e3f4041,program_generation_ms=0.0108,cuda_source_generation_ms=0.2687,cpu_jit_compile_ms=0.0654,cpu_oracle_total_ms=2401.1818
+seed_index=7,hashes=65536,seed_prefix=73747576,program_generation_ms=0.0093,cuda_source_generation_ms=0.2677,cpu_jit_compile_ms=0.0799,cpu_oracle_total_ms=1935.7577
+seed_index=8,hashes=65536,seed_prefix=a8a9aaab,program_generation_ms=0.0104,cuda_source_generation_ms=0.2676,cpu_jit_compile_ms=0.1711,cpu_oracle_total_ms=4631.5674
+seed_index=9,hashes=65536,seed_prefix=dddedfe0,program_generation_ms=0.0100,cuda_source_generation_ms=0.2808,cpu_jit_compile_ms=0.0579,cpu_oracle_total_ms=7810.0093
+seed_index=10,hashes=65536,seed_prefix=12131415,program_generation_ms=0.0097,cuda_source_generation_ms=0.2569,cpu_jit_compile_ms=0.0606,cpu_oracle_total_ms=2145.3601
+seed_index=11,hashes=65536,seed_prefix=4748494a,program_generation_ms=0.0104,cuda_source_generation_ms=0.5401,cpu_jit_compile_ms=0.0842,cpu_oracle_total_ms=2500.3096
+seed_index=12,hashes=65536,seed_prefix=7c7d7e7f,program_generation_ms=0.0116,cuda_source_generation_ms=1.7580,cpu_jit_compile_ms=0.0725,cpu_oracle_total_ms=1005.7955
+seed_index=13,hashes=65536,seed_prefix=b1b2b3b4,program_generation_ms=0.0088,cuda_source_generation_ms=0.2582,cpu_jit_compile_ms=0.0636,cpu_oracle_total_ms=1853.7087
+seed_index=14,hashes=65536,seed_prefix=e6e7e8e9,program_generation_ms=0.0086,cuda_source_generation_ms=0.2625,cpu_jit_compile_ms=0.0717,cpu_oracle_total_ms=494.2972
+seed_index=15,hashes=65536,seed_prefix=1b1c1d1e,program_generation_ms=0.0105,cuda_source_generation_ms=0.2731,cpu_jit_compile_ms=0.0723,cpu_oracle_total_ms=287.1772

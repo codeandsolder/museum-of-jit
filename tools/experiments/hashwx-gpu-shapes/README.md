@@ -127,3 +127,70 @@ otherwise surprising observations:
 An independently recompiled run from the exact checked-in source measured
 **5.463 MH/s** on the RTX 3080 for 65,536 hashes, with all 65,536 outputs
 oracle-verified (see logs/reproduction-20261123.log).
+
+## Multi-seed source generation and compilation-inclusive measurements (2026-11-23)
+
+A Rust [IR-to-CUDA generator](generator/src/main.rs) emits **all 13**
+HashWX instruction types from the architecture-neutral hashwx-rs program
+representation, including the exact 32-subprogram branch policies,
+seed-derived SipHash key, and both phases. It independently generates
+native-CPU-JIT reference hashes for any requested number of distinct nonces.
+
+The standalone [NVRTC runner](bench/multiseed_nvrtc.cu) compiles one complete
+seed-specific CUDA kernel to SM86 CUBIN using the CUDA runtime compiler,
+loads it via the CUDA driver API, and checks every output with the CPU oracle.
+It separates host program generation, CPU JIT construction, NVRTC compiler
+time, CUDA module load, and warmed CUDA-event kernel timings.
+
+### Reproduce
+
+On Acer, with the repository's managed Cargo/sccache configuration:
+
+    cargo +nightly-2026-11-22 test --offline --locked \
+      --manifest-path generator/Cargo.toml \
+      --target-dir /home/jan/build/hashwx-shapes/generator-target
+    cargo +nightly-2026-11-22 run --offline --release --locked \
+      --manifest-path generator/Cargo.toml \
+      --target-dir /home/jan/build/hashwx-shapes/generator-target \
+      -- /home/jan/build/hashwx-shapes/seeds 16 65536
+
+Transfer the generated seeds directory to a CUDA machine. Build and run:
+
+    /usr/local/cuda/bin/nvcc -O2 -std=c++17 -arch=sm_86 \
+      bench/multiseed_nvrtc.cu -o /path/to/build/multiseed_nvrtc -lnvrtc -lcuda
+    /path/to/build/multiseed_nvrtc /path/to/generated/seeds 7
+
+The generator output directory and CUDA binary build directory are explicit,
+outside the checkout. No CUDA binary or generated seed corpus is committed.
+Raw measurements are stored in logs/.
+
+### Physical RTX 3080 results — 16 independent programs
+
+- **16 separately generated programs, 65,536 distinct nonces each**:
+  1,048,576 distinct program/nonce pairs, plus smaller batch repeats, with
+  **every GPU output verified** against an independent native CPU-JIT oracle.
+- CPU-side source generation on Acer ~0.25–0.5 ms/seed usually; native CPU JIT
+  compilation **0.05–0.17 ms/seed**. Oracle hashing duration was affected
+  by other work on Acer, so it is not a clean CPU throughput measurement.
+- Eight previously compiled seeds: NVRTC compile **34–41 ms**.
+  Eight new seed kernels: NVRTC compile **1.65–2.40 seconds**. Reusing an
+  identical source benefits from compiler caching; initial application-wide
+  driver initialization is a separate variable.
+- CUDA module load **0.27–0.60 ms**.
+- With a large batch first to warm the GPU, 463-hash kernels execute in
+  **0.151–0.171 ms** across 16 seeds; 4,096-hash kernels take
+  **0.795–0.896 ms**. Earlier 5x short-batch outliers followed launch
+  order/power-state effects, not intrinsic seed complexity.
+- At 65,536 distinct nonces, **15 of 16** seeds delivered roughly
+  **4.76–5.47 MH/s**; seed #13 unexpectedly reached **2.23 MH/s**
+  median while its smaller batches were normal. This needs an isolated
+  retest before being treated as an architectural outlier.
+- Cold NVRTC compilation is vastly slower than native CPU JIT construction
+  for a new proof with approximately 463 candidate hashes. The optimized GPU
+  kernel is mainly useful if compilation is amortized or compilation is made
+  dramatically cheaper.
+
+The new corpus uses distinct nonces, not repeated 4,096-case fixtures.
+See logs/multiseed-16-unique-nvrtc.log and earlier order/cache controls.
+A static GPU interpreter or a direct machine-code emitter could eliminate
+heavy NVRTC compilation; this benchmark is only for specialized CUDA kernels.
