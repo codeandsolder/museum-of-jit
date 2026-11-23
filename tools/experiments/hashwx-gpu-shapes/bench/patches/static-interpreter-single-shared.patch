@@ -1,0 +1,183 @@
+--- a/static_interpreter.cu
++++ b/static_interpreter.cu
+@@ -62,18 +62,19 @@
+     const uint32_t i=static_cast<uint32_t>(offset)&16383u;
+     const uint64_t a=s[i>>3];
+     const uint32_t shift=(i&7u)*8u;
+-    if(shift==0) return a;
+     const uint64_t b=s[(i>>3)+1];
+-    return (a>>shift)|(b<<(64-shift));
++    const uint64_t shifted=b<<((64U-shift)&63U);
++    return (a>>shift)|(shifted & (uint64_t(0)-uint64_t(shift!=0U)));
+ }
+ 
+ __global__ void static_hashwx(const ProgramData* __restrict__ programs,
+                               uint64_t* __restrict__ memory,
+                               uint64_t* __restrict__ output,
+-                              int active_lanes, int hashes_per_seed, uint64_t start_nonce) {
++                              int active_lanes, int hashes_per_seed, uint64_t start_nonce, int total_nonce_count) {
+     __shared__ uint16_t instructions[256][WARP];
+     __shared__ uint32_t unconditional[WARP];
+     __shared__ uint64_t r[9][WARP];
++    extern __shared__ uint64_t shared_scratch[];
+ 
+     const int lane=threadIdx.x;
+     const bool active=lane<active_lanes;
+@@ -81,7 +82,7 @@
+ 
+     uint64_t k[2]={0,0};
+     if(active) {
+-        const ProgramData* data=programs+idx;
++        const ProgramData* data=programs;
+         k[0]=data->key[0]; k[1]=data->key[1];
+         #pragma unroll 1
+         for(int i=0;i<256;++i) {
+@@ -100,12 +101,12 @@
+         unconditional[lane]=mask;
+     }
+     __syncthreads();
+-    if(!active)return;
+-    uint64_t* s=memory+static_cast<size_t>(idx)*NWORDS;
++    if(!active || idx>=total_nonce_count)return;
++    uint64_t* s=shared_scratch+static_cast<size_t>(lane)*NWORDS;
+     uint64_t digest=0;
+     for(int nonce_index=0;nonce_index<hashes_per_seed;++nonce_index) {
+         uint64_t v[4];
+-        init(v,k,start_nonce+nonce_index,r,lane);
++        init(v,k,start_nonce+static_cast<uint64_t>(idx)*hashes_per_seed+nonce_index,r,lane);
+         s[2048]=r[8][lane];
+         uint32_t sp=16384;
+         for(int phase=0;phase<2;++phase) {
+@@ -174,80 +175,59 @@
+     return data;
+ }
+ 
+-int main(int argc,char**argv) {
+-    if(argc<2){fprintf(stderr,"usage: static_interpreter DATA_FOLDER\n");return 2;}
+-    const std::string data=argv[1];
+-    auto data_p=read_file((data+"/programs.bin").c_str());
+-    auto data_gold=read_file((data+"/gold.bin").c_str());
+-    if(data_p.size()%sizeof(ProgramData)!=0 || data_p.size()/sizeof(ProgramData)*32!=data_gold.size()){
+-        fprintf(stderr,"bad fixture sizes %zu %zu\n",data_p.size(),data_gold.size());return 2;
++int main(int argc, char** argv) {
++    if (argc != 2) {fprintf(stderr,"usage: static-interpreter-single DIR\n");return 2;}
++    const std::string directory=argv[1];
++    auto input=read_file((directory+"/programs.bin").c_str());
++    auto oracle_bytes=read_file((directory+"/gold.bin").c_str());
++    if(input.size()!=sizeof(ProgramData) || oracle_bytes.size()<1024*sizeof(uint64_t)) {
++        fprintf(stderr,"invalid single seed oracle\n"); return 2;
+     }
+-    const size_t max_programs=data_p.size()/sizeof(ProgramData);
+-    cudaDeviceProp prop;
+-    CK(cudaGetDeviceProperties(&prop,0));
+-    int l2=0;
++    const auto* oracle=reinterpret_cast<const uint64_t*>(oracle_bytes.data());
++    ProgramData* d_program=nullptr;
++    uint64_t* d_scratch=nullptr;
++    uint64_t* d_out=nullptr;
++    CK(cudaMalloc(&d_program,sizeof(ProgramData)));
++    CK(cudaMalloc(&d_scratch,1024ULL*SCRATCH_BYTES));
++    CK(cudaMalloc(&d_out,1024ULL*sizeof(uint64_t)));
++    CK(cudaMemcpy(d_program,input.data(),input.size(),cudaMemcpyHostToDevice));
++    int sm_count=0, l2=0;
++    CK(cudaDeviceGetAttribute(&sm_count,cudaDevAttrMultiProcessorCount,0));
+     CK(cudaDeviceGetAttribute(&l2,cudaDevAttrL2CacheSize,0));
+-    printf("CUDA_GPU name=%s SMs=%d L2_KiB=%d\n",prop.name,prop.multiProcessorCount,l2/1024);
+-    ProgramData* gpu_p=nullptr;
+-    uint64_t *gpu_s=nullptr,*gpu_out=nullptr;
+-    CK(cudaMalloc(&gpu_p,data_p.size()));
+-    CK(cudaMalloc(&gpu_s,max_programs*sizeof(uint64_t)*NWORDS));
+-    CK(cudaMalloc(&gpu_out,max_programs*sizeof(uint64_t)));
+-    CK(cudaMemcpy(gpu_p,data_p.data(),data_p.size(),cudaMemcpyHostToDevice));
+-    // Differential test across different generated programs AND nonce values,
+-    // before doing any throughput measurements.
+-    for(int nonce=0;nonce<4;++nonce) {
+-        constexpr int check_blocks=30, check_lanes=6, n=check_blocks*check_lanes;
+-        static_hashwx<<<check_blocks,32>>>(gpu_p,gpu_s,gpu_out,check_lanes,1,nonce);
+-        CK(cudaGetLastError());
+-        CK(cudaDeviceSynchronize());
+-        std::vector<uint64_t> output(n);
+-        CK(cudaMemcpy(output.data(),gpu_out,n*8,cudaMemcpyDeviceToHost));
+-        for(int i=0;i<n;++i) {
+-            uint64_t expected=0;
+-            std::memcpy(&expected,&data_gold[i*32+nonce*8],8);
+-            if(output[i]!=expected) {
+-                fprintf(stderr,"GOLD_NONCE_MISMATCH seed=%d nonce=%d got=%016" PRIx64 " want=%016" PRIx64 "\n",
+-                    i,nonce,output[i],expected);
+-                return 4;
+-            }
+-        }
+-    }
+-    puts("GOLDEN_180_SEEDS_4_NONCES_ALL_MATCH");
+-    for(auto [blocks,lanes]: std::vector<std::pair<int,int>>{
+-        {30,4},{64,3},{90,2}
+-    }) {
+-        const int active=blocks*lanes;
+-        if(active>static_cast<int>(max_programs))continue;
+-        static_hashwx<<<blocks,32>>>(gpu_p,gpu_s,gpu_out,lanes,1,0);
+-        CK(cudaGetLastError());
+-        CK(cudaDeviceSynchronize());
+-        std::vector<uint64_t> output(active);
+-        CK(cudaMemcpy(output.data(),gpu_out,active*8,cudaMemcpyDeviceToHost));
+-        int bad=0;
+-        for(int i=0;i<active;++i) {
+-            uint64_t expected=0;
+-            std::memcpy(&expected,&data_gold[i*32],8);
+-            if(output[i]!=expected) {
+-                if(bad<4)printf("MISMATCH blocks=%d lanes=%d seed=%d got=%016" PRIx64 " want=%016" PRIx64 "\n",blocks,lanes,i,output[i],expected);
+-                ++bad;
+-            }
+-        }
+-        if(bad){fprintf(stderr,"VERIFY_FAILED %d/%d\n",bad,active);return 3;}
+-        cudaEvent_t ev_start,ev_end;
+-        CK(cudaEventCreate(&ev_start));CK(cudaEventCreate(&ev_end));
+-        const int n=463;
+-        // Timed work includes the kernel, not program generation or memory transfer.
+-        CK(cudaEventRecord(ev_start));
+-        static_hashwx<<<blocks,32>>>(gpu_p,gpu_s,gpu_out,lanes,n,0);
+-        CK(cudaEventRecord(ev_end));CK(cudaEventSynchronize(ev_end));CK(cudaGetLastError());
+-        float ms=0;
+-        CK(cudaEventElapsedTime(&ms,ev_start,ev_end));
+-        printf("STATIC_INTERPRETER blocks=%d lanes=%d hashes=%d scratch_KiB=%zu ms=%.4f MHs=%.6f verified=%d\n",
+-            blocks,lanes,active*n,active*SCRATCH_BYTES/1024,ms,
+-            (static_cast<double>(active)*n)/(ms*1000.),active);
+-        fflush(stdout);
+-        CK(cudaEventDestroy(ev_start));CK(cudaEventDestroy(ev_end));
++    printf("SINGLE_SEED gpu_SM=%d L2KiB=%d\n",sm_count,l2/1024);
++    CK(cudaFuncSetAttribute(static_hashwx,cudaFuncAttributeMaxDynamicSharedMemorySize,4*SCRATCH_BYTES));
++    for(int count : {463,1024}) {
++      for(auto [blocks, lanes] : std::vector<std::pair<int,int>>{
++        {15,32},{16,32},{30,16},{32,16},{34,16},
++        {58,8},{60,8},{68,8},{100,5},{116,4},
++        {136,4},{155,3},{155,4},{232,2},{256,2},{463,1},{512,1},
++        {64,16},{128,8},{256,4},{340,3}
++      }) {
++         if(blocks*lanes<count || blocks*lanes>1024 || lanes>4) continue;
++         static_hashwx<<<blocks,32,lanes*SCRATCH_BYTES>>>(d_program,d_scratch,d_out,lanes,1,0,count);
++         CK(cudaGetLastError());CK(cudaDeviceSynchronize());
++         std::vector<uint64_t> results(count);
++         CK(cudaMemcpy(results.data(),d_out,count*sizeof(uint64_t),cudaMemcpyDeviceToHost));
++         for(int n=0;n<count;++n) if(results[n]!=oracle[n]) {
++             fprintf(stderr,"incorrect nonce=%d blocks=%d lanes=%d got=%016" PRIx64 " want=%016" PRIx64 "\n", n,blocks,lanes,results[n],oracle[n]);
++             return 3;
++         }
++         cudaEvent_t t0{},t1{};
++         CK(cudaEventCreate(&t0));CK(cudaEventCreate(&t1));
++         std::vector<float> timings;
++         for(int rep=0;rep<9;++rep) {
++           CK(cudaEventRecord(t0));
++           static_hashwx<<<blocks,32,lanes*SCRATCH_BYTES>>>(d_program,d_scratch,d_out,lanes,1,0,count);
++           CK(cudaEventRecord(t1));CK(cudaEventSynchronize(t1));
++           float elapsed=0;CK(cudaEventElapsedTime(&elapsed,t0,t1));
++           timings.push_back(elapsed);
++         }
++         std::sort(timings.begin(),timings.end());
++         const double med=timings[timings.size()/2];
++         printf("single_seed,count=%d,blocks=%d,lanes=%d,concurrent=%d,median_ms=%.6f,rate_MHs=%.4f,verified=%d\n",count,blocks,lanes,blocks*lanes,med,count/med/1000.0,count);
++         fflush(stdout);
++         CK(cudaEventDestroy(t0));CK(cudaEventDestroy(t1));
++      }
+     }
+-    CK(cudaFree(gpu_p));CK(cudaFree(gpu_s));CK(cudaFree(gpu_out));
++    CK(cudaFree(d_program));CK(cudaFree(d_scratch));CK(cudaFree(d_out));
+ }

@@ -1,0 +1,12 @@
+SINGLE_SEED gpu_SM=68 L2KiB=5120
+single_seed,count=463,blocks=116,lanes=4,concurrent=464,median_ms=2.004992,rate_MHs=0.2309,verified=463
+single_seed,count=463,blocks=136,lanes=4,concurrent=544,median_ms=2.003840,rate_MHs=0.2311,verified=463
+single_seed,count=463,blocks=155,lanes=3,concurrent=465,median_ms=2.641920,rate_MHs=0.1753,verified=463
+single_seed,count=463,blocks=155,lanes=4,concurrent=620,median_ms=2.001920,rate_MHs=0.2313,verified=463
+single_seed,count=463,blocks=232,lanes=2,concurrent=464,median_ms=2.987008,rate_MHs=0.1550,verified=463
+single_seed,count=463,blocks=256,lanes=2,concurrent=512,median_ms=2.985984,rate_MHs=0.1551,verified=463
+single_seed,count=463,blocks=463,lanes=1,concurrent=463,median_ms=2.237440,rate_MHs=0.2069,verified=463
+single_seed,count=463,blocks=512,lanes=1,concurrent=512,median_ms=2.120704,rate_MHs=0.2183,verified=463
+single_seed,count=463,blocks=256,lanes=4,concurrent=1024,median_ms=1.902592,rate_MHs=0.2434,verified=463
+single_seed,count=463,blocks=340,lanes=3,concurrent=1020,median_ms=2.503680,rate_MHs=0.1849,verified=463
+single_seed,count=1024,blocks=256,lanes=4,concurrent=1024,median_ms=3.773440,rate_MHs=0.2714,verified=1024

@@ -194,3 +194,119 @@ The new corpus uses distinct nonces, not repeated 4,096-case fixtures.
 See logs/multiseed-16-unique-nvrtc.log and earlier order/cache controls.
 A static GPU interpreter or a direct machine-code emitter could eliminate
 heavy NVRTC compilation; this benchmark is only for specialized CUDA kernels.
+
+## Static interpreter versus per-seed NVRTC JIT (2026-11-23)
+
+For new, short PoW puzzles, raw 65k-hash throughput is misleading: a
+seed-specialized CUDA compiler needs compilation on every previously unseen
+program. We therefore recovered the previously verified generic HashWX CUDA
+interpreter from **hashwx-rs PR #17** (archived commit
+a3ab135d7385d7d16c7b822ee40860aec2baa8f6), preserving its original
+portable-Rust oracle generator. The branch has since been removed, but GitHub
+still exposes the immutable original source via refs/pull/17/head.
+
+The generic interpreter stores the 256-instruction packed program in shared
+memory and uses an independent 16,392-byte **global** scratchpad per active
+CUDA lane. A single compiled GPU kernel handles many distinct HashWX
+ProgramSets without re-running NVRTC.
+
+### RTX 3080, multiple different programs
+
+Compiled the original interpreter with nvcc -O3 -arch=sm_86, generated 1,024
+different programs, checked the 180-seed x 4-nonce baseline oracle (720/720),
+and checked the first output for all active programs at every launch shape.
+Each active lane executes **463 sequential nonces for its own program**.
+The timed result is an XOR of those 463 hashes; all 463 individual hashes per
+lane were **not separately verified** in this multiseed interpreter test.
+
+| CTA count | Active lanes / CTA | Concurrent programs | Throughput MH/s |
+| ---: | ---: | ---: | ---: |
+| 90 | 2 | 180 | 0.182 baseline, 0.188 branchless |
+| 136 | 6 | 816 | 0.373 |
+| 204 | 3 | 612 | 0.388 |
+| 340 | 2 | 680 | 0.516 |
+| 256 | 4 | 1024 | 0.545 |
+| 320 | 3 | 960 | 0.573 |
+| **340** | **3** | **1020** | **0.615** |
+
+The final 340 x 3 configuration repeated at **0.608, 0.615, 0.614 MH/s**
+using separate runs, roughly **3.3x the initial 90 x 2 configuration**.
+It has about 16 MiB of simultaneous global scratchpads, well beyond
+the RTX 3080's 5 MiB L2. This is evidence that more independent data-dependent
+loads/latency hiding outweigh higher cache residency for this interpreter.
+
+Changing the interpreter's unaligned load to the same branchless lowering as
+the specialized CUDA kernel improves the initial geometry only ~3%, rather
+than doubling throughput. Dynamic opcode and register-file handling account
+for a larger portion of its cost. Unlike the specialized kernel, placing full
+scratchpads into shared memory also **regresses** due reduced concurrency.
+
+### RTX 3080, a *single* previously unseen program
+
+For an apples-to-apples short-challenge latency test, the archived interpreter
+was patched to broadcast one ProgramSet to every active lane, assign a unique
+nonce to each lane, and verify the resulting digest for **every** output against
+1,024 independent native-Rust reference hashes. This is a distinct workload
+from the multi-program XOR benchmark above.
+
+| Shape for a 463-nonce search | GPU kernel time |
+| --- | ---: |
+| 15 CTAs x 32 active lanes | 3.122 ms |
+| 58 CTAs x 8 active lanes | 2.123 ms |
+| 116 CTAs x 4 active lanes | 1.597 ms |
+| 155 CTAs x 3 active lanes | 1.408 ms |
+| **232 CTAs x 2 active lanes** | **1.167 ms** |
+| 463 CTAs x 1 active lane | 1.315 ms |
+| Shared scratch, best tested shape | ~1.903 ms |
+
+The single-program kernel is already compiled and its reported CUDA time
+excludes uploading the new ProgramSet and transferring results. It nonetheless
+demonstrates that interpreter execution for a ~463-nonce fresh challenge
+is ~7 times slower than the specialized post-compilation CUDA kernel
+(~0.15–0.17 ms), before accounting for unavoidable host/device overhead.
+
+### Compilation cost and backend policy
+
+Physical RTX3080 NVRTC for **8 new unrelated seeds**: 1.65–2.40 **seconds**
+per complete program; **8 previously compiled seeds**: ~34–41 **milliseconds**
+per seed, showing the compiler cache matters. CUDA module load ~0.3–0.6 ms.
+The native CPU JIT compiles each program on Acer in roughly
+0.05–0.17 ms, excluding CPU workload execution. A fresh tiny challenge
+therefore should **not** select seed-specialized CUDA/NVRTC automatically.
+
+The strongest current architecture is:
+- CPU native JIT for fresh, small challenges and low-latency responses.
+- Static GPU interpreter when many programs must be handled concurrently
+  and the kernel is already resident; its relevant metric is independent
+  challenges/second and end-to-end first-proof time, not only MH/s.
+- Optimized shared-memory CUDA specialization for programs reused across
+  enough work to amortize code-generation/compile costs.
+- If low-cost direct SASS/codegen is implemented later, remeasure the
+  crossover instead of retaining a legacy fixed dispatch threshold.
+
+### Reproducing archived-interpreter adaptations
+
+Fetch the exact historical source (do not modify the hashwx-rs main branch):
+
+~~~bash
+git fetch https://github.com/codeandsolder/hashwx-rs.git refs/pull/17/head
+git show FETCH_HEAD:experiments/gpu-static-interpreter/static_interpreter.cu \
+  > /path/to/build/static_interpreter.cu
+~~~
+
+Apply the appropriate standalone patch from bench/patches into that
+**build directory**, then compile with nvcc for sm_86:
+- static-interpreter-geometry.patch: branchless read and multi-program
+  geometry sweep; original 180x4 oracle validation.
+- static-interpreter-single.patch: one broadcast ProgramSet, unique nonce
+  per active lane, exhaustive output checking and shape timings.
+- static-interpreter-single-shared.patch: same single-program test but
+  full scratch in CUDA shared memory (negative control).
+- static-interpreter-oracle-1024.patch: change the original Rust fixture
+  generator to emit 1,024 oracle nonces for the single-program workload.
+
+The patches were dry-applied successfully against the exact original source.
+The raw measurements and compiler diagnostics live under logs/.
+The same benchmark covers **kernel time only**; a production proof engine
+still needs upload, dispatch, result transfer, validation and seed churn
+benchmarks before any routing decision.

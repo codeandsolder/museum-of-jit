@@ -1,0 +1,15 @@
+# focused seed13 repeat 1
+seed,seed=13,cubin_bytes=128160,compile_ms=55.331,module_load_ms=0.342,regs=54,resident_ctas=3
+result,seed=13,count=65536,compile_ms=55.331,module_load_ms=0.342,median_kernel_ms=12.65424,rate_MHs=5.17898,verified=65536,regs=54,resident_ctas=3,min_ms=11.93363,max_ms=13.44304
+result,seed=13,count=4096,compile_ms=55.331,module_load_ms=0.342,median_kernel_ms=0.80691,rate_MHs=5.07614,verified=4096,regs=54,resident_ctas=3,min_ms=0.80589,max_ms=0.89203
+result,seed=13,count=463,compile_ms=55.331,module_load_ms=0.342,median_kernel_ms=0.15462,rate_MHs=2.99436,verified=463,regs=54,resident_ctas=3,min_ms=0.15360,max_ms=0.22307
+# focused seed13 repeat 2
+seed,seed=13,cubin_bytes=128160,compile_ms=57.691,module_load_ms=0.461,regs=54,resident_ctas=3
+result,seed=13,count=65536,compile_ms=57.691,module_load_ms=0.461,median_kernel_ms=12.15181,rate_MHs=5.39311,verified=65536,regs=54,resident_ctas=3,min_ms=11.92858,max_ms=13.89466
+result,seed=13,count=4096,compile_ms=57.691,module_load_ms=0.461,median_kernel_ms=0.80582,rate_MHs=5.08300,verified=4096,regs=54,resident_ctas=3,min_ms=0.80486,max_ms=1.02093
+result,seed=13,count=463,compile_ms=57.691,module_load_ms=0.461,median_kernel_ms=0.15462,rate_MHs=2.99436,verified=463,regs=54,resident_ctas=3,min_ms=0.15258,max_ms=0.20589
+# focused seed13 repeat 3
+seed,seed=13,cubin_bytes=128160,compile_ms=65.818,module_load_ms=0.358,regs=54,resident_ctas=3
+result,seed=13,count=65536,compile_ms=65.818,module_load_ms=0.358,median_kernel_ms=12.20506,rate_MHs=5.36958,verified=65536,regs=54,resident_ctas=3,min_ms=11.94906,max_ms=13.48096
+result,seed=13,count=4096,compile_ms=65.818,module_load_ms=0.358,median_kernel_ms=0.80589,rate_MHs=5.08259,verified=4096,regs=54,resident_ctas=3,min_ms=0.80486,max_ms=1.21958
+result,seed=13,count=463,compile_ms=65.818,module_load_ms=0.358,median_kernel_ms=0.15456,rate_MHs=2.99560,verified=463,regs=54,resident_ctas=3,min_ms=0.15360,max_ms=0.24723

@@ -1,0 +1,11 @@
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -44,7 +44,7 @@
+             programs.write_all(&key.to_le_bytes())?;
+         }
+         let oracle = HashWx::interpret_program(&p);
+-        for nonce in 0..4_u64 {
++        for nonce in 0..1024_u64 {
+             gold.write_all(&oracle.hash(nonce).to_le_bytes())?;
+         }
+         if index == 0 {
