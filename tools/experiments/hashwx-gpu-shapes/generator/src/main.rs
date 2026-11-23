@@ -1,6 +1,8 @@
 //! Generate complete seed-specialized `HashWX` CUDA source and CPU-reference hashes.
 //! The emitted programs are compiled using the same CUDA harness as the original fixture.
 
+mod ptx;
+
 use hashwx::{HashWx, Instruction, Op, ProgramSet};
 use std::fmt::Write as _;
 use std::fs::{self, File};
@@ -120,6 +122,7 @@ fn emit_seed(
     let cuda = emit_cuda(&program)?;
     let source_ms = t1.elapsed().as_secs_f64() * 1e3;
     fs::write(directory.join("fixture.cuh"), cuda)?;
+    fs::write(directory.join("kernel.ptx"), ptx::emit(&program)?)?;
 
     let t2 = Instant::now();
     let cpu = HashWx::compile_program(&program)?;

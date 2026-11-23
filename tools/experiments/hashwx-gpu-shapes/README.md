@@ -310,3 +310,91 @@ The raw measurements and compiler diagnostics live under logs/.
 The same benchmark covers **kernel time only**; a production proof engine
 still needs upload, dispatch, result transfer, validation and seed churn
 benchmarks before any routing decision.
+
+## Native GPU JIT and per-architecture bootstrap (2026-11-23)
+
+The new Rust [IR-to-PTX emitter](generator/src/ptx.rs) produces complete
+seed-specific HashWX programs from the architecture-neutral program IR, across
+all 13 op kinds, both phases, conditional loops, SipHash and two-word
+unaligned shared-memory reads. It is unit tested across 64 seeds.
+
+The [PTX native runner](run-gpu-jit.sh) uses ptxas to compile SASS, then loads
+and validates the binary directly using the CUDA Driver API. On RTX 3080:
+
+| Mode | Fresh native compilation | 65,536-hash throughput |
+| --- | ---: | ---: |
+| ptxas -O0 | 155 ms | 0.23 MH/s |
+| ptxas -O1 | 485 ms | 2.76 MH/s |
+| ptxas -O2 | ~600 ms | 3.94 MH/s |
+| **ptxas -O3** | **~620 ms** | **~4.10 MH/s** |
+| NVRTC CUDA C++ | 1.65–2.40 seconds | up to 5.46 MH/s |
+
+The full O3 source and kernel each returned correct GPU outputs on all
+**16 distinct programs x 65,536 distinct nonces: 1,048,576 verified hashes**.
+O3 rates by seed ranged roughly 3.7–4.1 MH/s, and CUDA module loading was
+usually ~0.2–0.6 ms. The 463-hash kernel typically took ~0.20–0.23 ms.
+
+### Automatically harvested per-SM native shell
+
+The [bootstrap](bootstrap/src/main.rs) queries GPU compute capability and
+compiles a reference PTX kernel once per architecture/toolkit/source identity.
+It parses CUBIN ELF section headers rather than assuming fixed offsets,
+locates native instruction text and exit-offset metadata, extracts up to
+eight native SASS instruction samples per mnemonic from nvdisasm, and caches
+them in an explicitly supplied build directory. Repeated runs show cache hits.
+
+The [shell generator](bootstrap/build-shell.sh) builds an inert, oversized
+native kernel shell with the same HashWX entry ABI and sufficient resource
+reservation for an entire generated kernel. Our SM86 shell reserves
+**128 registers/thread and 291,840 bytes of native instruction space**.
+
+The Rust patcher validates architecture, code capacity, register capacity,
+kernel metadata and exit sites, then inserts a completely different native
+instruction stream and relocates exit metadata. It permits one absent/present
+explicit-zero stack-size attribute; all other ABI attributes must match.
+**The same shell successfully hosted all 16 independently generated SASS
+programs**, each verified for 65,536 hashes on the physical RTX 3080.
+Throughput remained ~3.8–4.1 MH/s. A native-to-native transplant between
+two ordinary shells and an exact byte-for-byte self-transplant also passed.
+
+Offline calibration compiled successfully for **SM89, SM90, and SM120** with
+CUDA 13.1, discovering different native ELF text and exit-offset locations.
+Only SM86 was run on physical hardware. These calibration samples are **not
+yet a complete SASS operand encoder**; their primary value is automating the
+per-ISA CUBIN layout, opcode specimen collection, and resource handling.
+
+### Reproduce
+
+Generate 16 seed programs plus independent CPU JIT oracles on Acer:
+
+~~~bash
+cargo +nightly-2026-11-22 run --offline --locked --release \
+  --manifest-path generator/Cargo.toml \
+  --target-dir /home/jan/build/hashwx-jit/generator-target \
+  -- /home/jan/build/hashwx-jit/seeds 16 65536
+~~~
+
+Transfer the seeds directory to the GPU host. Then:
+
+~~~bash
+./run-gpu-jit.sh /path/to/seeds /path/to/build/hashwx-jit 7
+~~~
+
+The runner compiles the std-only Rust bootstrap, calibrates the connected
+architecture, builds its cached native shell, runs ptxas once per new seed
+(CUBIN cached by seed/source/SM/compiler), patches the native SASS into that
+shell (separately cached), and validates every GPU output. Repeat runs re-use
+the calibration, compiled CUBINs, and patched binaries. All generated
+binaries and caches remain in the user-supplied build directory.
+
+### Direct-SASS emitter still needed
+
+This is a fully verified **IR → PTX → ptxas → native CUBIN → patched native
+shell** pipeline. Unlike the existing [HashX SM86 native SASS JIT](https://github.com/codeandsolder/challenge-solvers/pull/65),
+HashWX still invokes ptxas for each fresh program. The next milestone is
+**IR → encoded SASS directly in Rust**, reusing HashX's 64-bit arithmetic
+lowerings but extending its encoder with LDS/STS shared-memory instructions,
+branch offsets/reconvergence, register allocation, scheduling controls and
+per-architecture instruction fields. The proven patcher and automatic shell
+remove the CUBIN-format barrier, but do not yet make source-to-SASS JIT
+generation microsecond-fast.
