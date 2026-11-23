@@ -2,7 +2,6 @@
 //! The emitted programs are compiled using the same CUDA harness as the original fixture.
 
 use hashwx::{HashWx, Instruction, Op, ProgramSet};
-use std::fmt::Write as _;
 use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -11,7 +10,12 @@ use std::time::Instant;
 const CUDA_REFERENCE: &str = include_str!("../../fixtures/fixture.cuh");
 
 fn seed(index: u32) -> [u8; 32] {
-    std::array::from_fn(|position| (position as u8).wrapping_add((index as u8).wrapping_mul(53)))
+    let offset = index.to_le_bytes()[0].wrapping_mul(53);
+    let mut result = [0_u8; 32];
+    for (byte, position) in result.iter_mut().zip(0_u8..) {
+        *byte = position.wrapping_add(offset);
+    }
+    result
 }
 
 fn emit_instruction(instruction: Instruction, memory_phase: bool, out: &mut String) {
@@ -43,20 +47,26 @@ fn emit_instruction(instruction: Instruction, memory_phase: bool, out: &mut Stri
         Op::AddRor | Op::AddAsr | Op::AddLsr => format!("{shift}+{y}"),
         Op::SubRor | Op::SubAsr | Op::SubLsr => format!("{shift}-{y}"),
     };
-    writeln!(out, "r[{dst}]={value};").expect("write String");
+    out.push_str(&format!("r[{dst}]={value};\n"));
 }
 
-fn emit_cuda(program: &ProgramSet) -> String {
+fn emit_cuda(program: &ProgramSet) -> Result<String, Box<dyn std::error::Error>> {
     let (template_prefix, _) = CUDA_REFERENCE
         .split_once("for (unsigned rep=0;rep<4;++rep)")
-        .expect("reference must contain the register phase");
+        .ok_or("reference must contain the register phase")?;
     let template_suffix = &CUDA_REFERENCE[CUDA_REFERENCE
         .rfind("    auto lo=sip")
-        .expect("reference must contain final SipHash")..];
+        .ok_or("reference must contain final SipHash")?..];
     let mut out = template_prefix.to_owned();
 
-    let key_start = out.find("constexpr U64 k0=").expect("key declaration");
-    let key_end = key_start + out[key_start..].find(';').expect("key terminator") + 1;
+    let key_start = out
+        .find("constexpr U64 k0=")
+        .ok_or("key declaration not found")?;
+    let key_end = key_start
+        + out[key_start..]
+            .find(';')
+            .ok_or("key terminator not found")?
+        + 1;
     let [key0, key1] = program.hash_key();
     out.replace_range(
         key_start..key_end,
@@ -80,15 +90,17 @@ fn emit_cuda(program: &ProgramSet) -> String {
                 emit_instruction(instruction, memory_phase, &mut out);
             }
             if !subprogram.unconditional() {
-                writeln!(out, "if (r[{}]&32ULL) break;", subprogram.body()[0].dst())
-                    .expect("write String");
+                out.push_str(&format!(
+                    "if (r[{}]&32ULL) break;\n",
+                    subprogram.body()[0].dst()
+                ));
             }
             out.push_str("if (budget==0) break; --budget;\n}\n");
         }
         out.push_str("}\n");
     }
     out.push_str(template_suffix);
-    out
+    Ok(out)
 }
 
 fn emit_seed(
@@ -103,7 +115,7 @@ fn emit_seed(
     let generation_ms = t0.elapsed().as_secs_f64() * 1e3;
 
     let t1 = Instant::now();
-    let cuda = emit_cuda(&program);
+    let cuda = emit_cuda(&program)?;
     let source_ms = t1.elapsed().as_secs_f64() * 1e3;
     fs::write(directory.join("fixture.cuh"), cuda)?;
 
@@ -156,13 +168,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn emits_all_13_operations_in_both_phases() {
+    fn emits_all_13_operations_in_both_phases() -> Result<(), Box<dyn std::error::Error>> {
         // All generated subprogram instructions are rendered; no fallback path exists.
         // Exercise 64 unique deterministic seeds to cover every opcode.
         let mut seen = [false; 13];
         for index in 0..64 {
             let program = hashwx::generate(&seed(index));
-            let source = emit_cuda(&program);
+            let source = emit_cuda(&program)?;
             assert!(source.contains("auto lo=sip"));
             assert_eq!(source.matches("for (;;) {").count(), 64);
             for phase in 0..2 {
@@ -177,5 +189,6 @@ mod tests {
             }
         }
         assert!(seen.into_iter().all(|value| value));
+        Ok(())
     }
 }
