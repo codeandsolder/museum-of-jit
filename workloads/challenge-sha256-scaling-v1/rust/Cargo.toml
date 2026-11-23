@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-challenge-solvers = { git = "https://github.com/codeandsolder/challenge-solvers", rev = "766a21d2b52a682467f1a03857c435212924c2c2", default-features = false, features = ["std", "portable-simd", "compare-64bit"] }
+challenge-solvers = { git = "https://github.com/codeandsolder/challenge-solvers", rev = "766a21d2b52a682467f1a03857c435212924c2c2", default-features = false, features = ["std", "compare-64bit"] }
 libc = "0.2"
 sha2 = "0.11"
 
