@@ -1,0 +1,75 @@
+# CUDA 13.1 SM86 SASS comparison, same fixed HashWX program
+# Native branchless-shared kernels, 2 threads/block, 65536 nonces
+# Pitch2049: ~5.4–5.5 MH/s; pitch2056/2064: ~3.8–3.9 MH/s
+# All have 3 resident CTAs/SM, same 32,784/32,896/33,024 shared bytes per CTA (approximately)
+
+kernel=shape-branchless-shared
+  REG:52 STACK:0 SHARED:0 LOCAL:0 CONSTANT[0]:380 TEXTURE:0 SURFACE:0 SAMPLER:0
+sass_disassembly_lines=15508
+   2209 IMAD
+   1796 LOP3
+   1566 SHF
+    448 SEL
+    448 LDS
+    350 IADD3
+    320 LEA
+    305 STS
+     71 ISETP
+     71 BRA
+     65 BSYNC
+     65 BSSY
+      1 STG
+      1 LDG
+
+kernel=shape-branchless-shared-p2056
+  REG:40 STACK:0 SHARED:0 LOCAL:0 CONSTANT[0]:380 TEXTURE:0 SURFACE:0 SAMPLER:0
+sass_disassembly_lines=16180
+   2698 IMAD
+   1796 LOP3
+   1566 SHF
+    448 SEL
+    448 LDS
+    350 IADD3
+    320 LEA
+    153 STS
+     71 BRA
+     70 ISETP
+     65 BSYNC
+     65 BSSY
+      1 STG
+      1 LDG
+
+kernel=shape-branchless-shared-p2064
+  REG:40 STACK:0 SHARED:0 LOCAL:0 CONSTANT[0]:380 TEXTURE:0 SURFACE:0 SAMPLER:0
+sass_disassembly_lines=16180
+   2698 IMAD
+   1796 LOP3
+   1566 SHF
+    448 SEL
+    448 LDS
+    350 IADD3
+    320 LEA
+    153 STS
+     71 BRA
+     70 ISETP
+     65 BSYNC
+     65 BSSY
+      1 STG
+      1 LDG
+
+kernel=shape-shared
+  REG:48 STACK:0 SHARED:0 LOCAL:0 CONSTANT[0]:380 TEXTURE:0 SURFACE:0 SAMPLER:0
+sass_disassembly_lines=16372
+   2548 IMAD
+   1566 SHF
+   1442 LOP3
+    574 IADD3
+    448 LDS
+    320 LEA
+    305 STS
+    295 BRA
+    289 BSYNC
+    289 BSSY
+     70 ISETP
+      1 STG
+      1 LDG

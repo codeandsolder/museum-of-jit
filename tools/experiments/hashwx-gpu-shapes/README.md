@@ -103,3 +103,27 @@ including startup/compilation, solve latency, and correct difficulty search;
 record actual L1/L2 traffic, shared-memory bank conflicts, scoreboard stalls
 and clock/power counters. Do not interpret streaming cache bandwidth as
 dependent random-load throughput.
+
+### Why branch removal and scratch pitch matter
+
+The NVIDIA SASS comparison in logs/sass-compare-20261123.txt explains two
+otherwise surprising observations:
+
+- The original shared-scratch kernel has **295 BRA** instructions and
+  **289 BSSY/BSYNC pairs** in its static generated program. The branchless
+  form has **71 BRA** and **65 BSSY/BSYNC pairs**: **224 conditional read
+  branches and their reconvergence regions disappeared**. This is a
+  much larger effect than avoiding one simple branch in a hot scalar loop.
+- Increasing scratch pitch from 2049 to 2056 words reduces the reported
+  register allocation from 52 to 40, but adds **489 static IMAD**
+  instructions (2209 to 2698) while removing 152 STS instructions
+  (305 to 153). Both retain **3 resident CTAs/SM** at two threads/CTA.
+  Five interleaved 65,536-hash trials put pitch2049 around
+  **5.1–5.5 MH/s** and pitch2056 around **3.90–3.91 MH/s**.
+  The regression is accompanied by significant changes in compiler
+  instruction selection, **not just lower occupancy**. Attribution to
+  a specific shared-memory bank conflict would require profiler counters.
+
+An independently recompiled run from the exact checked-in source measured
+**5.463 MH/s** on the RTX 3080 for 65,536 hashes, with all 65,536 outputs
+oracle-verified (see logs/reproduction-20261123.log).
