@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.99"
 
 [dependencies]
-cranelift-codegen = "=0.137.1"
+cranelift-codegen = "=0.138.0"
 cranelift-frontend = "=0.137.1"
 cranelift-jit = "=0.137.1"
 cranelift-module = "=0.137.1"
