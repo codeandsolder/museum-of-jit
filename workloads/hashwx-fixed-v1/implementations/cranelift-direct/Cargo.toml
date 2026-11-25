@@ -8,6 +8,6 @@ rust-version = "1.99"
 cranelift-codegen = "=0.137.1"
 cranelift-frontend = "=0.137.1"
 cranelift-jit = "=0.137.1"
-cranelift-module = "=0.137.1"
+cranelift-module = "=0.138.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
