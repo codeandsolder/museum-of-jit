@@ -21,6 +21,18 @@
         "pyproject.toml"
       ],
       "automerge": false
+    },
+    {
+      "description": "Cranelift crates share public types and must be updated in lockstep",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchPackageNames": [
+        "/^cranelift-/"
+      ],
+      "groupName": "Cranelift monorepo",
+      "groupSlug": "cranelift-monorepo",
+      "automerge": false
     }
   ]
 }
