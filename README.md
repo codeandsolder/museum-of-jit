@@ -100,3 +100,11 @@ The result format is documented by `schema/result.schema.json`. A future Salad/f
 The first curated cold-storage run on an AMD EPYC 9655 lands in `results/epyc-9655-zen5-2026-10-31.json`: direct Rust/dynasm is 442.4 kH/s median, .NET 10.0.403 dynamic-pointer is 412.1 kH/s (93.1% of direct emission), and static C# is 290.2 kH/s. See `results/README.md` for accepted, rejected, and historical experiments.
 
 The reproducibly built CPython 3.15 tier-2 JIT was investigated and retired as a HashWX performance candidate: it regressed substantially relative to the same runtime with the JIT disabled, and both trailed direct native emission by orders of magnitude. The source, builder, and raw diagnostic measurements remain available; no noncanonical CPython measurement was added to the leaderboard. See [`results/diagnostics/README.md`](results/diagnostics/README.md) for the trace and policy experiments.
+
+## Licensing
+
+Code and Solder's original contributions are additionally available under
+either MIT or Apache-2.0, at your option. Imported or upstream-derived
+reference implementations retain their original licenses. See
+[third-party provenance](THIRD_PARTY.md), `LICENSE`, `LICENSE-MIT` and
+`LICENSE-APACHE`.
