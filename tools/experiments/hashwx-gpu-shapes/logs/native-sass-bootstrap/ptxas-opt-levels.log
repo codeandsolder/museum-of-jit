@@ -1,0 +1,20 @@
+=== O0 ===
+module,seed=seed-000,load_ms=0.47212,regs=39,static_shared=0,cubin_bytes=356256
+verified,seed=seed-000,count=463,median_ms=3.679200,mhs=0.1258
+verified,seed=seed-000,count=4096,median_ms=20.633633,mhs=0.1985
+verified,seed=seed-000,count=65536,median_ms=284.516357,mhs=0.2303
+=== O1 ===
+module,seed=seed-000,load_ms=0.37202,regs=46,static_shared=0,cubin_bytes=250784
+verified,seed=seed-000,count=463,median_ms=0.256000,mhs=1.8086
+verified,seed=seed-000,count=4096,median_ms=1.285120,mhs=3.1873
+verified,seed=seed-000,count=65536,median_ms=23.726080,mhs=2.7622
+=== O2 ===
+module,seed=seed-000,load_ms=0.45632,regs=80,static_shared=0,cubin_bytes=252448
+verified,seed=seed-000,count=463,median_ms=0.206720,mhs=2.2397
+verified,seed=seed-000,count=4096,median_ms=1.097728,mhs=3.7313
+verified,seed=seed-000,count=65536,median_ms=16.628736,mhs=3.9411
+=== O3 ===
+module,seed=seed-000,load_ms=0.36862,regs=80,static_shared=0,cubin_bytes=252448
+verified,seed=seed-000,count=463,median_ms=0.203680,mhs=2.2732
+verified,seed=seed-000,count=4096,median_ms=1.083392,mhs=3.7807
+verified,seed=seed-000,count=65536,median_ms=15.992832,mhs=4.0978

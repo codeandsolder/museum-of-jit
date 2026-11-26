@@ -1,0 +1,8 @@
+architecture=sm_120
+text_offset=1920
+text_bytes=291968
+info_offset=1652
+info_bytes=124
+exit_array_file_offset=1728
+exit_text_offset=64
+exit_text_offset=291696

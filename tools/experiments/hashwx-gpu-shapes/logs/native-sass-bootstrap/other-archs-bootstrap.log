@@ -1,0 +1,33 @@
+=== sm_89 offline native architecture bootstrap ===
+cache_hit=false arch=sm_89 text_bytes=291840 exits=[48, 291648]
+architecture=sm_89
+text_offset=1792
+text_bytes=291840
+info_offset=1208
+info_bytes=108
+exit_array_file_offset=1292
+exit_text_offset=48
+exit_text_offset=291648
+native opcode kinds 11
+=== sm_90 offline native architecture bootstrap ===
+cache_hit=false arch=sm_90 text_bytes=291968 exits=[64, 291696]
+architecture=sm_90
+text_offset=1664
+text_bytes=291968
+info_offset=1460
+info_bytes=120
+exit_array_file_offset=1532
+exit_text_offset=64
+exit_text_offset=291696
+native opcode kinds 13
+=== sm_120 offline native architecture bootstrap ===
+cache_hit=false arch=sm_120 text_bytes=291968 exits=[64, 291696]
+architecture=sm_120
+text_offset=1920
+text_bytes=291968
+info_offset=1652
+info_bytes=124
+exit_array_file_offset=1728
+exit_text_offset=64
+exit_text_offset=291696
+native opcode kinds 13

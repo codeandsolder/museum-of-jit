@@ -1,0 +1,26 @@
+CUDA_GPU name=NVIDIA GeForce RTX 3080 SMs=68 L2_KiB=5120
+GOLDEN_180_SEEDS_4_NONCES_ALL_MATCH
+STATIC_INTERPRETER blocks=34 lanes=4 hashes=62968 scratch_KiB=2177 ms=657.8860 MHs=0.095713 verified=136
+STATIC_INTERPRETER blocks=68 lanes=2 hashes=62968 scratch_KiB=2177 ms=438.8997 MHs=0.143468 verified=136
+STATIC_INTERPRETER blocks=68 lanes=4 hashes=125936 scratch_KiB=4354 ms=645.6776 MHs=0.195045 verified=272
+STATIC_INTERPRETER blocks=68 lanes=8 hashes=251872 scratch_KiB=8708 ms=1093.2898 MHs=0.230380 verified=544
+STATIC_INTERPRETER blocks=68 lanes=12 hashes=377808 scratch_KiB=13062 ms=1315.4557 MHs=0.287207 verified=816
+STATIC_INTERPRETER blocks=102 lanes=2 hashes=94452 scratch_KiB=3265 ms=443.3317 MHs=0.213050 verified=204
+STATIC_INTERPRETER blocks=102 lanes=3 hashes=141678 scratch_KiB=4898 ms=564.7756 MHs=0.250857 verified=306
+STATIC_INTERPRETER blocks=102 lanes=4 hashes=188904 scratch_KiB=6531 ms=767.0641 MHs=0.246269 verified=408
+STATIC_INTERPRETER blocks=102 lanes=6 hashes=283356 scratch_KiB=9796 ms=984.7179 MHs=0.287753 verified=612
+STATIC_INTERPRETER blocks=102 lanes=8 hashes=377808 scratch_KiB=13062 ms=1138.9685 MHs=0.331711 verified=816
+STATIC_INTERPRETER blocks=136 lanes=1 hashes=62968 scratch_KiB=2177 ms=290.8797 MHs=0.216474 verified=136
+STATIC_INTERPRETER blocks=136 lanes=2 hashes=125936 scratch_KiB=4354 ms=457.5927 MHs=0.275214 verified=272
+STATIC_INTERPRETER blocks=136 lanes=3 hashes=188904 scratch_KiB=6531 ms=656.7166 MHs=0.287649 verified=408
+STATIC_INTERPRETER blocks=136 lanes=4 hashes=251872 scratch_KiB=8708 ms=825.7625 MHs=0.305018 verified=544
+STATIC_INTERPRETER blocks=136 lanes=6 hashes=377808 scratch_KiB=13062 ms=1013.7294 MHs=0.372691 verified=816
+STATIC_INTERPRETER blocks=204 lanes=1 hashes=94452 scratch_KiB=3265 ms=300.2058 MHs=0.314624 verified=204
+STATIC_INTERPRETER blocks=204 lanes=2 hashes=188904 scratch_KiB=6531 ms=530.3578 MHs=0.356182 verified=408
+STATIC_INTERPRETER blocks=204 lanes=3 hashes=283356 scratch_KiB=9796 ms=730.1560 MHs=0.388076 verified=612
+STATIC_INTERPRETER blocks=272 lanes=1 hashes=125936 scratch_KiB=4354 ms=311.6099 MHs=0.404146 verified=272
+STATIC_INTERPRETER blocks=272 lanes=2 hashes=251872 scratch_KiB=8708 ms=574.2310 MHs=0.438625 verified=544
+STATIC_INTERPRETER blocks=340 lanes=1 hashes=157420 scratch_KiB=5442 ms=335.0726 MHs=0.469809 verified=340
+STATIC_INTERPRETER blocks=340 lanes=2 hashes=314840 scratch_KiB=10885 ms=609.6317 MHs=0.516443 verified=680
+STATIC_INTERPRETER blocks=512 lanes=1 hashes=237056 scratch_KiB=8196 ms=619.3069 MHs=0.382776 verified=512
+STATIC_INTERPRETER blocks=512 lanes=2 hashes=474112 scratch_KiB=16392 ms=1073.5818 MHs=0.441617 verified=1024

@@ -1,0 +1,8 @@
+architecture=sm_90
+text_offset=1664
+text_bytes=291968
+info_offset=1460
+info_bytes=120
+exit_array_file_offset=1532
+exit_text_offset=64
+exit_text_offset=291696

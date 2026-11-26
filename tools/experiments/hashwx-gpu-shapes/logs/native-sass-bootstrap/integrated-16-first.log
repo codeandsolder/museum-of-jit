@@ -1,0 +1,99 @@
+cache_hit=true arch=sm_86
+Generated native kernel calibration shell PTX: /var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-shell/shell.ptx, padding stores=18000
+cache_hit=false arch=sm_86 text_bytes=291840 exits=[48, 291648]
+jit_cache_hit=true seed=seed-000 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-000/kernel.cubin
+jit_cache_hit=true seed=seed-001 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-001/kernel.cubin
+jit_cache_hit=true seed=seed-002 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-002/kernel.cubin
+jit_cache_hit=true seed=seed-003 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-003/kernel.cubin
+jit_cache_hit=true seed=seed-004 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-004/kernel.cubin
+jit_cache_hit=true seed=seed-005 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-005/kernel.cubin
+jit_cache_hit=true seed=seed-006 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-006/kernel.cubin
+jit_cache_hit=true seed=seed-007 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-007/kernel.cubin
+jit_cache_hit=true seed=seed-008 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-008/kernel.cubin
+jit_cache_hit=true seed=seed-009 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-009/kernel.cubin
+jit_cache_hit=true seed=seed-010 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-010/kernel.cubin
+jit_cache_hit=true seed=seed-011 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-011/kernel.cubin
+jit_cache_hit=true seed=seed-012 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-012/kernel.cubin
+jit_cache_hit=true seed=seed-013 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-013/kernel.cubin
+jit_cache_hit=true seed=seed-014 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-014/kernel.cubin
+jit_cache_hit=true seed=seed-015 arch=sm_86
+native_patch_validated=true output=/var/lib/sentinelx/uploads/hashwx-direct-jit-20261123/fullrun/native-patched/seed-015/kernel.cubin
+module,seed=seed-000,load_ms=0.62193,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-000,count=463,median_ms=0.224256,mhs=2.0646
+verified,seed=seed-000,count=4096,median_ms=1.144832,mhs=3.5778
+verified,seed=seed-000,count=65536,median_ms=17.093632,mhs=3.8339
+module,seed=seed-001,load_ms=0.25951,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-001,count=463,median_ms=0.222208,mhs=2.0836
+verified,seed=seed-001,count=4096,median_ms=1.159168,mhs=3.5336
+verified,seed=seed-001,count=65536,median_ms=18.256960,mhs=3.5896
+module,seed=seed-002,load_ms=0.32592,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-002,count=463,median_ms=0.222208,mhs=2.0836
+verified,seed=seed-002,count=4096,median_ms=1.142784,mhs=3.5842
+verified,seed=seed-002,count=65536,median_ms=16.696159,mhs=3.9252
+module,seed=seed-003,load_ms=0.25771,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-003,count=463,median_ms=0.207872,mhs=2.2273
+verified,seed=seed-003,count=4096,median_ms=1.099776,mhs=3.7244
+verified,seed=seed-003,count=65536,median_ms=15.972352,mhs=4.1031
+module,seed=seed-004,load_ms=0.41382,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-004,count=463,median_ms=0.196608,mhs=2.3549
+verified,seed=seed-004,count=4096,median_ms=1.086464,mhs=3.7700
+verified,seed=seed-004,count=65536,median_ms=16.500736,mhs=3.9717
+module,seed=seed-005,load_ms=0.25641,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-005,count=463,median_ms=0.233472,mhs=1.9831
+verified,seed=seed-005,count=4096,median_ms=1.068032,mhs=3.8351
+verified,seed=seed-005,count=65536,median_ms=15.880192,mhs=4.1269
+module,seed=seed-006,load_ms=0.25331,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-006,count=463,median_ms=0.205824,mhs=2.2495
+verified,seed=seed-006,count=4096,median_ms=1.085440,mhs=3.7736
+verified,seed=seed-006,count=65536,median_ms=16.490496,mhs=3.9742
+module,seed=seed-007,load_ms=0.38052,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-007,count=463,median_ms=0.228352,mhs=2.0276
+verified,seed=seed-007,count=4096,median_ms=1.110016,mhs=3.6900
+verified,seed=seed-007,count=65536,median_ms=16.206528,mhs=4.0438
+module,seed=seed-008,load_ms=0.43062,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-008,count=463,median_ms=0.210944,mhs=2.1949
+verified,seed=seed-008,count=4096,median_ms=1.163392,mhs=3.5207
+verified,seed=seed-008,count=65536,median_ms=16.198656,mhs=4.0458
+module,seed=seed-009,load_ms=0.31012,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-009,count=463,median_ms=0.207872,mhs=2.2273
+verified,seed=seed-009,count=4096,median_ms=1.087488,mhs=3.7665
+verified,seed=seed-009,count=65536,median_ms=16.046080,mhs=4.0842
+module,seed=seed-010,load_ms=0.24881,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-010,count=463,median_ms=0.219136,mhs=2.1128
+verified,seed=seed-010,count=4096,median_ms=1.107968,mhs=3.6969
+verified,seed=seed-010,count=65536,median_ms=16.533632,mhs=3.9638
+module,seed=seed-011,load_ms=0.39182,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-011,count=463,median_ms=0.230400,mhs=2.0095
+verified,seed=seed-011,count=4096,median_ms=1.122304,mhs=3.6496
+verified,seed=seed-011,count=65536,median_ms=16.456703,mhs=3.9823
+module,seed=seed-012,load_ms=0.32772,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-012,count=463,median_ms=0.227328,mhs=2.0367
+verified,seed=seed-012,count=4096,median_ms=1.096704,mhs=3.7348
+verified,seed=seed-012,count=65536,median_ms=16.326656,mhs=4.0140
+module,seed=seed-013,load_ms=0.26101,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-013,count=463,median_ms=0.222208,mhs=2.0836
+verified,seed=seed-013,count=4096,median_ms=1.113984,mhs=3.6769
+verified,seed=seed-013,count=65536,median_ms=16.416033,mhs=3.9922
+module,seed=seed-014,load_ms=0.27271,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-014,count=463,median_ms=0.218112,mhs=2.1228
+verified,seed=seed-014,count=4096,median_ms=1.097728,mhs=3.7313
+verified,seed=seed-014,count=65536,median_ms=17.309696,mhs=3.7861
+module,seed=seed-015,load_ms=0.62953,regs=128,static_shared=0,cubin_bytes=294816
+verified,seed=seed-015,count=463,median_ms=0.229376,mhs=2.0185
+verified,seed=seed-015,count=4096,median_ms=1.094464,mhs=3.7425
+verified,seed=seed-015,count=65536,median_ms=16.139456,mhs=4.0606

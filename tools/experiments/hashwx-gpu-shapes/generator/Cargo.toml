@@ -1,0 +1,8 @@
+[package]
+name = "hashwx-cuda-fixture-gen"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+hashwx = { git = "https://github.com/codeandsolder/hashwx-rs", rev = "cbee7de3d3b69a6575861e015e1bc5697fdd27c5", default-features = false, features = ["native"] }

@@ -1,0 +1,73 @@
+# CUDA shared-memory scratchpad pitch/alignment sweep, all hashes oracle verified
+# PITCH_WORDS=2050
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 318.883 ms
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=1,spoiler=16400,samples=7,median_ms=1.23187196,rate_MHs=3.325021,verified=4096,min_ms=1.22777605,max_ms=1.48934400
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=2,spoiler=32800,samples=7,median_ms=1.36406398,rate_MHs=3.002792,verified=4096,min_ms=1.36294401,max_ms=1.57196796
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=3,spoiler=49200,samples=7,median_ms=1.64352000,rate_MHs=2.492212,verified=4096,min_ms=1.64249599,max_ms=1.85036802
+result,group=1,pitch=2050,shared_mode=1,count=4096,block=6,spoiler=98400,samples=7,median_ms=2.18931198,rate_MHs=1.870907,verified=4096,min_ms=2.18828797,max_ms=2.25072002
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=1,spoiler=16400,samples=7,median_ms=20.75443268,rate_MHs=3.157687,verified=65536,min_ms=20.09600067,max_ms=21.88435173
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=2,spoiler=32800,samples=7,median_ms=19.59526443,rate_MHs=3.344482,verified=65536,min_ms=19.17849541,max_ms=21.64441681
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=3,spoiler=49200,samples=7,median_ms=23.58169556,rate_MHs=2.779105,verified=65536,min_ms=23.36256027,max_ms=25.98707199
+result,group=1,pitch=2050,shared_mode=1,count=65536,block=6,spoiler=98400,samples=7,median_ms=31.90886307,rate_MHs=2.053849,verified=65536,min_ms=30.89100838,max_ms=33.62252808
+# PITCH_WORDS=2052
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 324.093 ms
+result,group=1,pitch=2052,shared_mode=1,count=4096,block=1,spoiler=16416,samples=7,median_ms=1.24211204,rate_MHs=3.297609,verified=4096,min_ms=1.23391998,max_ms=1.67020798
+result,group=1,pitch=2052,shared_mode=1,count=4096,block=2,spoiler=32832,samples=7,median_ms=1.36396801,rate_MHs=3.003003,verified=4096,min_ms=1.36192000,max_ms=1.43216002
+result,group=1,pitch=2052,shared_mode=1,count=4096,block=3,spoiler=49248,samples=7,median_ms=1.64249599,rate_MHs=2.493766,verified=4096,min_ms=1.64249599,max_ms=1.70176005
+result,group=1,pitch=2052,shared_mode=1,count=4096,block=6,spoiler=98496,samples=7,median_ms=2.18921590,rate_MHs=1.870990,verified=4096,min_ms=2.18822408,max_ms=2.25132799
+result,group=1,pitch=2052,shared_mode=1,count=65536,block=1,spoiler=16416,samples=7,median_ms=20.08764839,rate_MHs=3.262502,verified=65536,min_ms=19.15187263,max_ms=20.70473671
+result,group=1,pitch=2052,shared_mode=1,count=65536,block=2,spoiler=32832,samples=7,median_ms=19.61574364,rate_MHs=3.340990,verified=65536,min_ms=19.16105652,max_ms=20.54774475
+result,group=1,pitch=2052,shared_mode=1,count=65536,block=3,spoiler=49248,samples=7,median_ms=23.95136070,rate_MHs=2.736212,verified=65536,min_ms=23.34822464,max_ms=24.95897675
+result,group=1,pitch=2052,shared_mode=1,count=65536,block=6,spoiler=98496,samples=7,median_ms=31.31084824,rate_MHs=2.093076,verified=65536,min_ms=31.10604858,max_ms=32.72089767
+# PITCH_WORDS=2056
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 359.074 ms
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=1,spoiler=16448,samples=7,median_ms=1.23494399,rate_MHs=3.316750,verified=4096,min_ms=1.22880006,max_ms=1.45100796
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=2,spoiler=32896,samples=7,median_ms=1.37113595,rate_MHs=2.987304,verified=4096,min_ms=1.37011194,max_ms=1.43932796
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=3,spoiler=49344,samples=7,median_ms=1.64454401,rate_MHs=2.490660,verified=4096,min_ms=1.64352000,max_ms=2.11091208
+result,group=1,pitch=2056,shared_mode=1,count=4096,block=6,spoiler=98688,samples=7,median_ms=2.18931198,rate_MHs=1.870907,verified=4096,min_ms=2.18828797,max_ms=2.41459203
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=1,spoiler=16448,samples=7,median_ms=19.66489601,rate_MHs=3.332639,verified=65536,min_ms=19.14972878,max_ms=20.15436745
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=2,spoiler=32896,samples=7,median_ms=19.15904045,rate_MHs=3.420631,verified=65536,min_ms=19.15084839,max_ms=19.28268814
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=3,spoiler=49344,samples=7,median_ms=23.56531143,rate_MHs=2.781037,verified=65536,min_ms=23.15673637,max_ms=24.78489685
+result,group=1,pitch=2056,shared_mode=1,count=65536,block=6,spoiler=98688,samples=7,median_ms=31.58736038,rate_MHs=2.074754,verified=65536,min_ms=31.10284805,max_ms=33.95174408
+# PITCH_WORDS=2064
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 326.857 ms
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=1,spoiler=16512,samples=7,median_ms=1.23801601,rate_MHs=3.308519,verified=4096,min_ms=1.23289597,max_ms=1.30150402
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=2,spoiler=33024,samples=7,median_ms=1.37113595,rate_MHs=2.987304,verified=4096,min_ms=1.37011194,max_ms=1.43136001
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=3,spoiler=49536,samples=7,median_ms=1.64454401,rate_MHs=2.490660,verified=4096,min_ms=1.64249599,max_ms=2.05920005
+result,group=1,pitch=2064,shared_mode=1,count=4096,block=6,spoiler=99072,samples=7,median_ms=2.19027209,rate_MHs=1.870087,verified=4096,min_ms=2.18828797,max_ms=2.41152000
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=1,spoiler=16512,samples=7,median_ms=20.12057686,rate_MHs=3.257163,verified=65536,min_ms=20.03251266,max_ms=20.16547203
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=2,spoiler=33024,samples=7,median_ms=19.16825676,rate_MHs=3.418986,verified=65536,min_ms=19.15699196,max_ms=19.81952095
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=3,spoiler=49536,samples=7,median_ms=23.24684715,rate_MHs=2.819135,verified=65536,min_ms=23.15366364,max_ms=23.78358459
+result,group=1,pitch=2064,shared_mode=1,count=65536,block=6,spoiler=99072,samples=7,median_ms=31.91910362,rate_MHs=2.053190,verified=65536,min_ms=30.89407921,max_ms=33.56876755
+# PITCH_WORDS=2080
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 336.954 ms
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=1,spoiler=16640,samples=7,median_ms=1.23904002,rate_MHs=3.305785,verified=4096,min_ms=1.23391998,max_ms=1.33340800
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=2,spoiler=33280,samples=7,median_ms=1.97836804,rate_MHs=2.070393,verified=4096,min_ms=1.97734404,max_ms=2.17395210
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=3,spoiler=49920,samples=7,median_ms=1.65171194,rate_MHs=2.479851,verified=4096,min_ms=1.65068805,max_ms=2.11353588
+result,group=1,pitch=2080,shared_mode=1,count=4096,block=6,spoiler=99840,samples=7,median_ms=2.18931198,rate_MHs=1.870907,verified=4096,min_ms=2.18828797,max_ms=2.67139196
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=1,spoiler=16640,samples=7,median_ms=20.13695908,rate_MHs=3.254513,verified=65536,min_ms=20.09395218,max_ms=22.54844856
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=2,spoiler=33280,samples=7,median_ms=29.05292892,rate_MHs=2.255745,verified=65536,min_ms=28.63718414,max_ms=31.69712067
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=3,spoiler=49920,samples=7,median_ms=23.96159935,rate_MHs=2.735043,verified=65536,min_ms=23.16799927,max_ms=25.16064072
+result,group=1,pitch=2080,shared_mode=1,count=65536,block=6,spoiler=99840,samples=7,median_ms=31.71123123,rate_MHs=2.066649,verified=65536,min_ms=31.30873680,max_ms=32.73215866
+# PITCH_WORDS=2112
+    0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+ptxas info    : Used 40 registers, used 0 barriers, 380 bytes cmem[0]
+ptxas info    : Compile time = 340.979 ms
+result,group=1,pitch=2112,shared_mode=1,count=4096,block=1,spoiler=16896,samples=7,median_ms=1.22982395,rate_MHs=3.330558,verified=4096,min_ms=1.22368002,max_ms=1.38508797
+result,group=1,pitch=2112,shared_mode=1,count=4096,block=2,spoiler=33792,samples=7,median_ms=1.98950398,rate_MHs=2.058805,verified=4096,min_ms=1.98758399,max_ms=2.21183991
+result,group=1,pitch=2112,shared_mode=1,count=4096,block=3,spoiler=50688,samples=7,median_ms=3.14163208,rate_MHs=1.303781,verified=4096,min_ms=3.13753605,max_ms=5.20601606
+result,group=1,pitch=2112,shared_mode=1,count=4096,block=6,spoiler=101376,samples=7,median_ms=2.19030404,rate_MHs=1.870060,verified=4096,min_ms=2.18828797,max_ms=2.59699202
+result,group=1,pitch=2112,shared_mode=1,count=65536,block=1,spoiler=16896,samples=7,median_ms=20.11647987,rate_MHs=3.257826,verified=65536,min_ms=19.70688057,max_ms=20.19433594
+result,group=1,pitch=2112,shared_mode=1,count=65536,block=2,spoiler=33792,samples=7,median_ms=29.06521606,rate_MHs=2.254791,verified=65536,min_ms=28.63699150,max_ms=29.80966377
+result,group=1,pitch=2112,shared_mode=1,count=65536,block=3,spoiler=50688,samples=7,median_ms=47.69683075,rate_MHs=1.374012,verified=65536,min_ms=46.37270355,max_ms=48.82252884
+result,group=1,pitch=2112,shared_mode=1,count=65536,block=6,spoiler=101376,samples=7,median_ms=31.70508766,rate_MHs=2.067050,verified=65536,min_ms=31.30675125,max_ms=32.17062378

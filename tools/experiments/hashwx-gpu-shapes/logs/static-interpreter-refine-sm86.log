@@ -1,0 +1,42 @@
+# repeat=1
+CUDA_GPU name=NVIDIA GeForce RTX 3080 SMs=68 L2_KiB=5120
+GOLDEN_180_SEEDS_4_NONCES_ALL_MATCH
+STATIC_INTERPRETER blocks=204 lanes=4 hashes=377808 scratch_KiB=13062 ms=866.1781 MHs=0.436178 verified=816
+STATIC_INTERPRETER blocks=204 lanes=5 hashes=472260 scratch_KiB=16327 ms=943.7343 MHs=0.500416 verified=1020
+STATIC_INTERPRETER blocks=256 lanes=3 hashes=355584 scratch_KiB=12294 ms=747.2833 MHs=0.475836 verified=768
+STATIC_INTERPRETER blocks=256 lanes=4 hashes=474112 scratch_KiB=16392 ms=866.5768 MHs=0.547109 verified=1024
+STATIC_INTERPRETER blocks=272 lanes=3 hashes=377808 scratch_KiB=13062 ms=735.3276 MHs=0.513795 verified=816
+STATIC_INTERPRETER blocks=300 lanes=3 hashes=416700 scratch_KiB=14407 ms=774.7706 MHs=0.537837 verified=900
+STATIC_INTERPRETER blocks=320 lanes=3 hashes=444480 scratch_KiB=15367 ms=775.5798 MHs=0.573094 verified=960
+STATIC_INTERPRETER blocks=340 lanes=2 hashes=314840 scratch_KiB=10885 ms=604.6239 MHs=0.520720 verified=680
+STATIC_INTERPRETER blocks=340 lanes=3 hashes=472260 scratch_KiB=16327 ms=777.1880 MHs=0.607652 verified=1020
+STATIC_INTERPRETER blocks=400 lanes=2 hashes=370400 scratch_KiB=12806 ms=1022.8203 MHs=0.362136 verified=800
+STATIC_INTERPRETER blocks=400 lanes=1 hashes=185200 scratch_KiB=6403 ms=594.6404 MHs=0.311449 verified=400
+# repeat=2
+CUDA_GPU name=NVIDIA GeForce RTX 3080 SMs=68 L2_KiB=5120
+GOLDEN_180_SEEDS_4_NONCES_ALL_MATCH
+STATIC_INTERPRETER blocks=204 lanes=4 hashes=377808 scratch_KiB=13062 ms=859.2122 MHs=0.439714 verified=816
+STATIC_INTERPRETER blocks=204 lanes=5 hashes=472260 scratch_KiB=16327 ms=947.9509 MHs=0.498190 verified=1020
+STATIC_INTERPRETER blocks=256 lanes=3 hashes=355584 scratch_KiB=12294 ms=735.8253 MHs=0.483245 verified=768
+STATIC_INTERPRETER blocks=256 lanes=4 hashes=474112 scratch_KiB=16392 ms=870.1685 MHs=0.544851 verified=1024
+STATIC_INTERPRETER blocks=272 lanes=3 hashes=377808 scratch_KiB=13062 ms=735.5055 MHs=0.513671 verified=816
+STATIC_INTERPRETER blocks=300 lanes=3 hashes=416700 scratch_KiB=14407 ms=769.0049 MHs=0.541869 verified=900
+STATIC_INTERPRETER blocks=320 lanes=3 hashes=444480 scratch_KiB=15367 ms=775.9614 MHs=0.572812 verified=960
+STATIC_INTERPRETER blocks=340 lanes=2 hashes=314840 scratch_KiB=10885 ms=613.6789 MHs=0.513037 verified=680
+STATIC_INTERPRETER blocks=340 lanes=3 hashes=472260 scratch_KiB=16327 ms=767.5743 MHs=0.615263 verified=1020
+STATIC_INTERPRETER blocks=400 lanes=2 hashes=370400 scratch_KiB=12806 ms=1028.2577 MHs=0.360221 verified=800
+STATIC_INTERPRETER blocks=400 lanes=1 hashes=185200 scratch_KiB=6403 ms=606.2115 MHs=0.305504 verified=400
+# repeat=3
+CUDA_GPU name=NVIDIA GeForce RTX 3080 SMs=68 L2_KiB=5120
+GOLDEN_180_SEEDS_4_NONCES_ALL_MATCH
+STATIC_INTERPRETER blocks=204 lanes=4 hashes=377808 scratch_KiB=13062 ms=858.7885 MHs=0.439931 verified=816
+STATIC_INTERPRETER blocks=204 lanes=5 hashes=472260 scratch_KiB=16327 ms=947.5256 MHs=0.498414 verified=1020
+STATIC_INTERPRETER blocks=256 lanes=3 hashes=355584 scratch_KiB=12294 ms=732.3464 MHs=0.485541 verified=768
+STATIC_INTERPRETER blocks=256 lanes=4 hashes=474112 scratch_KiB=16392 ms=870.6482 MHs=0.544551 verified=1024
+STATIC_INTERPRETER blocks=272 lanes=3 hashes=377808 scratch_KiB=13062 ms=739.6368 MHs=0.510802 verified=816
+STATIC_INTERPRETER blocks=300 lanes=3 hashes=416700 scratch_KiB=14407 ms=769.8998 MHs=0.541239 verified=900
+STATIC_INTERPRETER blocks=320 lanes=3 hashes=444480 scratch_KiB=15367 ms=781.5727 MHs=0.568700 verified=960
+STATIC_INTERPRETER blocks=340 lanes=2 hashes=314840 scratch_KiB=10885 ms=616.5946 MHs=0.510611 verified=680
+STATIC_INTERPRETER blocks=340 lanes=3 hashes=472260 scratch_KiB=16327 ms=769.6297 MHs=0.613620 verified=1020
+STATIC_INTERPRETER blocks=400 lanes=2 hashes=370400 scratch_KiB=12806 ms=1028.9475 MHs=0.359979 verified=800
+STATIC_INTERPRETER blocks=400 lanes=1 hashes=185200 scratch_KiB=6403 ms=605.6540 MHs=0.305785 verified=400
