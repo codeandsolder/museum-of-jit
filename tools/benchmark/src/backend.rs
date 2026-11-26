@@ -1,7 +1,9 @@
 use std::{
     collections::BTreeMap,
-    env, fs,
-    io::{self, BufReader},
+    env,
+    fmt::Write as _,
+    fs,
+    io::{BufRead, BufReader},
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
@@ -18,8 +20,21 @@ use crate::{
 
 pub fn sha256(path: &Path) -> Result<String> {
     let mut digest = Sha256::new();
-    io::copy(&mut BufReader::new(fs::File::open(path)?), &mut digest)?;
-    Ok(format!("{:x}", digest.finalize()))
+    let mut reader = BufReader::new(fs::File::open(path)?);
+    loop {
+        let bytes = reader.fill_buf()?;
+        if bytes.is_empty() {
+            break;
+        }
+        digest.update(bytes);
+        let count = bytes.len();
+        reader.consume(count);
+    }
+    let mut hex = String::with_capacity(64);
+    for byte in digest.finalize() {
+        write!(hex, "{byte:02x}")?;
+    }
+    Ok(hex)
 }
 
 fn rooted(root: &Path, path: &Path) -> PathBuf {
@@ -738,6 +753,22 @@ pub fn prepare(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sha256_hashes_empty_and_multi_buffer_files() -> Result<()> {
+        let file = tempfile::NamedTempFile::new()?;
+        assert_eq!(
+            sha256(file.path())?,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        fs::write(file.path(), vec![b'a'; 1_000_000])?;
+        assert_eq!(
+            sha256(file.path())?,
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+        );
+        Ok(())
+    }
+
     #[test]
     fn cargo_artifacts_are_selected_by_identity() -> Result<()> {
         let stream = r#"{"reason":"compiler-artifact","target":{"name":"dep"},"executable":null}
