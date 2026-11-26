@@ -9,3 +9,12 @@ The first HashWX/HashX exhibit is derived from and compared against these upstre
 Recovered historical experiments under `archive/hashwx-fixed-v1/` were written while developing the HashWX implementation and are retained so benchmark conclusions remain auditable. Their generated instruction stream is normalized as `workloads/hashwx-fixed-v1/program.json`.
 
 See the upstream repositories for their original notices and licenses. The museum repository is distributed under LGPL-3.0-only; individual imported/reference components remain subject to their upstream terms where applicable.
+
+## License grant for original contributions
+
+Code and Solder's original contributions are additionally available under MIT
+OR Apache-2.0, at your option (see `LICENSE-MIT` and `LICENSE-APACHE`).
+The grant applies only to original work. It does not change the licenses of
+third-party or upstream-derived reference material, including recovered
+HashWX/HashX experiments. The existing LGPL license is retained for the
+combined repository pending precise provenance separation of the exhibits.
