@@ -25,7 +25,7 @@ jobs:
           - workloads/challenge-sha256-v1/implementations/rust-challenge-simd
           - workloads/hashwx-fixed-v1/implementations/cranelift-direct
           - workloads/hashwx-fixed-v1/implementations/rust-dynasm
-    uses: codeandsolder/rust-skills2/.github/workflows/strict-rust.yml@8e82916a91d94d82b6bb31bcdfc59af06953b839 # main
+    uses: codeandsolder/rust-skills2/.github/workflows/strict-rust.yml@2defd2ef97352d7a32cddf2dc6350d685f5ed3d4 # main
     with:
       working-directory: ${{ matrix.workspace }}
       cargo-args: "--locked --workspace --all-targets --all-features"
@@ -35,7 +35,7 @@ jobs:
 
   rust-tests:
     name: Maintained Rust workspace tests
-    uses: codeandsolder/ci-workflows/.github/workflows/rust-sccache.yml@2bf1fa8216c6b09836ea837d663ca616d0ec6427 # main
+    uses: codeandsolder/ci-workflows/.github/workflows/rust-sccache.yml@db22785ec97c653cf0ec96b6964ded8158436f3c # main
     with:
       command: |
         cargo test --locked --workspace --all-features --manifest-path tools/benchmark/Cargo.toml
